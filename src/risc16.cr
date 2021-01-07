@@ -1,20 +1,28 @@
 # https://user.eng.umd.edu/~blj/RiSC/RiSC-isa.pdf
-# runtime behavior: io, halting, interrupt mode, interrupt table ?
-# Indexing store expected memory location in LOC
-# Split program in memory section ? (with fill 0 in between ?)
-# More complex immediate: label+-offset, specify if rlative to pc or not (current default to absolute unless param to beq)
-
+# DONE # Indexing store expected memory location in LOC
+# DONE # More complex immediate: label+-offset, specify if rlative to pc or not (current default to absolute unless param to beq)
+# Data statements
 # Assembly time linking (mergeing multiples units and external references)
-# Loading address specified at assembly/linking time
+# # This needs:
+# # - statement for defining external symbol
+# # - a main unit (to put first)
+# # - Linking happen before solving units
+# # - Base-Address of all LOC in linked units are pushed as necessary before solving
+# # - Index of all units are fed the external index of referenced
+# # - An assembly time check at solving that verify that there are no arithmetic overflow when solving labels references (including for pseudi lli)
+# # # - Overflow check on final result after solving
+# # - Maybe a assembler entry point grabbing multiple files (sepcifying main unit)
+# # - Maybe a assembler statement asking to require another file as unit
 # Special RW: IO
-# Fault (bad address, write to r0) and interrupt (interrupt code added in memory protected area ?)
+# Fault (bad address, overflow, write to r0) and interrupt (interrupt code added in predefined memory protected area ?)
+# # This need to waste a register for storing the return address.
 # Now we have a "runtime" for the proc maybe we can make a micro kernel: system lib, syscall, runtime linking and loading of program with a more complex file structure.
-## Runtime linking would: loading a program and replacing external ref with those of a previously laoded library.
+# # Runtime linking would: loading a program and replacing external ref with those of a previously laoded library.
 # Program could be given an indicative memory section to sray in (wont be enforced).
 # Subdivision or ram in io, firmware (interrupts), kernel & syscall, and programsLlibs area.
 # Program could ask for a ram amount and a priority. Syscall would allow for kernel code to decide, with priority of which program to resume next.
-## Nothing would be safe without memory proptection but still fun.
-## The loaded code need to be aware that iy has a dynamic base_address and should probably keep it in a register.
+# # Nothing would be safe without memory proptection but still fun.
+# # The loaded code need to be aware that iy has a dynamic base_address and should probably keep it in a register.
 # Finally we would want a minimalistic stack based language.
 # Tool for editing, debuging, desassembling.
 module RiSC16
@@ -28,7 +36,7 @@ module RiSC16
   #not tested yet
   class VM
     property ram : Array(UInt16)
-    property registers = Array(UInt16).new REGISTER_COUNT - 1
+    property registers = Array(UInt16).new REGISTER_COUNT
     property pc = 0
     
     def initialize(ram_size)
@@ -43,7 +51,7 @@ module RiSC16
     end
 
     def step
-      instruction = ram[pc]
+      instruction = ram[@pc]
       opcode = ISA.from_value instruction >> 13
       case opcode
       when Add then registers[(instruction >> 10) & 0b111] = regsiters[(instruction >> 7) & 0b111] + registers[instruction 0b111]
@@ -51,14 +59,14 @@ module RiSC16
       when Nand then registers[(instruction >> 10) & 0b111] = ~(regsiters[(instruction >> 7) & 0b111] & registers[instruction 0b111])
       when Lui then registers[(instruction >> 10) & 0b111] = (instruction & 0b1111111111) << 6
       when Sw then ram[regsiters[(instruction >> 7) & 0b111] + (instruction & 0b111111) * ((instruction >> 6) & 1 ? -1 : 0)] = registers[(instruction >> 10) & 0b111]
-      when Beq then pc += (instruction & 0b111111) * ((instruction >> 6) & 1 ? -1 : 0) if regsiters[(instruction >> 10) & 0b111] == regsiters[(instruction >> 7) & 0b111]
+      when Beq then @pc += (instruction & 0b111111) * ((instruction >> 6) & 1 ? -1 : 0) if regsiters[(instruction >> 10) & 0b111] == regsiters[(instruction >> 7) & 0b111]
       when Jalr
-        registers[(instruction >> 10) & 0b111] = pc + 1
-        pc = regsiters[(instruction >> 7) & 0b111]
+        registers[(instruction >> 10) & 0b111] = @pc + 1
+        @pc = regsiters[(instruction >> 7) & 0b111]
       end
+      @pc += 1 unless opcode.jalr?
+      registers[0] = 0
     end
-    pc += 1 unless opcode.jalr?
-    registers[0] = 0
   end
 
   # Instruction set
@@ -142,6 +150,8 @@ module RiSC16
 
     # Represent an instruction in the program (as code).
     class Instruction < RiSC16::Instruction
+      # Address to resolve that must be added to the immediate when solving.
+      # Absolute unless op is beq, then relative to pc (so then relative to base_address).
       property label : String? = nil
 
       def self.parse(operation : ISA, parameters): self
@@ -161,23 +171,22 @@ module RiSC16
         end
       end  
 
-      def initialize(op : ISA, reg_a : UInt16 = 0_u16, reg_b : UInt16 = 0_u16, reg_c : UInt16 = 0_u16, immediate : UInt16 | String | Nil = nil)
-        if (immediate.is_a? UInt16)
-          super(op: op, reg_a: reg_a, reg_b: reg_b, reg_c: reg_c, immediate: immediate.as UInt16)
+      def initialize(op : ISA, reg_a : UInt16 = 0_u16, reg_b : UInt16 = 0_u16, reg_c : UInt16 = 0_u16, immediate : { String?, UInt16 } | Nil = nil)
+        if immediate
+          label, offset = immediate
+          super(op: op, reg_a: reg_a, reg_b: reg_b, reg_c: reg_c, immediate: offset)
+          @label = label
         else
           super(op: op, reg_a: reg_a, reg_b: reg_b, reg_c: reg_c)
-          @label = immediate
         end
       end
 
       def solve(base_address, indexes)
-        raise "Misaligned" if base_address.odd?
         @label.try do |label|
           if @op.beq?
-            @immediate = (indexes[label]?.try &.base_address! || raise "Unknown label '#{label}'") // 2
-            @immediate -= base_address // 2 + 1
+            @immediate += (indexes[label]?.try &.base_address! || raise "Unknown label '#{label}'") - base_address + 1
           else
-            @immediate = indexes[label]?.try &.base_address! || raise "Unknown label '#{label}'"
+            @immediate += indexes[label]?.try &.base_address! || raise "Unknown label '#{label}'"
           end
         end
         @label = nil
@@ -193,48 +202,42 @@ module RiSC16
 
       def assembly_size
         case operation
-        in PISA::Nop then 2
-        in PISA::Halt then 2
-        in PISA::Lli then 2
-        in PISA::Movi then 4
+        in PISA::Nop then 1
+        in PISA::Halt then 1
+        in PISA::Lli then 1
+        in PISA::Movi then 2
         end
       end
 
       def solve(base_address, indexes)
-        raise "Misaligned" if base_address.odd?
         case operation
         in PISA::Nop then [Instruction.new ISA::Add, reg_a: 0_u16 ,reg_b: 0_u16, reg_c: 0_u16]
-        in PISA::Halt then [Instruction.new ISA::Jalr, reg_a: 0_u16 , reg_b: 0_u16, immediate: 0xff_u16]
+        in PISA::Halt then [Instruction.new ISA::Jalr, reg_a: 0_u16 , reg_b: 0_u16, immediate: { nil, 0xff_u16}]
         in PISA::Lli
-          a,i = Assembler.parse_ri parameters
-          i = indexes[i]?.try &.base_address! || raise "Unknown label '#{i}'" if i.is_a? String
-          [Instruction.new ISA::Addi, reg_a: a, reg_b: a, immediate: i & 0x3f_u16]
+          a,immediate = Assembler.parse_ri parameters
+          label, offset = immediate
+          offset = offset + (label.try { |label| indexes[label]?.try &.base_address! || raise "Unknown label '#{label}'" } || 0_u16)
+          [Instruction.new ISA::Addi, reg_a: a, reg_b: a, immediate: { nil, offset & 0x3f_u16 } ]
         in PISA::Movi
-          a,i = Assembler.parse_ri parameters
-          i = indexes[i]?.try &.base_address! || raise "Unknown label '#{i}'" if i.is_a? String
-          [Instruction.new(ISA::Lui, reg_a: a, immediate: i),
-           Instruction.new(ISA::Addi, reg_a: a, reg_b: a, immediate: i & 0x3f_u16)]
+          a,immediate = Assembler.parse_ri parameters
+          label, offset = immediate
+          offset = offset + (label.try { |label| indexes[label]?.try &.base_address! || raise "Unknown label '#{label}'" } || 0_u16)
+          [Instruction.new(ISA::Lui, reg_a: a, immediate: { nil, offset >> 6 }),
+           Instruction.new(ISA::Addi, reg_a: a, reg_b: a, immediate: { nil, offset & 0x3f_u16 })]
         end
       end
     end
     
-    def self.parse_immediate(raw : String, signed): UInt16 | String
-      offset = /^(?<label>:[A-Z_][A-Z_0-9]*)|((?<mod>\+|-)?(?<base>0x|0b)?(?<offset>[A-F_0-9]+))$/i.match raw
-      raise "Bad immediate '#{raw}'" if offset.nil?
-      label = offset["label"]?
-      return label.lchop ':' if label
-      raise "No sign allowed here" if !signed && offset["mod"]?
-      mod = offset["mod"]? == "-" ? 1_u16 : 0_u16
-      case offset["base"]?.try &.downcase
-      when "0x" then base = 16
-      when "0b" then base = 2
-      else base = 10
-      end
-      if signed
-        (mod << 16) | offset["offset"].to_u16 base: base, underscore: true, prefix: true
-      else
-        offset["offset"].to_u16 base: base, underscore: true, prefix: true
-      end
+    def self.parse_immediate(raw : String): {String?, UInt16}
+      immediate = /^(?<label>:[A-Z_][A-Z_0-9]*)?((?<mod>\+|-)?(?<offset>(0x|0b|0)?[A-F_0-9]+))?$/i.match raw
+      raise "Bad immediate '#{raw}'" if immediate.nil?
+      label = immediate["label"]?.try &.lchop ':'
+      offset = immediate["offset"]?
+      raise "Invalid immediate '#{raw}'" unless label || offset
+      mod = immediate["mod"]? == "-" ? 1_u16 : 0_u16
+      offset = offset.try &.to_u16(underscore: true, prefix: true) || 0_u16
+      offset |= mod << 16 if offset != 0                        
+      { label, offset }
     end
       
     def self.parse_rrr(params)
@@ -248,14 +251,14 @@ module RiSC16
       arr = params.split /\s+/, remove_empty: true
       raise "Unexpected rri type parameters amount: found #{arr.size}, expected #{no_i ? 2 : 3}" unless arr.size == 3 || (no_i && arr.size == 2)
       arr = arr.map do |register| register.lchop?('r') || register end
-      { (arr[0].lchop?('r') || arr[0]).to_u16, (arr[1].lchop?('r') || arr[1]).to_u16, no_i ? 0_u16 : parse_immediate arr[2], signed: true }
+      { (arr[0].lchop?('r') || arr[0]).to_u16, (arr[1].lchop?('r') || arr[1]).to_u16, no_i ? { nil, 0_u16 } : parse_immediate arr[2] }
     end
     
     def self.parse_ri(params)
       arr = params.split /\s+/, remove_empty: true
       raise "Unexpected ri type parameters amount: found #{arr.size}, expected 2" unless arr.size == 2
       arr = arr.map do |register| register.lchop?('r') || register end
-      { (arr[0].lchop?('r') || arr[0]).to_u16, parse_immediate arr[1], signed: false }
+      { (arr[0].lchop?('r') || arr[0]).to_u16, parse_immediate arr[1] }
     end
 
     # Represent a line of code in a program.
@@ -283,7 +286,7 @@ module RiSC16
         @label = lm["label"]?  
         @comment = lm["comment"]?
         operation = lm["operation"]?
-        if operation                           
+        if operation
           parameters = lm["parameters"]? || ""
           if operation.starts_with? '.'
             @data = Data.parse operation.lchop, parameters
@@ -298,7 +301,7 @@ module RiSC16
       end
       
       def assembly_size
-        @data.try(&.assembly_size) || @pseudo.try(&.assembly_size) || @instructions.size * 2
+        @data.try(&.assembly_size) || @pseudo.try(&.assembly_size) || @instructions.size
       end
       
       def solve(indexes)
@@ -370,6 +373,12 @@ module RiSC16
           end
         end
       end
+
+      def write(io)
+        program.map(&.instructions).flatten.each do |it|
+          io.write_bytes it.word, IO::ByteFormat::BigEndian # it.word.to_io io, IO::ByteFormat::BigEndian
+        end
+      end
     end
   end
   
@@ -381,5 +390,8 @@ module RiSC16
   end
   unit.index
   unit.solve
-  unit.program.map(&.instructions).flatten.map(&.word)
+  output = File.open "a.out", mode: "w", encoding: "binary"
+  unit.write output
+  output.close
+  # load, step, debug
 end
