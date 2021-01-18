@@ -21,6 +21,11 @@ module RiSC16
         abort "Only one command can be specified. Previously set command: #{command}" unless command.nil?
         command = :assembly
       end
+
+      parser.on("run", "Assemble source file into a binary. This is the default command.") do
+        abort "Only one command can be specified. Previously set command: #{command}" unless command.nil?
+        command = :run
+      end
       
       parser.on("-h", "--help", "Show this help") { help = parser.to_s }
       parser.on("-v", "--version", "Display the current version") { version = "Version #{VERSION}" }
@@ -43,6 +48,19 @@ module RiSC16
 
     case command
     when :assembly then Assembler.assemble source_files, target_file, debug: debug_output
+    when :run
+      IO::Memory.new.tap do |target_buffer|
+        Assembler.assemble source_files, target_buffer, debug: debug_output
+        VM.new.tap do |vm|
+          vm.load target_buffer.tap &.rewind
+          loop do
+            STDIN.read_line
+            vm.dump
+            vm.step
+            break if vm.halted
+          end
+        end
+      end
     end
   end
   

@@ -217,15 +217,7 @@ module RiSC16
       @indexes = {} of String => Loc
     
       getter program
-      
-      def self.parse(io : IO)
-        new.tap do |unit|
-          unit.parse io
-          uint.index
-          unit.solve
-        end
-      end
-      
+            
       def initialize() end
 
       # Parse the diffrent lines of codes in the given io.
@@ -270,7 +262,7 @@ module RiSC16
 
       def write(io)
         program.map(&.instructions).flatten.each do |instruction|
-          instruction.encode.to_io io, IO::ByteFormat::BigEndian
+          instruction.encode.to_io io, IO::ByteFormat::LittleEndian
         end
       end
     end
@@ -284,8 +276,12 @@ module RiSC16
         end
         unit.index
         unit.solve
-        File.open target, mode: "w" do |output|
-          unit.write output
+        if target.is_a? String
+          File.open target, mode: "w" do |output|
+            unit.write output
+          end
+        else
+          unit.write target
         end
       end
     end
