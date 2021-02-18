@@ -22,7 +22,7 @@ module RiSC16
         command = :assembly
       end
 
-      parser.on("run", "Assemble source file into a binary. This is the default command.") do
+      parser.on("run", "Assemble source file into a binary and run it.") do
         abort "Only one command can be specified. Previously set command: #{command}" unless command.nil?
         command = :run
       end
@@ -50,13 +50,22 @@ module RiSC16
     when :assembly then Assembler.assemble source_files, target_file, debug: debug_output
     when :run
       IO::Memory.new.tap do |target_buffer|
-        Assembler.assemble source_files, target_buffer, debug: debug_output
+        unit = Assembler.assemble source_files, target_buffer, debug: debug_output
+        debug_info = unit.program.group_by &.base_address
         VM.new.tap do |vm|
           vm.load target_buffer.tap &.rewind
+          vm.dump_registers
           loop do
+            source = debug_info[vm.pc]?.try &.map do |loc|
+              loc.hint.try do |hint|
+                "#{loc.source} (#{hint})"
+              end || loc.source
+            end.join
+            puts source if source # pseudo instruction can mean that the same loc span over multiples instructions
+            vm.dump_instruction
             STDIN.read_line
-            vm.dump
             vm.step
+            vm.dump_registers
             break if vm.halted
           end
         end

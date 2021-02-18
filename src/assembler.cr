@@ -10,7 +10,7 @@ module RiSC16
     # Error emitted in case of error during assembly.
     class Exception < ::Exception
       def initialize(exception, @unit : String? = nil, @line : Int32? = nil)
-        super(exception)
+        super("Assembler stopped in unit #{@unit || "???"} at line #{@line || "???"}", cause: exception)
       end
     end
 
@@ -61,7 +61,7 @@ module RiSC16
  
       def solve(base_address, indexes)
         @complex_immediate.try do |complex|
-          @immediate = Assembler.solve_immediate complex, indexes, bits: (@op.jalr? ? 10 : 7), signed: !@op.jalr?, relative_to: (@op.beq? ? base_address : nil)
+          @immediate = Assembler.solve_immediate complex, indexes, bits: (@op.lui? ? 10 : 7), relative_to: (@op.beq? ? base_address : nil)
         end
       end
       
@@ -89,18 +89,29 @@ module RiSC16
         in PISA::Halt then [Instruction.new ISA::Jalr, reg_a: 0_u16 , reg_b: 0_u16, immediate: 1_u16 ]
         in PISA::Lli
             a,immediate = Assembler.parse_ri parameters
-            offset = Assembler.solve_immediate immediate, indexes, bits: 16, signed: true
+            offset = Assembler.solve_immediate immediate, indexes, bits: 16
             [Instruction.new ISA::Addi, reg_a: a, reg_b: a, immediate: offset & 0x3f_u16 ]
         in PISA::Movi
+            # TODO: if offset & 01111111 == 0 then the addi part is useless and it can be omitted.
             a,immediate = Assembler.parse_ri parameters
-            offset = Assembler.solve_immediate immediate, indexes, bits: 16, signed: true
+            offset = Assembler.solve_immediate immediate, indexes, bits: 16
             [Instruction.new(ISA::Lui, reg_a: a, immediate: offset >> 6),
              Instruction.new(ISA::Addi, reg_a: a, reg_b: a, immediate: offset & 0x3f_u16)]
         end
       end
+
+      # FIXME: this is subotptimal at best. we repeat the same operation that we did in solve.
+      def hint(base_address, indexes)
+        if operation == PISA::Movi
+          a,immediate = Assembler.parse_ri parameters
+          offset = Assembler.solve_immediate immediate, indexes, bits: 16
+          "lui r#{a} #{offset >> 6} ; addi r#{a} r#{a} #{offset & 0x3f_u16}"
+        end
+      end
     end
-   
-    def self.solve_immediate(immediate, indexes, bits, signed, relative_to = nil): UInt16
+
+    
+    def self.solve_immediate(immediate, indexes, bits, relative_to = nil): UInt16
       label, offset, is_negativ = immediate
       label_value =  label.try { |label| indexes[label]?.try &.base_address! || raise "Unknown label '#{label}'" } || 0_u16
       result = if relative_to
@@ -108,14 +119,11 @@ module RiSC16
         else
           label_value.to_i32 + (is_negativ ? -offset : offset)
       end
-      result = if signed
-        if result < 0
-          (-result - 1).to_u16 | 1 << (bits - 1)
-        else
-          result.to_u16
-        end
+      result = if result < 0
+         # Uncomment to disallow overflow (rotate otherwise). Usefull in case of programatic offset that could inadvertedly overflow
+         # raise "Immediate result #{result} complement two will overflow from store size of #{bits} bits" if -result > (2 ** (bits - 1))
+         ((2 ** bits) + result.bits(0...(bits- 1))).to_u16
       else
-        raise "Immediate result '#{result}' is illegal negative value" if result < 0
         result.to_u16
       end
       raise "Immediate result #{result} overflow from store size of #{bits} bits" if result & ~0 << bits != 0
@@ -167,6 +175,7 @@ module RiSC16
       property label : String? = nil
       property comment : String? = nil
       property base_address : UInt16? = nil
+      property hint : String? = nil
 
       def base_address!
         @base_address.not_nil!
@@ -199,6 +208,7 @@ module RiSC16
       def solve(indexes)
         @data.try &.solve base_address!, indexes
         @pseudo.try do |pseudo|
+          @hint = pseudo.hint base_address!, indexes
           @instructions = pseudo.solve base_address!, indexes
         end
         @instructions.each_with_index do |instruction, index|
@@ -228,7 +238,7 @@ module RiSC16
           begin
             @program << Loc.new source: line, file: name, line: i
           rescue ex
-            raise Exception.new ex.message, name, i
+            raise Exception.new ex, name, i
           end
           i += 1
         end
@@ -244,7 +254,7 @@ module RiSC16
             loc.label.try { |label| @indexes[label] = loc }
             i += loc.assembly_size.to_u16
           rescue ex
-            raise Exception.new ex.message, loc.file, loc.line
+            raise Exception.new ex, loc.file, loc.line
           end
         end
       end
@@ -255,7 +265,7 @@ module RiSC16
           begin
             loc.solve @indexes
           rescue ex
-            raise Exception.new ex.message, loc.file, loc.line
+            raise Exception.new ex, loc.file, loc.line
           end
         end
       end
@@ -275,7 +285,14 @@ module RiSC16
           unit.parse input
         end
         unit.index
-        unit.solve
+        begin 
+          unit.solve
+        rescue ex
+          puts ex
+          ex.cause.try do |cause|
+            raise cause
+          end
+        end
         if target.is_a? String
           File.open target, mode: "w" do |output|
             unit.write output

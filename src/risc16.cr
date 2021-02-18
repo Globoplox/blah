@@ -1,6 +1,8 @@
 # https://user.eng.umd.edu/~blj/RiSC/RiSC-isa.pdf
 # DONE # Indexing store expected memory location in LOC
 # DONE # More complex immediate: label+-offset
+# DONE: VM can do math
+# Debugging: decoding, desassembling, assembler hints
 # Data statements
 # Assembly time linking (mergeing multiples units and external references)
 # # This needs:
@@ -13,13 +15,18 @@
 # # # - Overflow check on final result after solving
 # # - Maybe a assembler entry point grabbing multiple files (sepcifying main unit)
 # # - Maybe a assembler statement asking to require another file as unit
+
 # Special RW: IO
+
 # Fault (bad address, overflow, write to r0) and interrupt (interrupt code added in predefined memory protected area ?)
-# # This need to waste a register for storing the return address.
+# Process: in case of fault: switch ram for rom microcode and pc to special microcode-pc (init pc depending on fault)
+#                            
+
 # Now we have a "runtime" for the proc maybe we can make a micro kernel: system lib, syscall, runtime linking and loading of program with a more complex file structure.
 # # Runtime linking would: loading a program and replacing external ref with those of a previously laoded library.
 # Program could be given an indicative memory section to sray in (wont be enforced).
-# Subdivision or ram in io, firmware (interrupts), kernel & syscall, and programsLlibs area.
+# Subdivision of ram in io, firmware (interrupts), kernel & syscall, and programsLlibs area. (split userland in program, sinlib, stack, and dyn mem alloc)
+#  kernal keep a table of libs, and a table of process (stack). 
 # Program could ask for a ram amount and a priority. Syscall would allow for kernel code to decide, with priority of which program to resume next.
 # # Nothing would be safe without memory proptection but still fun.
 # # The loaded code need to be aware that iy has a dynamic base_address and should probably keep it in a register.
@@ -71,7 +78,6 @@ module RiSC16
         raise "Immediate overflow #{@immediate.to_s base: 16} for #{@op}" if @immediate > ~(~0 << 10)
         instruction |= ((@reg_a & 0b111) << 10) | (@immediate & 0b_11_1111_1111)
       end
-      pp "#{@op.value.to_s base: 2}(#{(@reg_a & 0b111).to_s base: 2},#{@reg_b.to_s base: 2},#{@reg_c.to_s base: 2},#{@immediate.to_s base: 2}) = 0b#{instruction.to_s base: 2}"
       instruction
     end
 
