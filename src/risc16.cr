@@ -63,7 +63,6 @@ module RiSC16
     getter immediate : UInt16
     
     def initialize(@op, @reg_a = 0_u16, @reg_b = 0_u16, @reg_c = 0_u16, @immediate = 0_u16)
-      pp "#{@op.value.to_s base: 2}(#{(@reg_a & 0b111).to_s base: 2},#{@reg_b.to_s base: 2},#{@reg_c.to_s base: 2},#{@immediate.to_s base: 2})"
     end
 
     def encode
