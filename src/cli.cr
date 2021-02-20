@@ -1,15 +1,16 @@
 require "option_parser"
 require "./assembler"
 require "./vm"
+require "./debugger"
 
 module RiSC16
 
   module CLI
     run_vm = false
     vm_ram = VM::DEFAULT_RAM_SIZE
-    target_file = "./a.out"
+    DEFAULT_TARGET = "./a.out"
+    target_file = nil
     source_files = [] of String
-    debug_output = false
     command = nil
     help = nil
     version = nil
@@ -26,12 +27,16 @@ module RiSC16
         abort "Only one command can be specified. Previously set command: #{command}" unless command.nil?
         command = :run
       end
+
+      parser.on("debug", "Assemble source file into a binary and run it.") do
+        abort "Only one command can be specified. Previously set command: #{command}" unless command.nil?
+        command = :debug
+      end
       
       parser.on("-h", "--help", "Show this help") { help = parser.to_s }
       parser.on("-v", "--version", "Display the current version") { version = "Version #{VERSION}" }
       parser.on("-o FILENAME", "--output=FILENAME", "The output file. Created or overwriten. Default to 'a.out'.") { |filename| target_file = filename }
       parser.on("-m SIZE", "--memory=SIZE", "VM Ram Size. RAM allocated to the VM.") { |ram| vm_ram = ram.to_i16 prefix: true, underscore: true }
-      parser.on("-d", "--debug", "Enable debug output.") { |ram| debug_output = true }
       parser.unknown_args do |filenames, parameters|
         source_files = filenames
       end
@@ -47,21 +52,24 @@ module RiSC16
     abort "No command given." unless command || help || version
 
     case command
-    when :assembly then Assembler.assemble source_files, target_file, debug: debug_output
+    when :assembly then Assembler.assemble source_files, (target_file || DEFAULT_TARGET).as(String)
+    when :debug
+      begin
+        buffer = IO::Memory.new
+        unit = target_file.try do |target_file|
+          File.open target_file, "w" do |file|
+            Assembler.assemble source_files, IO::MultiWriter.new file, buffer
+          end
+        end || Assembler.assemble source_files, buffer
+        Debugger.new unit, buffer.rewind
+      end.run
     when :run
       IO::Memory.new.tap do |target_buffer|
-        unit = Assembler.assemble source_files, target_buffer, debug: debug_output
-        debug_info = unit.program.group_by &.base_address
+        unit = Assembler.assemble source_files, target_buffer
         VM.new.tap do |vm|
           vm.load target_buffer.tap &.rewind
           vm.dump_registers
           loop do
-            source = debug_info[vm.pc]?.try &.map do |loc|
-              loc.hint.try do |hint|
-                "#{loc.source} (#{hint})"
-              end || loc.source
-            end.join
-            puts source if source # pseudo instruction can mean that the same loc span over multiples instructions
             vm.dump_instruction
             STDIN.read_line
             vm.step
