@@ -23,11 +23,6 @@ module RiSC16
         command = :assembly
       end
 
-      parser.on("run", "Assemble source file into a binary and run it.") do
-        abort "Only one command can be specified. Previously set command: #{command}" unless command.nil?
-        command = :run
-      end
-
       parser.on("debug", "Assemble source file into a binary and run it.") do
         abort "Only one command can be specified. Previously set command: #{command}" unless command.nil?
         command = :debug
@@ -63,21 +58,6 @@ module RiSC16
         end || Assembler.assemble source_files, buffer
         Debugger.new unit, buffer.rewind
       end.run
-    when :run
-      IO::Memory.new.tap do |target_buffer|
-        unit = Assembler.assemble source_files, target_buffer
-        VM.new.tap do |vm|
-          vm.load target_buffer.tap &.rewind
-          vm.dump_registers
-          loop do
-            vm.dump_instruction
-            STDIN.read_line
-            vm.step
-            vm.dump_registers
-            break if vm.halted
-          end
-        end
-      end
     end
   end
   

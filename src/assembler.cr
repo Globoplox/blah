@@ -3,7 +3,6 @@ require "./risc16"
 module RiSC16
 
   # Assembler namespace.
-  # Holds various parsing helper function.
   module Assembler
     extend self
 
@@ -14,6 +13,7 @@ module RiSC16
       end
     end
 
+    # Parse an immediate specification.
     def self.parse_immediate(raw : String): Complex
       immediate = /^(?<label>:[A-Z_][A-Z_0-9]*)?((?<mod>\+|-)?(?<offset>(0x|0b|(0))?[A-F_0-9]+))?$/i.match raw
       raise "Bad immediate '#{raw}'" if immediate.nil?
@@ -23,7 +23,8 @@ module RiSC16
       offset = offset.try &.to_i32(underscore: true, prefix: true) || 0
       Complex.new label, offset, immediate["mod"]? == "-" && offset != 0
     end
-          
+
+    # Parse RRR type parameters.
     def self.parse_rrr(params)
       arr = params.split /\s+/, remove_empty: true
       raise "Unexpected rrr parameters amount: found #{arr.size}, expected 3" unless arr.size == 3
@@ -31,13 +32,15 @@ module RiSC16
       { arr[0].to_u16, arr[1].to_u16, arr[2].to_u16 }
     end
     
+    # Parse RRI type parameters.
     def self.parse_rri(params, no_i = false)
       arr = params.split /\s+/, remove_empty: true
       raise "Unexpected rri type parameters amount: found #{arr.size}, expected #{no_i ? 2 : 3}" unless arr.size == 3 || (no_i && arr.size == 2)
       arr = arr.map do |register| register.lchop?('r') || register end
       { (arr[0].lchop?('r') || arr[0]).to_u16, (arr[1].lchop?('r') || arr[1]).to_u16, no_i ? Complex.new(nil, 0, false) : parse_immediate arr[2] }
     end
-    
+
+    # Parse RT type parameters.
     def self.parse_ri(params)
       arr = params.split /\s+/, remove_empty: true
       raise "Unexpected ri type parameters amount: found #{arr.size}, expected 2" unless arr.size == 2
@@ -45,12 +48,17 @@ module RiSC16
       { (arr[0].lchop?('r') || arr[0]).to_u16, parse_immediate arr[1] }
     end
 
+    # Represent any kind of meaningful statement that need further processing.
     module Statement
+      # Perform check and prepare for writing.
       abstract def solve(base_address, indexes)
+      # Write the statement equivalent bitcode to io.
       abstract def write(io)
+      # Return the expected size in words of the bitcode.
       abstract def stored    
     end
 
+    # Represent an immediate statement.
     class Complex
       property label : String?
       property offset : Int32
@@ -79,7 +87,7 @@ module RiSC16
       
     end
     
-    # Represent an instruction in the program (as code).
+    # Represent an instruction in the program.
     class Instruction < RiSC16::Instruction
       include Statement
       property complex_immediate : Complex? = nil
@@ -118,7 +126,7 @@ module RiSC16
       
     end
     
-    # A pseudo instruction
+    # Represent a pseudo instruction.
     class Pseudo
       include Statement
       property operation : PISA
@@ -170,20 +178,13 @@ module RiSC16
     # Represent a line of code in a program.
     # A line can hold various combinaisons of elements:
     # comment, label, a data statement, an instruction or a pseudo-instruction.
-    # Base address represent the address at which the hypothetical data or instruction would be stored in memory.
     class Loc
       property source : String
       property file : String? = nil
       property line : Int32? = nil
       property label : String? = nil
       property comment : String? = nil
-
       property statement : Statement? = nil
-      
-      def base_address!
-        @base_address.not_nil!
-      end
-
 
       def initialize(@source, @file = nil, @line = nil)
       end
@@ -218,13 +219,13 @@ module RiSC16
     end
 
     # Represent a collection of line of code.
-    # Maybe will support a kind of linking.
-    # Line of codes can references each others in the same unit.
-    # Currently an unit assume it is loaded at 0.
+    # Statements can references each others in the same unit.
+    # An unit assume it will be loaded at 0.
     class Unit
       @program = [] of Loc
       @indexes = {} of String => {loc: Loc, address: UInt16}
       getter program
+      getter indexes
             
       def error(cause, name, line)
         Exception.new name, line, cause
@@ -279,6 +280,7 @@ module RiSC16
       
     end
 
+    # Read the sources files, assemble them and write the result to target. 
     def self.assemble(sources, target)
       raise "No source file provided" unless sources.size > 0
       raise "Providing mutliples sources file is not supported yet." if sources.size > 1

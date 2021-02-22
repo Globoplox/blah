@@ -44,8 +44,6 @@ module RiSC16
     end
 
     def imm_7
-      #(@instruction & 0b111111) | ((@instruction & (1 << 6)) << 9)
-      # not good
       if (@instruction & 0b1_000_000 != 0)
         ((2_u32 ** 16) - ((2 ** 7) - (@instruction & 0b1111111))).bits(0...16).to_u16
       else
@@ -77,15 +75,6 @@ module RiSC16
       @pc += 1 unless opcode.jalr?
       registers[0] = 0
       @halted
-    end
-
-    def dump_instruction(io = STDIN)
-      io.puts "Next instruction: 0x#{@pc.to_s(base:16).rjust(4, '0')}: 0b#{ram[pc].to_s(base:2).rjust(16, '0')}"
-    end
-
-    def dump_registers(io = STDIN)
-      io.puts "Registers: #{registers.map do |r| "0x" + r.to_s(base:16).rjust(4, '0') end}"
-    end
-    
+    end    
   end
 end

@@ -1,26 +1,33 @@
 # blah
 
-Pet project where I intend to write a complete "usable" computer from as scratch as possible.
-Currently I'm writing a compiler and vm for an assembly like language that I hope is simple enough for me to be able to write a processor for.
+Pet project where I intend to write a complete usable computer from as scratch as possible.
+Based on the [RiSC16 ISA](# https://user.eng.umd.edu/~blj/RiSC/RiSC-isa.pdf).
+Written in crystal because it rule.
 
-TODO:
-- Write a LL parser builder
-- Update compiler to use it instead of nasty regex
-- Add sugar to he compiler: jump_eq & cie, data directive, address loading directive
-- Make compiler output linkable object
-- Add a simple linker
-- Write the assembler
-- Write the VM
+## Components
 
-## Grammer
+### Assembler
 
-Line = (Directive | Instruction)? + Comment?
-Instruction = label? opcode (arg(, arg)?)?
-Register = ...
-Location = (:label)?(+-)?(Ox|Ob)?(num)
+### VM
 
-aditional opcodes:
-jump_* to easy jump
-goto to easy set ip
+### Debugger
 
-call and return are meta instrcution that creates stack frames. Need to reserve on of r* as stack pointer
+### CLI
+
+## Roadmap
+- [x] Write an assembler able to ouput raw bitcode
+  - [ ] Data statements
+  - [ ] Static linking
+- [x] Write a dummy virtual machine that can execute this raw bitcode
+  - [ ] IO
+  - [ ] Write a program that do something
+- [x] Write a bunch of comfort utilities (CLI, barebone Debugger)
+- [ ] Design and write a compiler for a small stack language
+  - [ ] Write a bunch of utility functions (basic math)
+- [ ] Write an OS
+  - [ ] Load another program
+  - [ ] Handle syscalls and barebone scheduler 
+  - [ ] Syscall
+  - [ ] Memory management
+  - [ ] Create a more fleshed out executable file format
+  - [ ] Dynamic librairies and linking
