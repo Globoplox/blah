@@ -75,8 +75,6 @@ module RiSC16
                    label_value.to_i32 + (@complement ? -@offset : @offset)
                  end
         result = if result < 0
-                   # Uncomment to disallow overflow (rotate otherwise). Usefull in case of programatic offset that could inadvertedly overflow
-                   # raise "Immediate result #{result} complement two will overflow from store size of #{bits} bits" if -result > (2 ** (bits - 1))
                    ((2 ** bits) + result.bits(0...(bits- 1))).to_u16
                  else
                    result.to_u16
@@ -168,12 +166,71 @@ module RiSC16
              Instruction.new(ISA::Addi, reg_a: a, reg_b: a, immediate: offset & 0x3f_u16)]
         end
       end
-
+      
       def write(io)
         @instructions.each &.write io
       end
+    end
 
-    end    
+      # Represent a pseudo instruction.
+    abstract class Data
+      include Statement
+
+      class Word < Data
+        @complex : Complex
+        @word : UInt16 = 0
+        def initialize(parameters)
+          @complex = Assembler.parse_immediate parameters
+        end
+        
+        def stored
+          1
+        end
+
+        def solve(base_address, indexes)
+          @word = @complex.solve indexes, bits: 16
+        end
+
+        def write(io)
+          @word.to_io io, IO::ByteFormat::LittleEndian
+        end
+      end
+
+      class Ascii < Data
+        @bytes : Bytes
+        
+        def initialize(parameters)
+          raise "String is not ascii only" unless parameters.ascii_only?
+          match = /^"(?<str>.*)"$/.match parameters.strip
+          raise "Bad parameter for string data statement: '#{parameters}'" unless match
+          str = match["str"]
+          str = str.gsub /[^\\]\\\\/ { "/" }
+          str = str.gsub /\\n/ { "\n" }
+          str = str.gsub /\\0/ { "\0" }
+          @bytes = str.to_slice
+        end
+        
+        def stored
+          (@bytes.size / 2).ceil.to_u16
+        end
+
+        def solve(base_address, indexes)
+        end
+
+        def write(io)
+          io.write @bytes
+          0u8.to_io io, IO::ByteFormat::LittleEndian if @bytes.size.odd?
+        end
+      end
+      
+      def self.new(operation, parameters)
+        case operation
+        when ".word" then Word.new parameters
+        when ".ascii" then Ascii.new parameters
+        end
+      end
+
+    end  
 
     # Represent a line of code in a program.
     # A line can hold various combinaisons of elements:
@@ -202,6 +259,8 @@ module RiSC16
             @statement = Instruction.parse ISA.parse(operation), parameters
           elsif Pseudo::PISA.names.map(&.downcase).includes? operation
             @statement = Pseudo.new Pseudo::PISA.parse(operation), parameters
+          elsif operation.starts_with? '.'
+            @statement = Data.new operation, parameters
           else
             raise "Unknown operation '#{operation}'"
           end

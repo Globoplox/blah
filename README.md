@@ -16,7 +16,8 @@ Written in crystal because it rule.
 
 ## Roadmap
 - [x] Write an assembler able to ouput raw bitcode
-  - [ ] Data statements
+  - [x] Data statements
+  - [x] Basic math in offset (absolute difference between offset for data sizes)
   - [ ] Static linking
 - [x] Write a dummy virtual machine that can execute this raw bitcode
   - [ ] IO
