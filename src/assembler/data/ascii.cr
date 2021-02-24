@@ -26,10 +26,3 @@ class RiSC16::Assembler::Data::Ascii < RiSC16::Assembler::Data
     0u8.to_io io, IO::ByteFormat::LittleEndian if @bytes.size.odd?
   end
 end
-
-def self.new(operation, parameters)
-  case operation
-  when ".word" then Word.new parameters
-  when ".ascii" then Ascii.new parameters
-  end
-end
