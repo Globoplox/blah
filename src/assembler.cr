@@ -9,7 +9,7 @@ module RiSC16
     # Error emitted in case of error during assembly.
     class Exception < ::Exception
       def initialize(@unit : String?, @line : Int32?, cause)
-        super("Assembler stopped in unit #{@unit || "???"} at line #{@line || "???"}", cause: cause)
+        super("Assembler stopped in unit #{@unit || "???"} at line #{@line || "???"}: \n\t#{cause.message}", cause: cause)
       end
     end
 
@@ -344,22 +344,11 @@ module RiSC16
       raise "No source file provided" unless sources.size > 0
       raise "Providing mutliples sources file is not supported yet." if sources.size > 1
       Assembler::Unit.new.tap do |unit|
-
         File.open sources.first, mode: "r" do |input| 
           unit.parse input, name: sources.first
         end
-
         unit.index
-
-        begin 
-          unit.solve
-        rescue ex
-          puts ex
-          ex.cause.try do |cause|
-            raise cause
-          end
-        end
-
+        unit.solve
         if target.is_a? String
           File.open target, mode: "w" do |output|
             unit.write output
