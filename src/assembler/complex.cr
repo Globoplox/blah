@@ -17,7 +17,7 @@ class RiSC16::Assembler::Complex
                label_value.to_i32 + (@complement ? -@offset : @offset)
              end
     result = if result < 0
-               ((2 ** bits) + result.bits(0...(bits- 1))).to_u16
+               ((2 ** bits) + result.bits(0...(bits - 1))).to_u16
              else
                result.to_u16
              end

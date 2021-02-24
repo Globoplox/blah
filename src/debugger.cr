@@ -3,25 +3,21 @@ require "ncurses"
 
 module RiSC16
 
-  # A simple debugger that features:
-  # - Sources digging
-  # - Ram & registers dumps
-  # - step by step running
-  # TODO: breakpoints
   class Debugger
 
     @unit : Assembler::Unit
+    @input = IO::Memory.new
+    @output = IO::Memory.new
     @vm : VM
     @locs : Hash(UInt16, Array(Assembler::Loc))
     @cursor = 0
     
     def initialize(@unit, io)
-      @vm = VM.new.tap &.load io
+      @vm = VM.new(io: [VM::MMIO.new(@input, @output)]).tap &.load io
       @locs = {} of UInt16 => Array(Assembler::Loc)
       unit.each_with_address do |address, loc|
         (@locs[address] = @locs[address]? || [] of Assembler::Loc).push loc
       end
-      #pp @locs
     end
 
     def run
@@ -36,13 +32,7 @@ module RiSC16
         loop do
           code
           registers
-        
-          NCurses::Window.subwin x: (NCurses.maxx / 2).ceil, y: (NCurses.maxy / 2).floor, height: (NCurses.maxy / 2).ceil, width: NCurses.maxx / 2, parent: NCurses.stdscr do |idk|
-            idk.border
-            idk.mvaddstr("Press any key!", x: 1, y: 1)
-            idk.mvaddstr("I'm a subwindow", x: 1, y: 2)
-            idk.refresh
-          end
+          io
           
           case NCurses.getch
           when 'q', NCurses::KeyCode::ESC then break
@@ -73,7 +63,6 @@ module RiSC16
         real_index = 0
         cursor_index = 0
         @cursor = 0 if @cursor < 0
-        #@cursor = h - 3 if @cursor >= h - 3
         while index < h - 2
         pc = (real_index - (h - 2) // 2) + @vm.pc
           
@@ -124,10 +113,17 @@ module RiSC16
         end
         w.refresh
       end
-      
     end
-      
+
+    def io
+      NCurses::Window.subwin x: (NCurses.maxx / 2).ceil, y: (NCurses.maxy / 2).floor, height: (NCurses.maxy / 2).ceil, width: NCurses.maxx / 2, parent: NCurses.stdscr do |io|
+        io.border
+        @output.rewind
+        text = @output.gets_to_end
+        io.mvaddstr(text, x: 1, y: 1)
+        io.refresh
+      end
+    end
     
-  end
-  
+  end  
 end

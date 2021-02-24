@@ -28,8 +28,8 @@ class RiSC16::Assembler::Loc
       parameters = lm["parameters"]? || ""
       if ISA.names.map(&.downcase).includes? operation
         @statement = Instruction.parse ISA.parse(operation), parameters
-      elsif Pseudo::PISA.names.map(&.downcase).includes? operation
-        @statement = Pseudo.new Pseudo::PISA.parse(operation), parameters
+      elsif Pseudo::OPERATIONS.includes? operation
+        @statement = Pseudo.new operation, parameters
       elsif operation.starts_with? '.'
         @statement = Data.new operation, parameters
       else

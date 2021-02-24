@@ -13,6 +13,7 @@ module RiSC16
   REGISTER_COUNT = 8
   MAX_MEMORY_SIZE = 1 + UInt16::MAX # In word. Ram address words.
   DEFAULT_RAM_START = 0u16
+  MAX_IMMEDIATE = 0b1111111u16
   
   # Instruction set as per [RiSC16 ISA](# https://user.eng.umd.edu/~blj/RiSC/RiSC-isa.pdf).
   enum ISA
