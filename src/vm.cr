@@ -15,24 +15,18 @@ module RiSC16
     # write lower byte into io,
     # read a byte from io into upper byte of output, lower byte of output indate readeness (bit 0 for read, bit 1 for write)
     class MMIO
-      TTY = new STDIN, STDOUT
-            
+      TTY = new STDIN, STDOUT            
       @in : IO
       @out : IO
-      def initialize(@in, @out)
-      end
+      
+      def initialize(@in, @out) end
       
       def read : Word
-        byte = @in.read_byte
-        if byte
-          0b11u16 & (byte.to_u16 << 8)
-        else
-          0b10u16
-        end
+        @in.read_bytes Word, IO::ByteFormat::LittleEndian
       end
       
       def write(word : Word)
-        word.bits(8..15).to_u8.to_io @out, IO::ByteFormat::LittleEndian
+        word.to_io @out, IO::ByteFormat::LittleEndian
       end
     end
 
