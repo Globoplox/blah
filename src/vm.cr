@@ -41,13 +41,14 @@ module RiSC16
     property registers = Array(UInt16).new REGISTER_COUNT, 0_i16
     property pc = 0_u16
     property halted = false
-    @instruction = 0_u16
+    @instruction : Instruction
 
     def initialize(ram_size = DEFAULT_RAM_SIZE, ram_start = DEFAULT_RAM_START, io_start = DEFAULT_IO_START, @io = DEFAULT_IO)
       @ram_range = ram_start..(ram_start + (ram_size - 1))
       @io_range = io_start..(io_start + (@io.size - 1))
       raise "Address space overlap: ram: #{@ram_range}, io: #{@io_range}" if @ram_range.any?(&.in? @io_range) || @io_range.any?(&.in? @ram_range)
       @ram = Array(UInt16).new ram_size, 0_u16
+      @instruction = Instruction.decode 0u16
     end
 
     # Load a program at the given address. Raise if it reach an address that does not map to ram.
@@ -60,31 +61,19 @@ module RiSC16
     end
 
     def write_reg_a(v)
-      registers[(@instruction >> 10) & 0b111] = v
+      registers[@instruction.reg_a] = v
     end
 
     def reg_a
-      registers[(@instruction >> 10) & 0b111]
+      registers[@instruction.reg_a]
     end
     
     def reg_b
-      registers[(@instruction >> 7) & 0b111]
+      registers[@instruction.reg_b]
     end
 
     def reg_c
-      registers[@instruction & 0b111]
-    end
-
-    def imm_10
-      @instruction & 0b1111111111
-    end
-
-    def imm_7
-      if (@instruction & 0b1_000_000 != 0)
-        ((2_u32 ** 16) - ((2 ** 7) - (@instruction & 0b1111111))).bits(0...16).to_u16
-      else
-        @instruction & 0b111_111
-      end
+      registers[@instruction.reg_c]
     end
 
     def add(a : UInt16, b : UInt16): UInt16
@@ -92,16 +81,14 @@ module RiSC16
     end      
     
     def step
-      @instruction = ram[@pc]
-      instruction = @instruction
-      opcode = ISA.from_value instruction >> 13
-      case opcode
+      @instruction = Instruction.decode ram[@pc]
+      case @instruction.opcode
       when ISA::Add then write_reg_a add reg_b, reg_c
-      when ISA::Addi then write_reg_a add reg_b, imm_7
+      when ISA::Addi then write_reg_a add reg_b, @instruction.immediate
       when ISA::Nand then write_reg_a ~(reg_b & reg_c)
-      when ISA::Lui then write_reg_a imm_10 << 6
+      when ISA::Lui then write_reg_a @instruction.immediate << 6
       when ISA::Sw
-        address = add reg_b, imm_7
+        address = add reg_b, @instruction.immediate
         if address.in? @ram_range
           ram[address - @ram_range.begin] = reg_a
         elsif address.in? @io_range
@@ -110,7 +97,7 @@ module RiSC16
           raise BusError.new "address: 0x#{address.to_s(base: 16)} (#{address}) io: #{@io_range} ram: #{@ram_range}"
         end
       when ISA::Lw
-        address = add reg_b, imm_7
+        address = add reg_b, @instruction.immediate
         if address.in? @ram_range
           write_reg_a ram[address - @ram_range.begin]
         elsif address.in? @io_range
@@ -118,14 +105,14 @@ module RiSC16
         else
           raise BusError.new address
         end        
-      when ISA::Beq then @pc = add @pc, imm_7 if reg_a == reg_b
+      when ISA::Beq then @pc = add @pc, @instruction.immediate if reg_a == reg_b
       when ISA::Jalr
-        return @halted = true if imm_7 != 0
+        return @halted = true if @instruction.immediate != 0
          ret = @pc + 1
          @pc = reg_b
          write_reg_a ret
       end
-      @pc += 1 unless opcode.jalr?
+      @pc += 1 unless @instruction.opcode.jalr?
       registers[0] = 0
       @halted
     end    

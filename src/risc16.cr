@@ -29,13 +29,13 @@ module RiSC16
 
   # A RiSC16 instruction
   class Instruction
-    getter op : ISA
+    getter opcode : ISA
     getter reg_a : UInt16
     getter reg_b : UInt16
     getter reg_c : UInt16
     getter immediate : UInt16
     
-    def initialize(@op, @reg_a = 0_u16, @reg_b = 0_u16, @reg_c = 0_u16, @immediate = 0_u16)
+    def initialize(@opcode, @reg_a = 0_u16, @reg_b = 0_u16, @reg_c = 0_u16, @immediate = 0_u16)
     end
 
     # return the instruction encoded as a 16 bit integer.
@@ -54,15 +54,23 @@ module RiSC16
       instruction
     end
 
-    # def self.decode(word)
-    #   op = ISA.parse (word >> 13) & 0b111
-    #   reg_a, reg_b, reg_c, immediate = case op
-    #   when ISA::Add, ISA::Nand then { (word >> 10) & 0b111, (word >> 7) & 0b111, word & 0b111, 0 }
-    #   when ISA::Addi, ISA::Sw, ISA::Lw, ISA::Beq, ISA::Jalr then word |= ((reg_a & 0b111) << 10) | ((reg_b & 0b111) << 7) | (word & 0b111111) | ((word < 0 ? 1 : 0) << 6)
-    #   when ISA::Lui then { (word >> 10) & 0b111, (word >> 7) & 0b111, 0, (word & 0b111111) & ((word & 0b1000000) << 8) }
-    #   end
-    #   {op, reg_a, reg_b, reg_c, immediate}
-    # end
+    def self.decode(instruction : Word): self
+      opcode = ISA.from_value instruction >> 13
+      reg_a = (instruction >> 10) & 0b111
+      reg_b = (instruction >> 7) & 0b111
+      reg_c = instruction & 0b111
+      immediate = case opcode
+      when ISA::Addi, ISA::Sw, ISA::Lw, ISA::Beq, ISA::Jalr
+        if (instruction & 0b1_000_000 != 0)
+          ((2_u32 ** 16) - ((2 ** 7) - (instruction & 0b1111111))).bits(0...16).to_u16
+        else
+          instruction & 0b111_111
+        end
+      when ISA::Lui then instruction & 0b1111111111
+      else 0u16
+      end
+      self.new opcode, reg_a, reg_b, reg_c, immediate
+    end
     
   end
 end
