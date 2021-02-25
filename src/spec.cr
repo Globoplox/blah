@@ -27,7 +27,7 @@ class RiSC16::Spec
   end
 
   def stack_start
-    @properties["general"]?.try &.["stack.start"]?. try &.to_u16 || DEFAULT_RAM_START - 1 + ram_size
+    @properties["general"]?.try &.["stack.start"]?. try &.to_u16 || DEFAULT_RAM_START + (ram_size - 1)
   end
 
   def io_start

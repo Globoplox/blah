@@ -53,7 +53,6 @@ module RiSC16
     end
     
     def initialize(ram_size, ram_start, io_start, @io)
-      pp "ram_size: #{ram_size}, ram_start: #{ram_start}, io_start: #{io_start}, io_size: #{@io.size}}"
       @ram_range = ram_start..(ram_start + (ram_size - 1))
       @io_range = io_start..(io_start + (@io.size - 1))
       raise "Address space overlap: ram: #{@ram_range}, io: #{@io_range}" if @ram_range.any?(&.in? @io_range) || @io_range.any?(&.in? @ram_range)

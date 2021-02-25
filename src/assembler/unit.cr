@@ -6,7 +6,7 @@ require "./loc"
 # An unit assume it will be loaded at 0.
 class RiSC16::Assembler::Unit
   @program = [] of Loc
-  @indexes = {} of String => {loc: Loc, address: UInt16}
+  @indexes = {} of String => {loc: Loc?, address: UInt16}
   getter program
   getter indexes
   
@@ -43,8 +43,9 @@ class RiSC16::Assembler::Unit
   end
   
   # Build an index for solving references.
-  def index
+  def index(predefined_symbols)
     @indexes.clear
+    @indexes.merge! predefined_symbols.transform_values { |address| {loc: nil, address: address} }
     each_with_address do |address, loc|
       loc.label.try { |label| @indexes[label] = {loc: loc, address: address} }
     end

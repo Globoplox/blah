@@ -34,11 +34,19 @@ module RiSC16::Assembler
   def self.assemble(sources, target, spec)
     raise "No source file provided" unless sources.size > 0
     raise "Providing mutliples sources file is not supported yet." if sources.size > 1
+    predefined_symbols = {} of String => Word
+    predefined_symbols["__stack"] = spec.stack_start
+    spec.io.each do |io|
+      absolute = spec.io_start + io.index
+      relative = ((2 ** 7) + (absolute.to_i32 - (UInt16::MAX.to_u32 + 1)).bits(0...6)).to_u16
+      predefined_symbols["__io_#{io.name}_a"] = absolute
+      predefined_symbols["__io_#{io.name}_r"] = relative
+    end
     Assembler::Unit.new.tap do |unit|
       File.open sources.first, mode: "r" do |input| 
         unit.parse input, name: sources.first
       end
-      unit.index
+      unit.index predefined_symbols
       unit.solve
       if target.is_a? String
         File.open target, mode: "w" do |output|
