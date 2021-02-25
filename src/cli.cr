@@ -1,4 +1,5 @@
 require "option_parser"
+require "./spec"
 require "./assembler"
 require "./vm"
 require "./debugger"
@@ -6,11 +7,10 @@ require "./debugger"
 module RiSC16
 
   module CLI
-    run_vm = false
-    vm_ram = VM::DEFAULT_RAM_SIZE
     DEFAULT_TARGET = "./a.out"
     target_file = nil
     source_files = [] of String
+    spec_file = nil
     command = nil
     help = nil
     version = nil
@@ -18,10 +18,15 @@ module RiSC16
     OptionParser.parse do |parser|
       parser.banner = "Usage: blah [command] [-d] [-o ./output_file] [-m 2048] input_file"
 
-      parser.on("asm", "Assemble source file into a binary. This is the default command.") do
+      parser.on("asm", "Assemble source file into a binary.") do
         abort "Only one command can be specified. Previously set command: #{command}" unless command.nil?
         command = :assembly
       end
+
+      # parser.on("run", "Assemble if necesary and run the specified file.") do
+      #   abort "Only one command can be specified. Previously set command: #{command}" unless command.nil?
+      #   command = :run
+      # end
 
       parser.on("debug", "Assemble source file into a binary and run it.") do
         abort "Only one command can be specified. Previously set command: #{command}" unless command.nil?
@@ -30,8 +35,8 @@ module RiSC16
       
       parser.on("-h", "--help", "Show this help") { help = parser.to_s }
       parser.on("-v", "--version", "Display the current version") { version = "Version #{VERSION}" }
+      parser.on("-s FILENAME", "--spec=FILENAME", "The spec description file to use") { |filename| spec_file = filename }
       parser.on("-o FILENAME", "--output=FILENAME", "The output file. Created or overwriten. Default to 'a.out'.") { |filename| target_file = filename }
-      parser.on("-m SIZE", "--memory=SIZE", "VM Ram Size. RAM allocated to the VM.") { |ram| vm_ram = ram.to_i16 prefix: true, underscore: true }
       parser.unknown_args do |filenames, parameters|
         source_files = filenames
       end
@@ -47,17 +52,18 @@ module RiSC16
     abort "No command given." unless command || help || version
 
     case command
-    when :assembly then Assembler.assemble source_files, (target_file || DEFAULT_TARGET).as(String)
+    when :assembly
+      spec = spec_file.try do |file| Spec.open file end || Spec.default
+      Assembler.assemble source_files, (target_file || DEFAULT_TARGET).as(String), spec
     when :debug
-      begin
-        buffer = IO::Memory.new
-        unit = target_file.try do |target_file|
-          File.open target_file, "w" do |file|
-            Assembler.assemble source_files, IO::MultiWriter.new file, buffer
-          end
-        end || Assembler.assemble source_files, buffer
-        Debugger.new unit, buffer.rewind
-      end.run
+      spec = spec_file.try do |file| Spec.open file end || Spec.default
+      buffer = IO::Memory.new
+      unit = target_file.try do |target_file|
+        File.open target_file, "w" do |file|
+          Assembler.assemble source_files, IO::MultiWriter.new(file, buffer), spec
+        end
+      end || Assembler.assemble source_files, buffer, spec
+      Debugger.new(unit, buffer.rewind, spec).run
     end
   end
   

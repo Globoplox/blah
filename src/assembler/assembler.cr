@@ -31,7 +31,7 @@ require "./unit"
 
 module RiSC16::Assembler
   # Read the sources files, assemble them and write the result to target. 
-  def self.assemble(sources, target)
+  def self.assemble(sources, target, spec)
     raise "No source file provided" unless sources.size > 0
     raise "Providing mutliples sources file is not supported yet." if sources.size > 1
     Assembler::Unit.new.tap do |unit|

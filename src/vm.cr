@@ -43,7 +43,17 @@ module RiSC16
     property halted = false
     @instruction : Instruction
 
-    def initialize(ram_size = DEFAULT_RAM_SIZE, ram_start = DEFAULT_RAM_START, io_start = DEFAULT_IO_START, @io = DEFAULT_IO)
+    # Build a VM from a specfile. Allow override of IO for easier debugging.
+    def self.from_spec(spec, io_override = {} of String => MMIO)
+      io = Array(MMIO).new(spec.io_size) do |index|
+        io_spec = spec.io.find(&.index.==(index)) || raise "Missing IO for index #{index} in specs"
+        io_override[io_spec.name] || MMIO.new File.open(io_spec.input, "r"), File.open(io_spec.output, "w")
+      end
+      self.new spec.ram_size, spec.ram_start, spec.io_start, io
+    end
+    
+    def initialize(ram_size, ram_start, io_start, @io)
+      pp "ram_size: #{ram_size}, ram_start: #{ram_start}, io_start: #{io_start}, io_size: #{@io.size}}"
       @ram_range = ram_start..(ram_start + (ram_size - 1))
       @io_range = io_start..(io_start + (@io.size - 1))
       raise "Address space overlap: ram: #{@ram_range}, io: #{@io_range}" if @ram_range.any?(&.in? @io_range) || @io_range.any?(&.in? @ram_range)

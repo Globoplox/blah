@@ -1,4 +1,5 @@
 require "./vm"
+require "./spec"
 require "ncurses"
 
 module RiSC16
@@ -11,9 +12,10 @@ module RiSC16
     @vm : VM
     @locs : Hash(UInt16, Array(Assembler::Loc))
     @cursor = 0
+    @spec : Spec
     
-    def initialize(@unit, io)
-      @vm = VM.new(io: [VM::MMIO.new(@input, @output)]).tap &.load io
+    def initialize(@unit, io, @spec)
+      @vm = VM.from_spec(@spec, io_override: {"tty" => VM::MMIO.new(@input, @output)}).tap &.load io
       @locs = {} of UInt16 => Array(Assembler::Loc)
       unit.each_with_address do |address, loc|
         (@locs[address] = @locs[address]? || [] of Assembler::Loc).push loc
