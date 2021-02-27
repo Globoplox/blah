@@ -39,34 +39,57 @@ It holds the base *Instruction* class encoding and decoding methods.
 
 ### Spec
 [Spec](./src/spec.cr) is a class holding configuration for the toolchain, 
-such as memory mapping informations. It can be parsed from .ini files as seen in the [specs directory](./specs).
+such as memory mapping and io informations. It can be parsed from .ini files as seen in the [specs directory](./specs).
 
 ### Assembler
 The [assembler](./src/assembler/assembler.cr) module holds various class and methods used to assemble a bunch of assembly file into bitcode.
+It works by creating a unit, parsing the input file, indexing the unit then solving it.
 
 #### Statement
 A statement is anything that can be assembled. It must be able to declare its expected bitcode size and write it's bitcode representation.
 
 #### Unit
-An [unit](./src/assembler/unit.cr) represent a program of a part of one. 
+An [unit](./src/assembler/unit.cr) represent a program or a part of one.
+It regroup line of codes that can freely share symbols definitions.
+It can parse a file in LOC, then perform indexing of symbol, solving statements that require context data, and write the bitcode.
 
 #### Loc
 A [line of code](./src/assembler/loc.cr) represent a single line of code. 
+It can holds comments, labels definition, a statement and context information (line number and source).
+
+### Complex
+A [complex](./src/assembler/complex.cr) represent a word expressed as a literal (in decimal, hex, or binary), 
+absolute or relative to a label.
+It require solving.
 
 #### Instruction
 An [instruction](./src/assembler/instruction.cr) is a statement that represent a single instruction.
+It require solving for handling potential complexes.
 
 #### Pseudo Instruction
 An [pseudo instruction](./src/assembler/pseudo/pseudo.cr) is a statement that represent a macro instruction that will resolve to multiple instructions.
+Additionaly to standrd RiSC16 pseudo-instruction, there are:
+- `call <immediate> <stack register> <...saved registers> <return value register>`: save registers on stack and call immediate. 
+On return, unstack register and put return value in the return value register.
+- `function <stack register> <return address register>` sugar for putting the return address register on stack. 
+It expect a reserved space in stack for storing the return address. 
+It works well with `call` that will store the return address in the return value register and will reserve space in stack for the writing of the adress.
+- `return <stack_register> <return value register> <temporary register>` will swap the return address and return value in stack then jump to the return address.
 
 #### Data
-A [data staement](./src/assembler/data/data.cr) is a statement that represent raw data.
+A [data staement](./src/assembler/data/data.cr) is a statement that represent raw data. They begin with a '.'.
+- `.word` store a word. It can be expressed as a complex.
+- `.ascii` store a ascii string, two byte per word. It add a '\0' to pad if the string does not algin to 2 byte words, then a null word. 
 
 ### VM
+The [VM](./src/vm.cr) can be created from a spec, load a bitcode-encoded program, and execute it.
+It maps IO registers to configurable memory range. Specs can specify the path of a device to map for input and output of an io register. 
 
 ### Debugger
+The [debugger](./src/debugger.cr) is a very WIPy tool for visualizing the execution of a program. 
 
 ### CLI
+All tools can be used from a [CLI](./src/cli.cr). Just run it with 'help' to get an idea of how it works.
 
 ## Roadmap
 - [x] Write an assembler able to ouput raw bitcode

@@ -15,7 +15,6 @@ module RiSC16
     # write lower byte into io,
     # read a byte from io into upper byte of output, lower byte of output indate readeness (bit 0 for read, bit 1 for write)
     class MMIO
-      TTY = new STDIN, STDOUT            
       @in : IO
       @out : IO
       
@@ -29,10 +28,6 @@ module RiSC16
         word.to_io @out, IO::ByteFormat::LittleEndian
       end
     end
-
-    DEFAULT_IO = [MMIO::TTY]
-    DEFAULT_RAM_SIZE = MAX_MEMORY_SIZE - DEFAULT_IO.size
-    DEFAULT_IO_START = DEFAULT_RAM_START + DEFAULT_RAM_SIZE
         
     @ram_range : Range(Word, Word)
     property ram : Array(UInt16)
@@ -47,7 +42,11 @@ module RiSC16
     def self.from_spec(spec, io_override = {} of String => MMIO)
       io = Array(MMIO).new(spec.io_size) do |index|
         io_spec = spec.io.find(&.index.==(index)) || raise "Missing IO for index #{index} in specs"
-        io_override[io_spec.name] || MMIO.new File.open(io_spec.input, "r"), File.open(io_spec.output, "w")
+        io_override[io_spec.name]? || begin
+          input = io_spec.stdio ? STDIN : File.open io_spec.input, "r"
+          output = io_spec.stdio ? STDOUT : File.open io_spec.output, "w"
+          MMIO.new in: input, out: output
+        end
       end
       self.new spec.ram_size, spec.ram_start, spec.io_start, io
     end
@@ -124,6 +123,12 @@ module RiSC16
       @pc += 1 unless @instruction.opcode.jalr?
       registers[0] = 0
       @halted
-    end    
+    end
+
+    def run
+      while !@halted
+        step
+      end
+    end
   end
 end

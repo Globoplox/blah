@@ -38,14 +38,15 @@ class RiSC16::Spec
     io.size.to_u16
   end
 
-  record IO, index : Word, name : String, input : String, output : String
+  record IO, index : Word, name : String, input : String, output : String, stdio : Bool
   def io
     @io ||= @properties.keys.compact_map do |key|
       key.lchop?("io.").try do |io_name|
         index = @properties[key]["index"].to_u16
-        input = @properties[key]["output"]
-        output = @properties[key]["input"]
-        IO.new index, io_name, input, output
+        stdio = @properties[key]["stdio"]?.try &.==("true") || false
+        input = stdio ? "" : @properties[key]["input"]
+        output = stdio ? "" : @properties[key]["output"]
+        IO.new index: index, name: io_name, input: input, output: output, stdio: stdio
       end
     end
   end

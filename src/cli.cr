@@ -12,8 +12,7 @@ module RiSC16
     source_files = [] of String
     spec_file = nil
     command = nil
-    help = nil
-    version = nil
+    help = ""
     
     OptionParser.parse do |parser|
       parser.banner = "Usage: blah [command] [-d] [-o ./output_file] [-m 2048] input_file"
@@ -23,20 +22,40 @@ module RiSC16
         command = :assembly
       end
 
-      # parser.on("run", "Assemble if necesary and run the specified file.") do
-      #   abort "Only one command can be specified. Previously set command: #{command}" unless command.nil?
-      #   command = :run
-      # end
+      parser.on("run", "Assemble if necesary and run the specified file.") do
+        abort "Only one command can be specified. Previously set command: #{command}" unless command.nil?
+        command = :run
+      end
 
       parser.on("debug", "Assemble source file into a binary and run it.") do
         abort "Only one command can be specified. Previously set command: #{command}" unless command.nil?
         command = :debug
       end
+
+      parser.on("help", "Show this help.") do
+        abort "Only one command can be specified. Previously set command: #{command}" unless command.nil?
+        command = :help
+      end
+
+      parser.on("version", "Display the current version.") do
+        abort "Only one command can be specified. Previously set command: #{command}" unless command.nil?
+        command = :version
+      end
       
-      parser.on("-h", "--help", "Show this help") { help = parser.to_s }
-      parser.on("-v", "--version", "Display the current version") { version = "Version #{VERSION}" }
+      parser.on("-h", "--help", "Show this help") do
+        abort "Only one command can be specified. Previously set command: #{command}" unless command.nil?
+        command = :help
+      end
+
+      parser.on("-v", "--version", "Display the current version") do
+        abort "Only one command can be specified. Previously set command: #{command}" unless command.nil?
+        command = :version
+      end
+
+      
       parser.on("-s FILENAME", "--spec=FILENAME", "The spec description file to use") { |filename| spec_file = filename }
       parser.on("-o FILENAME", "--output=FILENAME", "The output file. Created or overwriten. Default to 'a.out'.") { |filename| target_file = filename }
+
       parser.unknown_args do |filenames, parameters|
         source_files = filenames
       end
@@ -45,13 +64,22 @@ module RiSC16
         STDERR.puts parser
         exit 1
       end
+
+      help = parser.to_s
     end
 
-    puts version if version
-    puts help if help
-    abort "No command given." unless command || help || version
-
     case command
+    when :help
+      puts help
+    when :version
+      puts VERSION
+    when :run
+      spec = spec_file.try do |file| Spec.open file end || Spec.default
+      raise "No program specified" if source_files.empty?
+      raise "More than one program specified" if source_files.size > 1
+      File.open source_files.first, "r" do |file|
+        VM.from_spec(spec).tap(&.load file)
+      end.run
     when :assembly
       spec = spec_file.try do |file| Spec.open file end || Spec.default
       Assembler.assemble source_files, (target_file || DEFAULT_TARGET).as(String), spec
@@ -64,6 +92,8 @@ module RiSC16
         end
       end || Assembler.assemble source_files, buffer, spec
       Debugger.new(unit, buffer.rewind, spec).run
+    when nil then raise "No command given"
+    else raise "Invalid command: #{command}"
     end
   end
   
