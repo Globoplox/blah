@@ -35,6 +35,7 @@ module RiSC16
           code
           registers
           io
+          stack
           
           case NCurses.getch
           when 'q', NCurses::KeyCode::ESC then break
@@ -107,13 +108,26 @@ module RiSC16
     end
 
     def registers
-      NCurses::Window.subwin x: (NCurses.maxx / 2).ceil, y: 0, height: (NCurses.maxy / 2).floor, width: NCurses.maxx / 2, parent: NCurses.stdscr do |w|
+      NCurses::Window.subwin x: (NCurses.maxx / 2).ceil, y: 0, height: (NCurses.maxy / 2).floor, width: NCurses.maxx / 6, parent: NCurses.stdscr do |w|
         w.border
         w.mvaddstr("PC: 0x#{@vm.pc.to_s(base:16).rjust(4, '0')}", x: 1, y: 1)
         @vm.registers.each_with_index do |r, i|
           w.mvaddstr("R#{i}: 0x#{r.to_s(base:16).rjust(4, '0')}", x: 1, y: 2 + i)
         end
         w.refresh
+      end
+    end
+
+    def stack
+      NCurses::Window.subwin x: (NCurses.maxx / 6 * 4).ceil, y: 0, height: (NCurses.maxy / 2).floor, width: NCurses.maxx / 3, parent: NCurses.stdscr do |stack|
+        stack.border
+        i = 0
+        ((@spec.stack_start - stack.maxy + 3)..(@spec.stack_start)).each do |address|
+          value = @vm.ram[address]
+          stack.mvaddstr("STACK 0x#{address.to_s(base:16).rjust(4, '0')}: 0x#{value.to_s(base:16).rjust(4, '0')}", x: 1, y: 1 + i)
+          i += 1
+        end
+        stack.refresh
       end
     end
 
@@ -125,7 +139,6 @@ module RiSC16
         io.mvaddstr(text, x: 1, y: 1)
         io.refresh
       end
-    end
-    
+    end    
   end  
 end

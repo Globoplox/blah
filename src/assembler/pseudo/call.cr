@@ -43,7 +43,7 @@ class RiSC16::Assembler::Pseudo::Call < RiSC16::Assembler::Pseudo
     @instructions << Instruction.new ISA::Lw, reg_a: @call_register, reg_b: @stack_register, immediate: 1u16
     # restore saved registers
     @param_registers.each_with_index do |param, index|
-      @instructions << Instruction.new ISA::Lw, reg_a: param, reg_b: @stack_register, immediate: 1u16 + index
+      @instructions << Instruction.new ISA::Lw, reg_a: param, reg_b: @stack_register, immediate: index.to_u16 + 2 # 1u16 + index
     end
     @instructions << Instruction.new ISA::Addi, reg_a: @stack_register, reg_b: @stack_register, immediate: @param_registers.size.to_u16 + 1
   end

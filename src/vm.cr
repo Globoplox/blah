@@ -12,8 +12,6 @@ module RiSC16
 
     # Memory Mapped IO
     # Duplex RW register
-    # write lower byte into io,
-    # read a byte from io into upper byte of output, lower byte of output indate readeness (bit 0 for read, bit 1 for write)
     class MMIO
       @in : IO
       @out : IO
