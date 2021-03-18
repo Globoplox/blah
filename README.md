@@ -9,7 +9,7 @@ Quicktest:
 crystal build src/cli.cr && ./cli debug --spec=specs/tty.ini examples/hello.blah
 ```
 
-Rich hello world:
+Rich hello world: (Outdated, io changed and .ascii did not followed yet)
 ```
 start:  movi r7 :__stack         # stack at end of ram
 main:
@@ -79,7 +79,7 @@ It works well with `call` that will store the return address in the return value
 #### Data
 A [data staement](./src/assembler/data/data.cr) is a statement that represent raw data. They begin with a '.'.
 - `.word` store a word. It can be expressed as a complex.
-- `.ascii` store a ascii string, two byte per word. It add a '\0' to pad if the string does not algin to 2 byte words, then a null word. 
+- `.ascii` store a ascii string, two byte per word. It add a '\0' to pad if the string does not algin to 2 byte words, then a null word.
 
 ### VM
 The [VM](./src/vm.cr) can be created from a spec, load a bitcode-encoded program, and execute it.
@@ -95,8 +95,32 @@ All tools can be used from a [CLI](./src/cli.cr). Just run it with 'help' to get
 - [x] Write an assembler able to ouput raw bitcode
   - [x] Data statements
   - [x] Basic math in offset (absolute difference between offset for data sizes)
-  - [ ] Multiple source and minimal runtime
   - [x] Predefined symbols (stack, io)
+  - [ ] Defines can be used for label ? (no?).  default value for defines ? (no?). Raise on missing ? (yes!)
+  - [ ] Static linking: Multiple source, micro runtime, linker script ?
+    - Linker script could be as simple as defining sections in specs files
+	- Sections would have name, start, size. Size could be replaced by a min/max size, start could be replaced by a 'after' another section
+	- Sections could have 'negative size' to make them grow decreasingly
+	- Sections start and sizes would create predifined symbols (and we would remove stack from general spec info, to define it as a section ?)
+	- A meta statement (first of it's kind) would allow to specify the section (and potentially an offset) to write following instruction in
+	- Compiler would then perform check within sections and between sections to ensure everything fit
+	- Compiler could output a new kind of binary to allow loading sections far in memory without creating fat binary
+	  - Could be as simple as: (u16 address of section)(u16 word size of section)(section bitcode) repeated for each section.
+	- Since we already added a special statement for placing bitcode in section, let's add a modifier for symbols to allow reference from other units
+	- Then we could have something along the line of: 
+	  ```
+	  # Hypothetical synatx
+	  # In section ram, enforcing offset 0 (not specifying it would mean 'after what could have been put in section'RAM') 
+	  section RAM+0x0: 
+	  movi r7 :__section_stack_start
+	  call :main r7, r6
+	  halt
+	  ```
+      as startup code.
+	  And in another unit, somewhere: 
+	  ```
+	  extern main: function r7 r6
+	  ```
 - [x] Write a dummy virtual machine that can execute this raw bitcode
   - [x] IO (kinda)
   - [x] Hello World

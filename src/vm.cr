@@ -13,17 +13,18 @@ module RiSC16
     # Memory Mapped IO
     # Duplex RW register
     class MMIO
-      @in : IO
-      @out : IO
+      EOS = 0xff00u16
+      @in : IO?
+      @out : IO?
       
-      def initialize(@in, @out) end
+      def initialize(@in = nil, @out = nil) end
       
       def read : Word
-        @in.read_bytes Word, IO::ByteFormat::LittleEndian
+        @in.try &.read_byte.try &.to_u16 || EOS
       end
       
       def write(word : Word)
-        word.to_io @out, IO::ByteFormat::LittleEndian
+        (word & 0xff).to_u8.to_io @out.not_nil!, IO::ByteFormat::BigEndian if @out
       end
     end
         
@@ -41,9 +42,11 @@ module RiSC16
       io = Array(MMIO).new(spec.io_size) do |index|
         io_spec = spec.io.find(&.index.==(index)) || raise "Missing IO for index #{index} in specs"
         io_override[io_spec.name]? || begin
-          input = io_spec.stdio ? STDIN : File.open io_spec.input, "r"
-          output = io_spec.stdio ? STDOUT : File.open io_spec.output, "w"
-          MMIO.new in: input, out: output
+          case io_spec
+          when Spec::Peripheral::TTY then MMIO.new in: STDIN, out: STDOUT
+          when Spec::Peripheral::ROM then MMIO.new in: File.open(io_spec.source), out: nil
+          else raise "Unknown IO kind in spec: '#{io_spec.class}'"
+          end
         end
       end
       self.new spec.ram_size, spec.ram_start, spec.io_start, io
@@ -61,7 +64,7 @@ module RiSC16
     def load(program, at = 0)
       program.each_byte do |byte|
         raise BusError.new at // 2 unless @ram_range.includes? at // 2
-        ram[at // 2 - @ram_range.begin] |= byte.to_u16 << 8 * (at % 2)
+        ram[at // 2 - @ram_range.begin] |= byte.to_u16 << 8 * ((at + 1) % 2)
         at += 1
       end
     end

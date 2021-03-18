@@ -5,7 +5,7 @@ class RiSC16::Assembler::Data::Word < RiSC16::Assembler::Data
   @complex : Complex
   @word : UInt16 = 0
   def initialize(parameters)
-    @complex = Assembler.parse_immediate parameters
+    @complex = Assembler.parse_immediate parameters.strip
   end
   
   def stored
@@ -17,6 +17,6 @@ class RiSC16::Assembler::Data::Word < RiSC16::Assembler::Data
   end
   
   def write(io)
-    @word.to_io io, IO::ByteFormat::LittleEndian
+    @word.to_io io, IO::ByteFormat::BigEndian
   end
 end  

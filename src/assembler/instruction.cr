@@ -31,7 +31,7 @@ class RiSC16::Assembler::Instruction < RiSC16::Instruction
   end
   
   def write(io)
-    encode.to_io io, IO::ByteFormat::LittleEndian
+    encode.to_io io, IO::ByteFormat::BigEndian
   end
   
   def stored
