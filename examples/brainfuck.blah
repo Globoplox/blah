@@ -1,0 +1,141 @@
+start: 	movi r7 :__stack
+
+load:
+	movi r1 :__io_brainfuck_a
+	movi r2 :bf_program_start
+	movi r3 :bf_program_max_size
+	lw r3 r3 0 # dereference bf_program_max_size and add 1 (so if we read full we read too much)
+	addi r3 r3 1
+	call :read_io_fully r7 r3 r6
+	beq r6 r0 :_bf_program_empty
+	beq r6 r3 :_bf_program_too_big
+	# loaded, can now start execution
+	beq r0 r0 :start_execution
+_bf_program_empty: halt
+_bf_program_too_big: halt
+
+start_execution:
+	# R5 is Brainfuck address ptr, never used for something else unless stated otherwise
+	movi r5 :bf_address_space_start
+	lw r5 r5 0
+	# R4 is Brainfuck Program counter, never used for something else unless stated otherwise
+	movi r4 :bf_program_start
+	# R3 is the program end (to halt when reached)
+	add r3 r6 r4 # R6 contained the program size, added to the start address
+
+bf_loop:
+decode:		   # Check if we are at the end of the program:
+		   beq r4 r3 :_reached_end
+		   # load current instruction in r1 (from bf pc r4)
+	           lw r1 r4 0
+		   # now we do the "decoding":
+		   movi r6 0x3E # > increment data ptr
+ 		   beq r6 r1 :_inc_data_ptr
+      		   movi r6 0x3C # > decrement data ptr
+		   beq r6 r1 :_dec_data_ptr
+		   movi r6 0x2B # + increment
+		   beq r6 r1 :_inc_data
+		   movi r6 0x2D # - decrement
+		   beq r6 r1 :_dec_data
+		   movi r6 0x2E # . write
+		   beq r6 r1 :_write_data
+		   movi r6 0x2C # , read
+		   beq r6 r1 :_read_data
+		   movi r6 0x5B # [ begin loop 
+		   beq r6 r1 :_begin_loop
+		   movi r6 0x5D # ] end loop
+		   beq r6 r1 :_end_loop
+		   beq r0 r0 :_unknown_char
+_unknown_char:     halt
+_reached_end: 	   halt
+
+# Executions paths:
+		   # from now, r1 can be discarded (r1 and r2 are free to use, r6 too)
+_inc_data_ptr:	   movi r1 :bf_address_space_end
+		   lw r1 r1 0
+		   beq r5 r1 :_address_overflow
+		   addi r5 r5 1
+		   beq r0 r0 :_next_bf_i
+_dec_data_ptr:	   movi r1 :bf_address_space_start
+		   lw r1 r1 0
+		   beq r5 r1 :_address_underflow
+		   addi r5 r5 -1
+		   beq r0 r0 :_next_bf_i
+_inc_data: 	   lw r2 r5 0
+		   addi r2 r2 1
+		   sw r2 r5 0
+		   beq r0 r0 :_next_bf_i
+_dec_data: 	   lw r2 r5 0
+		   addi r2 r2 -1
+		   sw r2 r5 0
+		   beq r0 r0 :_next_bf_i
+_write_data:	   lw r2 r5 0
+		   sw r2 r0 :__io_tty_r
+		   beq r0 r0 :_next_bf_i
+_read_data:	   lw r2 r0 :__io_tty_r
+		   sw r2 r5 0
+		   beq r0 r0 :_next_bf_i
+_begin_loop:	   lw r2 r5 0
+		   beq r2 r0 :_jmp_match_closing
+		   sw r4 r7 0
+		   addi r7 r7 -1
+		   beq r0 r0 :_next_bf_i
+_jmp_match_closing:
+                   movi r1 0 # [ count
+_jmp_match_closing_loop:
+                   addi r4 r4 1
+                   beq r4 r3 :_out_of_program
+                   lw r2 r4 0
+                   movi r6 0x5B
+                   beq r2 r6 :_inc_loop_count
+                   movi r6 0x5D
+                   beq r2 r6 :_found_closing
+                   beq r0 r0 :_jmp_match_closing_loop
+_inc_loop_count:   addi r1 r1 1
+                   beq r0 r0 :_jmp_match_closing_loop
+_found_closing:    beq r1 r0 :_found_match
+                   addi r1 r1 -1
+                   beq r0 r0 :_jmp_match_closing_loop
+_found_match:      beq r0 r0 :_next_bf_i
+_end_loop:	   lw r2 r5 0
+		   beq r2 r0 :_next_bf_i
+		   lw r4 r7 1
+		   add r7 r7 1
+_next_bf_i:	   addi r4 r4 1 # we increment the program counter
+		   beq r0 r0 :bf_loop # and we loop
+_out_of_program:   halt
+_address_overflow: halt
+_address_underflow:halt
+
+
+# Read from a memory location until EOF (0xFF00) word is read or given amount has been read.
+# Read word are stored at a given address.
+# R1 is the io to read from address
+# R2 is the address to write to
+# R3 is the maximum size to read (we gonna stack it then use r3 ase the amount of word read)
+# Taint R3, R4, R5, R6 
+# Return the amount of word read
+read_io_fully: function r7 r6
+  sw r3 r7 0 # Store the max amount to read cause we run out of register
+  movi r3 0  # R3 will store the amount of word read
+  _read_io_fully_loop:
+    lw r6 r7 0      # fetch the max to read amount
+    beq r3 r6 :_read_io_fully_out # return if reached max amount
+    lw r4 r1 0      # Read input in r4
+    movi r5 0xff00
+    nand r6 r4 r5
+    nand r6 r6 r6
+    beq r6 r5 :_read_io_fully_out # Check if r4 was EOF (0xff00), tainting r5 and r6
+    add r6 r2 r3    # Get the write destination (r2 + r3) in r6
+    sw r4 r6 0      # Write the word in destination r6
+    addi r3 r3 1    # Incremment r3
+    beq r0 r0 :_read_io_fully_loop # Continue
+  _read_io_fully_out:
+    return r7 r3 r6 # Return amount read
+
+bf_program_max_size:	       .word 0x1000     
+bf_address_space_size:         .word 0x8000 # must leave some space for interpretor stack
+bf_address_space_start: .word :bf_program_start+0x1000
+bf_address_space_end:   .word :bf_program_start+0x9000
+end_of_interpertor:
+bf_program_start:

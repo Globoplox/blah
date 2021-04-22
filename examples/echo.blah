@@ -1,0 +1,21 @@
+start:	movi r7 :__stack
+main:
+	movi r1 4
+    	loop:
+ 	    #call :putd r7 r1 r6
+            beq r1 r0 :end
+      	    addi r1 r1 -1
+	    call :getw r7 r1 r6
+	    addi r6 r6 1
+	    sw r6 r0 :__io_tty_r # write data in tty
+	beq r0 r0 :loop
+end: 	halt
+getw:
+	function r7 r6           # declare func called using r7 stack and r6 tmp register
+      	lw r1 r0 :__io_tty_r     # load the data adress in r1
+      	return r7 r1 r6          # return r1 using stack r7 and tmp register r6
+putd: function r7 r6
+      movi r6 0x7e30
+      add r1 r1 r6
+      sw r1 r0 :__io_tty_r
+      return r7 r1 r6

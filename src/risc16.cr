@@ -3,6 +3,12 @@ module RiSC16
 
   alias Word = UInt16
 
+  struct Word
+    def to_w
+      to_s(base: 16).rjust(4, '0')
+    end
+  end
+
   class IORegister
     property io : ::IO
     property address : Word
