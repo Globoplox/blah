@@ -38,15 +38,18 @@ module RiSC16::Assembler
     predefined_symbols["__stack"] = spec.stack_start
     spec.io.each do |io|
       absolute = spec.io_start + io.index
+      # realtive value is the value (if it exists) you should add to 0 to obtain the right value.
+      # This is restricted to symbols +- 2^6 (as the RiSC16 assembler use 7bit signed offset)
+      # but allow to avoid aving to store the address (movi) then use it, instead the operation can use an address of 0
+      # from the r0 register and use the relative symbols as an offset.
       relative = ((2 ** 7) + (absolute.to_i32 - (UInt16::MAX.to_u32 + 1)).bits(0...6)).to_u16
       predefined_symbols["__io_#{io.name}_a"] = absolute
       predefined_symbols["__io_#{io.name}_r"] = relative
     end
-    Assembler::Unit.new.tap do |unit|
+    Assembler::Unit.new(predefined_symbols).tap do |unit|
       File.open sources.first, mode: "r" do |input| 
         unit.parse input, name: sources.first
       end
-      unit.index predefined_symbols
       unit.solve
       if target.is_a? String
         File.open target, mode: "w" do |output|

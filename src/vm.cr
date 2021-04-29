@@ -12,6 +12,8 @@ module RiSC16
 
     # Memory Mapped IO
     # Duplex RW register
+    # Behavior is kinda block device like, other kind of peripheral
+    # will likely have another behavior.
     class MMIO
       EOS = 0xff00u16
       @in : IO?
@@ -54,8 +56,8 @@ module RiSC16
     
     def initialize(ram_size, ram_start, io_start, @io)
       @ram_range = ram_start..(ram_start + (ram_size - 1))
-      @io_range = io_start..(io_start + (@io.size - 1))
-      raise "Address space overlap: ram: #{@ram_range}, io: #{@io_range}" if @ram_range.any?(&.in? @io_range) || @io_range.any?(&.in? @ram_range)
+      @io_range = io_start..(io_start + (@io.size == 0 ? 0 : @io.size - 1))
+      raise "Address space overlap: ram: #{@ram_range}, io: #{@io_range}" if @io.size != 0 && (@ram_range.any?(&.in? @io_range) || @io_range.any?(&.in? @ram_range))
       @ram = Array(UInt16).new ram_size, 0_u16
       @instruction = Instruction.decode 0u16
     end

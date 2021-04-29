@@ -39,11 +39,11 @@ class RiSC16::Spec
     @properties["general"]?.try &.["stack.start"]?. try &.to_u16(prefix: true) || DEFAULT_RAM_START + (ram_size - 1)
   end
 
-  def io_start
-    @properties["general"]?.try &.["io.start"]?. try &.to_u16(prefix: true) || DEFAULT_RAM_START + ram_size
+  def io_start # 0 if irrelevant because ram eat all the space available
+    @properties["general"]?.try &.["io.start"]?. try &.to_u16(prefix: true) || (ram_size == MAX_MEMORY_SIZE ? 0u16 : DEFAULT_RAM_START + ram_size)
   end
 
-  def io_size
+  def io_size : Word
     io.size.to_u16
   end
 
@@ -75,7 +75,7 @@ class RiSC16::Spec
       key.lchop?("io.").try do |io_name|
         case @properties[key]["type"]?
         when "tty" then Peripheral::TTY.new @properties[key]["index"].to_u16, io_name
-        when "rom" then Peripheral::ROM.new @properties[key]["index"].to_u16, io_name, solve @properties[key]["source"] 
+        when "rom" then Peripheral::ROM.new @properties[key]["index"].to_u16, io_name, solve @properties[key]["source"]
         when nil then raise "Bad IO missing kind for '#{key}'."
         else raise "Bad IO peripheral kind for '#{key}': '#{@properties[key]["type"]}'."
         end

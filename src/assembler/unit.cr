@@ -6,9 +6,17 @@ require "./loc"
 # An unit assume it will be loaded at 0.
 class RiSC16::Assembler::Unit
   @program = [] of Loc
-  @indexes = {} of String => {loc: Loc?, address: UInt16}
+  @symbols = {} of String => {loc: Loc?, address: UInt16}
+  #@externs = {} of String => {loc: Loc?, address: UInt16}
+  
   getter program
-  getter indexes
+  getter symbols
+
+  def initialize(globals = {} of String => Word)
+    @symbols = globals.transform_values do |address|
+      {loc: nil.as(Loc?), address: address}
+    end
+  end
   
   def error(cause, name, line)
     Exception.new name, line, cause
@@ -28,6 +36,9 @@ class RiSC16::Assembler::Unit
       end
       i += 1
     end
+    each_with_address do |address, loc|
+      loc.label.try { |label| @symbols[label] = {loc: loc, address: address} }
+    end
   end
   
   # Iterate statelement with their expected loading address (relative to unit)
@@ -41,20 +52,11 @@ class RiSC16::Assembler::Unit
       address + loc.stored
     end
   end
-  
-  # Build an index for solving references.
-  def index(predefined_symbols)
-    @indexes.clear
-    @indexes.merge! predefined_symbols.transform_values { |address| {loc: nil, address: address} }
-    each_with_address do |address, loc|
-      loc.label.try { |label| @indexes[label] = {loc: loc, address: address} }
-    end
-  end
-  
+    
   # Solve references and develop pseudo-instructions.
   def solve
     each_with_address do |address, loc|
-      loc.solve address, @indexes
+      loc.solve address, @symbols
     end
   end
   

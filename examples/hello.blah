@@ -16,3 +16,5 @@ fetch:
 
 hello: 	.ascii "Hello wolrd !!"
 	.ascii "garbaggggge"
+	nop
+	.ascii "some more garbage that wont be print"

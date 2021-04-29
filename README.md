@@ -9,7 +9,7 @@ Quicktest:
 crystal build src/cli.cr && ./cli debug --spec=specs/tty.ini examples/hello.blah
 ```
 
-Rich hello world: (Outdated, io changed and .ascii did not followed yet)
+Rich hello world:
 ```
 start:  movi r7 :__stack         # stack at end of ram
 main:
@@ -28,7 +28,9 @@ fetch:
         return r7 r1 r6          # return r1 using stack r7 and tmp register r6
 
 hello:  .ascii "Hello wolrd !!"
-        .ascii "garbaggggge"
+        .ascii "garbage"
+		nop
+		.ascii "other garbage"
 ```
 
 ## Components
@@ -79,7 +81,7 @@ It works well with `call` that will store the return address in the return value
 #### Data
 A [data staement](./src/assembler/data/data.cr) is a statement that represent raw data. They begin with a '.'.
 - `.word` store a word. It can be expressed as a complex.
-- `.ascii` store a ascii string, two byte per word. It add a '\0' to pad if the string does not algin to 2 byte words, then a null word.
+- `.ascii` store a ascii stringone char per word. Does not add a null char.
 
 ### VM
 The [VM](./src/vm.cr) can be created from a spec, load a bitcode-encoded program, and execute it.

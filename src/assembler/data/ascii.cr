@@ -1,8 +1,8 @@
 require "./data"
 
+# a word per chararcter, no null terminator
 class RiSC16::Assembler::Data::Ascii < RiSC16::Assembler::Data
   @bytes : Bytes
-  @padding = 0
   
   def initialize(parameters)
     raise "String is not ascii only" unless parameters.ascii_only?
@@ -13,20 +13,18 @@ class RiSC16::Assembler::Data::Ascii < RiSC16::Assembler::Data
     str = str.gsub /\\n/ { "\n" }
     str = str.gsub /\\0/ { "\0" }
     @bytes = str.to_slice
-    @padding = @bytes.size.odd? ? 3 : 2
   end
   
   def stored
-    (@bytes.size + @padding) // 2
+    @bytes.size
   end
   
   def solve(base_address, indexes)
   end
   
   def write(io)
-    io.write @bytes
-    @padding.times do
-      0u8.to_io io, IO::ByteFormat::LittleEndian
+    @bytes.each do |byte| 
+      byte.to_u16.to_io io, IO::ByteFormat::BigEndian
     end
   end
 end
