@@ -65,6 +65,10 @@ module RiSC16
       @line_cursor = (@line_cursor + 1).clamp(1, @height - 2)
     end
 
+    def cursor
+      @range.begin + @content_cursor + @line_cursor - 1
+    end
+
     def scroll_end
       @range.end.try do |last|
         @content_cursor = last - (@height - 2) + 1
