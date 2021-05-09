@@ -126,7 +126,7 @@ All tools can be used from a [CLI](./src/cli.cr). Just run it with 'help' to get
 - [x] Write a dummy virtual machine that can execute this raw bitcode
   - [x] IO (kinda)
   - [x] Hello World
-  - [ ] Write a program that do something
+  - [ ] Write a program that do something (brainfuk vm in progress)
 - [x] Write a bunch of comfort utilities (CLI, barebone Debugger)
 - [ ] Design and write a compiler for a small stack language
   - [ ] Write a bunch of utility functions (basic math)

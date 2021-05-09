@@ -13,8 +13,8 @@ fetch:
 	function r7 r6           # declare func called using r7 stack and r6 tmp register
       	movi r1 :hello           # load the data adress in r1
       	return r7 r1 r6          # return r1 using stack r7 and tmp register r6
-
-hello: 	.ascii "Hello wolrd !!"
-	.ascii "garbaggggge"
+	# note here creating a funcion is completely unecessary. It's here as an example only.
+	
+hello: 	.ascii "Hello world !"
 	nop
-	.ascii "some more garbage that wont be print"
+	.ascii "garbage"
