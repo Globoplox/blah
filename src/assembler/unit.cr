@@ -7,7 +7,20 @@ require "./loc"
 class RiSC16::Assembler::Unit
   @program = [] of Loc
   @symbols = {} of String => {loc: Loc?, address: UInt16}
-  #@externs = {} of String => {loc: Loc?, address: UInt16}
+  @externs = {} of String => {loc: Loc?, address: UInt16}
+  
+  # class Block
+  #   @section : String
+  #   @offset : Int32?
+  #   @program = [] of Loc
+  #   def initialize(@section, @offset = nil) end
+  # end
+
+  # DEFAULT_BLOCK = Block.new "TEXT"
+
+  # solving is removed from unit into the static linker
+  # static linker use specs to get the base address and maybe the size of each sections
+  # (maybe with a default TEXT section at 0
   
   getter program
   getter symbols
