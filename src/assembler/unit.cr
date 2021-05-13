@@ -5,27 +5,15 @@ require "./loc"
 # Statements can references each others in the same unit.
 # An unit assume it will be loaded at 0.
 class RiSC16::Assembler::Unit
+  @base_address : Word
   @program = [] of Loc
-  @symbols = {} of String => {loc: Loc?, address: UInt16}
-  @externs = {} of String => {loc: Loc?, address: UInt16}
-  
-  # class Block
-  #   @section : String
-  #   @offset : Int32?
-  #   @program = [] of Loc
-  #   def initialize(@section, @offset = nil) end
-  # end
+  @symbols = {} of String => {loc: Loc?, address: Word}
+  @externs = {} of String => Word
 
-  # DEFAULT_BLOCK = Block.new "TEXT"
-
-  # solving is removed from unit into the static linker
-  # static linker use specs to get the base address and maybe the size of each sections
-  # (maybe with a default TEXT section at 0
-  
   getter program
   getter symbols
 
-  def initialize(globals = {} of String => Word)
+  def initialize(globals = {} of String => Word, @base_address = 0u16)
     @symbols = globals.transform_values do |address|
       {loc: nil.as(Loc?), address: address}
     end
@@ -50,13 +38,16 @@ class RiSC16::Assembler::Unit
       i += 1
     end
     each_with_address do |address, loc|
-      loc.label.try { |label| @symbols[label] = {loc: loc, address: address} }
+      loc.label.try do |label|
+        @symbols[label] = {loc: loc, address: address}
+        @externs[label] = address if loc.extern
+      end
     end
   end
   
   # Iterate statelement with their expected loading address (relative to unit)
   def each_with_address
-    @program.reduce(0u16) do |address, loc|
+    @program.reduce(@base_address) do |address, loc|
       begin
         yield address, loc
       rescue ex
