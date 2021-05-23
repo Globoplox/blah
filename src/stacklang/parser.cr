@@ -77,26 +77,26 @@ class Parser
   def checkpoint(description)
     stack description do
       a = @io.tell
-      puts "#{"  " * @stack.size}trying #{description} at #{@io.tell}'"
+      #puts "#{"  " * @stack.size}trying #{description} at #{@io.tell}'"
       @io.pos = a
       @checkpoints.push @io.tell
       rollback unless value = yield
       #puts "#{" " * @stack.size}pop"
       @checkpoints.pop
-      puts "#{"  " * @stack.size}OK" if value
+      #puts "#{"  " * @stack.size}OK" if value
       value
     end
   end
 
-  def consume_until(sample): String
+  def consume_until(sample : String): String
     result = ""
     loop do
-      check = @io.tell
       value = @io.gets 1
-      break if 
-      if value == sample
-        @io.pos = check
-        break eof if value.nil?
+      if value == nil
+        break
+      elsif value == sample
+        @io.pos -= 1
+        break
       else
         result += value.not_nil!
       end

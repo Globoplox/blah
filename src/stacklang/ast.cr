@@ -14,8 +14,8 @@ module AST
         when Variable then globals.push element
         when Function then functions.push element
         end
-        Unit.new requirements, types, globals, functions
       end
+      Unit.new requirements, types, globals, functions
     end
   end
 

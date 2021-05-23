@@ -1,6 +1,8 @@
 require "./parser"
 require "./ast"
 
+# FIXME
+# function should be able to returns tuff
 class Stacklang < Parser
   include AST
 
@@ -13,8 +15,9 @@ class Stacklang < Parser
   def separator
     checkpoint "separator" do
       whitespace
-      mandatory char ',' 
+      sep = mandatory char ',' 
       whitespace
+      sep
     end
   end
 
@@ -29,7 +32,7 @@ class Stacklang < Parser
       when "/"
         c = @io.gets 1
         if c == "/"
-          consume_until '\n'
+          consume_until "\n"
         else
           @io.pos = check
           break
@@ -39,7 +42,7 @@ class Stacklang < Parser
         break
       end
     end
-    return separator == true ? true : nil
+    separator == true ? true : nil
   end
 
   def statement_if
@@ -200,9 +203,9 @@ class Stacklang < Parser
     operation
   end
 
-  def statement : Statement
+  def statement
     #or(statement_if, statement_while, expression)
-    expression.as Statement
+    expression.try &.as Statement
   end
 
   def type_name
@@ -278,7 +281,7 @@ class Stacklang < Parser
      mandatory str "require"
      mandatory whitespace
      mandatory char '"'
-     filename = mandatory consume_until '"'
+     filename = mandatory consume_until "\""
      mandatory char '"'
      Requirement.new filename
    end
@@ -292,7 +295,8 @@ class Stacklang < Parser
       Function::Parameter.new name, constraint
     end
   end
-  
+
+  # FIXME: function need a retval
   def function
     checkpoint "function prototype" do
       mandatory str "fun"
@@ -342,7 +346,8 @@ class Stacklang < Parser
 end
 
 Stacklang.new(IO::Memory.new ARGF.gets_to_end).tap do |parser|
-  unit = parser.struct_def
+  #unit = parser.unit
+  unit = parser.unit
   if unit
     pp unit
   else
