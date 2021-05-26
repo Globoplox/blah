@@ -1,4 +1,4 @@
-require "./risc16"
+require "../risc16"
 
 module RiSC16
 
