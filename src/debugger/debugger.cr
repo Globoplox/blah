@@ -15,7 +15,7 @@ module RiSC16
 
   class Debugger
 
-    @unit : Assembler::Unit
+    @units : Array(Assembler::Unit)
     @input = IO::Memory.new
     @output = IO::Memory.new
     @vm : VM
@@ -24,12 +24,12 @@ module RiSC16
     @spec : Spec
     @breakpoints = Set(Int32).new
     
-    def initialize(@unit, io, @spec)
+    def initialize(@units, io, @spec)
       @vm = VM.from_spec(@spec, io_override: {"tty" => VM::MMIO.new(@input, @output)}).tap &.load io      
       @locs = {} of UInt16 => Array(Assembler::Loc)
-      unit.each_with_address do |address, loc|
-        (@locs[address] = @locs[address]? || [] of Assembler::Loc).push loc
-      end
+      #unit.each_with_address do |address, loc|
+      #  (@locs[address] = @locs[address]? || [] of Assembler::Loc).push loc
+      #end
     end
 
     def disassemble(word)

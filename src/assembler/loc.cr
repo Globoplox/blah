@@ -13,19 +13,18 @@ class RiSC16::Assembler::Loc
   property label : String? = nil
   property comment : String? = nil
   property statement : Statement? = nil
-  property extern : Bool? = nil
+  property export : Bool? = nil
   
   def initialize(@source, @file = nil, @line = nil)
   end
   
   def parse
-    lm = /^((?<label>(?<extern>extern\s+)?[a-z0-9_]+):)?\s*((?<operation>[A-Za-z._]+)(\s+(?<parameters>[^#]*))?)?\s*(?<comment>#.*)?$/i.match @source
+    lm = /^((?<export>export\s+)?(?<label>[A-Za-z0-9_]+):)?\s*((?<operation>[A-Za-z._]+)(\s+(?<parameters>[^#]*))?)?\s*(?<comment>#.*)?$/i.match @source
     raise "Syntax Error" if lm.nil?
     @label = lm["label"]?
-    @extern = @label.try { lm["extern"]? != nil }
+    @export = lm["export"]? != nil    
     @comment = lm["comment"]?
     operation = lm["operation"]?
-
     if operation
       parameters = lm["parameters"]? || ""
       if ISA.names.map(&.downcase).includes? operation

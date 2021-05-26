@@ -87,12 +87,12 @@ module RiSC16
     when :debug
       spec = spec_file.try do |file| Spec.open file, macros end || Spec.default
       buffer = IO::Memory.new
-      unit = target_file.try do |target_file|
+      units = target_file.try do |target_file|
         File.open target_file, "w" do |file|
           Assembler.assemble source_files, IO::MultiWriter.new(file, buffer), spec
         end
       end || Assembler.assemble source_files, buffer, spec
-      Debugger.new(unit, buffer.rewind, spec).run
+      Debugger.new(units, buffer.rewind, spec).run
     when nil then raise "No command given"
     else raise "Invalid command: #{command}"
     end
