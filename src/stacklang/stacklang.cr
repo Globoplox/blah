@@ -46,15 +46,51 @@ class Stacklang < Parser
   end
 
   def statement_if
-    nil
+    checkpoint "if statement" do
+      mandatory str "if"
+      whitespace
+      mandatory char '('
+      multiline_whitespace
+      condition = mandatory expression
+      multiline_whitespace
+      mandatory char ')'
+      multiline_whitespace
+      statements : Array(Statement) = if char '{'
+        expression_separators
+        _statements = zero_or_more any_statement, separated_by: expression_separators
+        expression_separators
+        mandatory char '}'
+        _statements
+      else
+        [mandatory any_statement]
+      end
+      If.new condition, statements
+    end
   end
 
   def statement_while
-    nil
+    checkpoint "while statement" do
+      mandatory str "while"
+      whitespace
+      mandatory char '('
+      multiline_whitespace
+      condition = mandatory expression
+      multiline_whitespace
+      mandatory char ')'
+      multiline_whitespace
+      statements = if char '{'
+        expression_separators
+        _statements = zero_or_more any_statement, separated_by: expression_separators
+        expression_separators
+        mandatory char '}'
+        _statements
+      else
+        [mandatory any_statement]
+      end
+      While.new condition, statements
+    end
   end
 
-  # FIXME: parameters are expression, not identifiers
-  # FIEME: should be a chain ?
   def call
     checkpoint "call" do
       name = mandatory identifier
@@ -176,16 +212,15 @@ class Stacklang < Parser
     low_priority_operation
   end
 
-  def hex
+  def number
     checkpoint "literal" do
-      mandatory char '0'
-      mandatory char 'x'
-      Literal.new (mandatory one_or_more(char '0'..'9')).join.to_i32(base: 16)
+      base = str "0x"
+      Literal.new (mandatory one_or_more(char ['0'..'9', 'a'..'f', 'A'..'F'])).join.to_i32(base: base ? 16 : 10)
     end
   end
   
   def literal
-    hex
+    number
   end
 
   def parenthesis
@@ -203,9 +238,8 @@ class Stacklang < Parser
     operation
   end
 
-  def statement
-    #or(statement_if, statement_while, expression)
-    expression.try &.as Statement
+  def any_statement : Statement?
+    or(statement_if, statement_while, expression)
   end
 
   def type_name
@@ -296,7 +330,6 @@ class Stacklang < Parser
     end
   end
 
-  # FIXME: function need a retval
   def function
     checkpoint "function prototype" do
       mandatory str "fun"
@@ -309,6 +342,8 @@ class Stacklang < Parser
         mandatory char ')'
         params
       end || [] of Function::Parameter
+      whitespace
+      ret_type = type_constraint
 
       multiline_whitespace
       mandatory char '{'
@@ -321,11 +356,11 @@ class Stacklang < Parser
         mandatory expression_separators
       end
 
-      statements = zero_or_more statement, separated_by: expression_separators
+      statements = zero_or_more any_statement, separated_by: expression_separators
       expression_separators
       mandatory char '}'
 
-      Function.new name, parameters, variables, statements.map &.as(Statement)
+      Function.new name, parameters, ret_type, variables, statements
     end
   end
 
@@ -345,7 +380,7 @@ class Stacklang < Parser
   
 end
 
-Stacklang.new(IO::Memory.new ARGF.gets_to_end).tap do |parser|
+Stacklang.new(IO::Memory.new(ARGF.gets_to_end), ENV["DEBUG_PARSER"]? == "true").tap do |parser|
   #unit = parser.unit
   unit = parser.unit
   if unit

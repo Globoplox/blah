@@ -42,18 +42,18 @@ module AST
   end
 
   class If < Statement
-    def initialize(@condition : Expression, @body : Block) end
+    def initialize(@condition : Expression, @body : Array(Statement)) end
   end
 
   class While < Statement
-    def initialize(@condition : Expression, @body : Block) end
+    def initialize(@condition : Expression, @body : Array(Statement)) end
   end
 
   class Function
     class Parameter
       def initialize(@name : Identifier, @constraint : Type) end
     end
-    def initialize(@name : Identifier, @parameters : Array(Parameter), @variables : Array(Variable), @body : Array(Statement)) end
+    def initialize(@name : Identifier, @parameters : Array(Parameter), @return_type : Type, @variables : Array(Variable), @body : Array(Statement)) end
   end
 
   class Struct

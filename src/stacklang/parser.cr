@@ -15,7 +15,7 @@ class Parser
     @error
   end
   
-  def initialize(@io) end
+  def initialize(@io, @debug = false) end
 
   # register an error
   def error(message)
@@ -77,13 +77,13 @@ class Parser
   def checkpoint(description)
     stack description do
       a = @io.tell
-      #puts "#{"  " * @stack.size}trying #{description} at #{@io.tell}'"
+      puts "#{"  " * @stack.size}trying #{description} at #{@io.tell}'" if @debug
       @io.pos = a
       @checkpoints.push @io.tell
       rollback unless value = yield
       #puts "#{" " * @stack.size}pop"
       @checkpoints.pop
-      #puts "#{"  " * @stack.size}OK" if value
+      puts "#{"  " * @stack.size}OK" if value if @debug
       value
     end
   end
