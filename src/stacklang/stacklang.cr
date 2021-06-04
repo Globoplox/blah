@@ -68,6 +68,14 @@ class Stacklang < Parser
     end
   end
 
+  def statement_return
+    checkpoint "return statement" do
+      mandatory str "return"
+      mandatory whitespace
+      Return.new mandatory expression
+    end
+  end
+
   def statement_while
     checkpoint "while statement" do
       mandatory str "while"
@@ -239,7 +247,7 @@ class Stacklang < Parser
   end
 
   def any_statement : Statement?
-    or(statement_if, statement_while, expression)
+    or(statement_if, statement_while, statement_return ,expression)
   end
 
   def type_name

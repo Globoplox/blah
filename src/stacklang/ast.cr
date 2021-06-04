@@ -49,6 +49,10 @@ module AST
     def initialize(@condition : Expression, @body : Array(Statement)) end
   end
 
+  class Return < Statement
+    def initialize(@value : Expression) end
+  end
+
   class Function
     class Parameter
       def initialize(@name : Identifier, @constraint : Type) end
