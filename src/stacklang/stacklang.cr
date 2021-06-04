@@ -110,25 +110,6 @@ class Stacklang < Parser
     end
   end
 
-  def access
-    checkpoint "access" do
-      expr = mandatory expression # identifier or parenthesis to make thing much easier ?
-      mandatory str "."
-      field = mandatory identifier
-      Access.new expr, field
-    end
-  end
-
-  # dereferenced access a->b = (*a).b
-  def dereferenced_access
-    checkpoint "dereferenced access" do
-      expr = mandatory expression # identifier or parenthesis to make thing much easier ?
-      mandatory str "->"
-      field = mandatory identifier
-      Access.new Unary.new(expr, "*"), field
-    end
-  end
-
   def unary_operation
     checkpoint "unary_operation" do
       operator = mandatory str ["!", "*", "&"]
@@ -201,7 +182,7 @@ class Stacklang < Parser
     checkpoint "affectation_chain" do
       name = mandatory str "="
       whitespace
-      right = mandatory leaf_expression
+      right = mandatory access
       whitespace
       {name, right}
     end
@@ -209,13 +190,30 @@ class Stacklang < Parser
   
   def affectation_operation
     checkpoint "affectation_operation" do
-      left = mandatory leaf_expression
+      left = mandatory access
       whitespace
       chain = zero_or_more affectation_chain
       Binary.from_chain left, chain
     end
   end
-    
+
+  def access_chain
+    checkpoint "access_chain" do
+      mandatory char '.'
+      mandatory identifier
+    end
+  end  
+  
+  def access
+    checkpoint "access" do
+      expr = mandatory leaf_expression
+      chain = zero_or_more access_chain
+      chain.reduce(expr) do |expr, field|
+        Access.new expr, field
+      end
+    end
+  end
+  
   def operation
     low_priority_operation
   end
