@@ -3,7 +3,7 @@
 struct Person {
      age
      name: *
-     friends: *Person; best_friend: Person
+     friends: *Person; best_friend: *Person
 }
 
 require "truc/pet.blah" // this extract only protoypes and types
@@ -12,11 +12,16 @@ require "truc/pet.blah" // this extract only protoypes and types
 fun read_io(src: *, dst: *, limit) {
     var offset = 0x0
     var read = 0x0
+    var test: Person
+    
+    test.best_friend = &test
+    test.best_friend.best_friend.best_friend.age = 25
+   
     while (offset < max_size && (offset == 0x0 || read != 0xff00)) {
    	  *(src + offset) = *(dst + offset) // Here we need to handle a special case: affectation can be done to a var OR to a dereferencement (so its always 'somewhere').
     	  offset = offset + 0x1
     }
-    //return offset
+    return offset
 }
 
 // When we do &something, something must be addressable. Something is addressable if: it's a var, or an access (which is sugar for &var + offset anyway).

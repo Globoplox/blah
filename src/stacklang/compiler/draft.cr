@@ -1,3 +1,96 @@
+class Stacklang::Unit
+
+#  class Struct
+  #   class Field
+  #     def initialize(@name : Identifier, @constraint : Type) end
+  #   end
+  #   def initialize(@name : String, @fields : Array(Field)) end
+  # end
+
+  # class Word < Type end
+
+  # class Pointer < Type
+  #   def initialize(@target : Type) end
+  # end
+
+  # class Custom < Type
+  #   def initialize(@name : String) end
+  # end
+
+  
+  abstract class Type::Any
+    abstract def size : UInt16
+  end
+
+  class Type::Word < Type::Any
+    getter size = 1u16
+  end
+
+  class Type::Pointer < Type::Any
+    getter size = 1u16
+    def initialize(@pointer_of : Type::Any) end
+  end
+  
+  class Type::Struct
+    class Field
+      property name
+      property any
+      property offset
+      def initialize(@name : String, @type : Type::Any, @offset : UInt16) end
+    end
+
+    property name : String
+    property fields : Array(Field)
+    @size : UInt16? = nil
+    
+    def initialize(@ast_struct : AST::Struct)
+      @name = ast.name
+      @fields = [] of Field
+    end
+
+    def solve_constraint(ast : AST::Constraint, types : Hash(String, Type::Any), stack : Array(Type::Any)) : Type::Any 
+      case ast
+      when AST::Word then Type::Word.new
+      when AST::Pointer then Type::Pointer.new solve_constraint ast.target, types, [] of String
+      when AST::Custom
+        actual_type = types[ast.name]? || raise "Unknown struct name: '{ast.name}'"
+        raise "Type #{actual_type.name} is recursive. This is illegal. Use a pointer to #{actual_type.name} instead." if actual_type.in? stack
+        actual_type.solve types, stack
+        actual_type
+      else raise "Unknown Type Kind #{typeof(ast)}"
+      end
+    end
+
+    def size : UInt16
+      @size || raise "Type must be solved before size can be used"
+    end
+    
+    def solve(other_types : Hash(String, Type::Any), stack : Array(Type::Any))
+      if @size.nil?
+        offset = 0u16
+        @fields = @ast_struct.fields.map do |ast_field|
+          constraint = solve_field ast_field, other_types, stack + [self]
+          Field.new ast_field.name, constraint, (offset += constaint.size) 
+        end
+        @size = offset
+      end
+    end
+  end
+  
+  def compile(ast)
+    # TYPES:
+    # build all, check for name clash
+    # then solve all
+  end
+
+end
+
+
+
+
+
+
+
 enum GPR
   R1, R2, R3, R4, R5, R6
 end
@@ -18,6 +111,9 @@ class Register
   @variable : Variable?
   @free : Bool
 end
+
+
+
 
 class Function
   @return : Nil # must hold the return type if exists but no care rn

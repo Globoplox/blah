@@ -1,293 +1,385 @@
-# fix the error management, it is almost useless now
-class Parser
-  VERSION = "0.1.0"
+require "./parser-primitive"
+require "./ast"
 
-  @checkpoints = [] of (Int32 | Int64)
-  @io : IO
-  @error : String? = nil
-  @stack = [] of String
+class Stacklang::Parser < Parser
+  include Stacklang::AST
 
-  UNEXPECTED_EOF = "Reached end of input unexpectedly"
-
-  UNEXPECTED_VALUE = "Encountered unexpected value"
-
-  def summary
-    @error
-  end
-  
-  def initialize(@io, @debug = false) end
-
-  # register an error
-  def error(message)
-    @error = String::Builder.build do |io|
-      io << "Error at position "
-      io << @io.tell
-      io << ": "
-      io << message
-      io << "\n"
-      @stack.reverse.each do |frame|
-        io << frame
-        io << "\n"
-      end
-    end
-    nil
-  end
-
-  # True if read fully, false otherwise.
-  # Use at the end of the root rule to ensure there is no dandling stuff at the end of input.
-  def read_fully?
-    if @io.peek.try &.empty? == true
-      true
-    else
-      error "Unexpected input, Expected EOF"
-    end
-  end
-  
-  # register an eof error
-  def eof
-    error UNEXPECTED_EOF
-  end
-
-  # register a mismatch error
-  def mismatch
-    error UNEXPECTED_VALUE
-  end
-  
-  # Optional parser for node that register them for debugging.
-  # This does not allow for checkpoints, a node using this must
-  # either never fail or not consume.
-  # Rule of thumb is: it's okay to use this instead of `checkpoint` when wrapping a single consuming call.
-  def stack(description)
-    cursor = @stack.size
-    @stack.push "#{description} at #{@io.tell}"
-    yield.tap do @stack.pop end
-  end
-
-  # Rollback to the last checkpoint.
-  # FIXME: do not use a stack, only a local variable (swap with previous value) cached into a property for use by reollback. 
-  def rollback
-    #puts "#{" " * @stack.size}rollbacking to #{@checkpoints[-1]}"
-    @io.pos = @checkpoints[-1]
-  end
-
-  # Create a checkpoint and rollback in case of failure.
-  # The rule to avoid mishap is that every parsing rule must rollback
-  # to the state of the parser at the beginning of the ruel if they fail.
-  # This is what checkpoint do.
-  def checkpoint(description)
-    stack description do
-      a = @io.tell
-      puts "#{"  " * @stack.size}trying #{description} at #{@io.tell}'" if @debug
-      @io.pos = a
-      @checkpoints.push @io.tell
-      rollback unless value = yield
-      #puts "#{" " * @stack.size}pop"
-      @checkpoints.pop
-      puts "#{"  " * @stack.size}OK" if value if @debug
-      value
+  def identifier
+    checkpoint "identifier" do
+      Identifier.new (mandatory one_or_more(char(['a'..'z', '_'..'_']))).join
     end
   end
 
-  def consume_until(sample : String): String
-    result = ""
-    loop do
-      value = @io.gets 1
-      if value == nil
-        break
-      elsif value == sample
-        @io.pos -= 1
-        break
-      else
-        result += value.not_nil!
-      end
-    end
-    result
-  end
-  
-  # Consume a single character that must match given sample.
-  def char(sample : Array(Char) | Char | Range(Char,Char) | Array(Range(Char, Char))): Char?
-    checkpoint "char '#{sample}'" do
-      case value = @io.gets(1).try &.char_at 0
-      when nil then eof
-      else
-        case sample
-        when Char then value if sample == value
-        when Array(Char), Range(Char,Char) then value if sample.includes? value
-        when Array(Range(Char, Char)) then value if sample.any?(&.includes? value)
-        end
-      end
-    end
-  end
-
-  # Consume a single string that must match the given sample.
-  def str(sample : Array(String) | String): String?
-    checkpoint "string '#{sample}'" do
-      sample_size = case sample
-      when String then sample.size
-      when Array(String) then sample.map(&.size).max_by &.itself
-      else 0
-      end
-      case value = @io.gets sample_size
-      when nil then eof
-      else
-        case sample
-        when String then value if sample == value
-        when Array(String)
-          sample.find do |subsample|
-            subsample == value[0...(subsample.size)]
-          end.try &.tap do |subsample|
-            @io.pos = @io.tell - sample_size + subsample.size            
-          end
-        end
-      end
-    end
-  end
-
-  # Consume whitespace.
-  # Here we don't need a checkpoint because we don't consume anything ourselves before the call that
-  # define if we failed or not.
-  def whitespace(multiline = false)
-    stack "whitespace" do
-      if multiline
-        one_or_more(char([' ', '\t', '\r', '\n']))
-      else
-        one_or_more(char([' ', '\t', '\r']))
-      end
-    end
-  end
-
-  def multiline_whitespace
-    whitespace true
-  end
-
-  # TODO: remove ?
-  def newlines
-    checkpoint "newlines" do
+  def separator
+    checkpoint "separator" do
       whitespace
-      mandatory begin
-        one_or_more(char('\n'), separated_by: begin
-          whitespace
-          true
-        end).tap do  
-          whitespace
+      sep = mandatory char ',' 
+      whitespace
+      sep
+    end
+  end
+
+  # Greedely consume any whitespace or comment, but ensure at least one ; or newline has been consumed.
+  def expression_separators
+    separator = false
+    loop do
+      check = @io.tell
+      case c = @io.gets 1
+      when ";", "\n" then separator = true
+      when " ", "\t", "\r" then next
+      when "/"
+        c = @io.gets 1
+        if c == "/"
+          consume_until "\n"
+        else
+          @io.pos = check
+          break
         end
+      else
+        @io.pos = check
+        break
+      end
+    end
+    separator == true ? true : nil
+  end
+
+  def statement_if
+    checkpoint "if statement" do
+      mandatory str "if"
+      whitespace
+      mandatory char '('
+      multiline_whitespace
+      condition = mandatory expression
+      multiline_whitespace
+      mandatory char ')'
+      multiline_whitespace
+      statements : Array(Statement) = if char '{'
+        expression_separators
+        _statements = zero_or_more any_statement, separated_by: expression_separators
+        expression_separators
+        mandatory char '}'
+        _statements
+      else
+        [mandatory any_statement]
+      end
+      If.new condition, statements
+    end
+  end
+
+  def statement_return
+    checkpoint "return statement" do
+      mandatory str "return"
+      mandatory whitespace
+      Return.new mandatory expression
+    end
+  end
+
+  def statement_while
+    checkpoint "while statement" do
+      mandatory str "while"
+      whitespace
+      mandatory char '('
+      multiline_whitespace
+      condition = mandatory expression
+      multiline_whitespace
+      mandatory char ')'
+      multiline_whitespace
+      statements = if char '{'
+        expression_separators
+        _statements = zero_or_more any_statement, separated_by: expression_separators
+        expression_separators
+        mandatory char '}'
+        _statements
+      else
+        [mandatory any_statement]
+      end
+      While.new condition, statements
+    end
+  end
+
+  def call
+    checkpoint "call" do
+      name = mandatory identifier
+      whitespace
+      mandatory char '('
+      parameters = zero_or_more expression, separated_by: separator
+      mandatory char ')'
+      Call.new name, parameters
+    end
+  end
+
+  def unary_operation
+    checkpoint "unary_operation" do
+      operator = mandatory str ["!", "*", "&"]
+      Unary.new mandatory(expression), operator
+    end
+  end
+
+  def leaf_expression
+    or(unary_operation, parenthesis, call, identifier, literal)
+  end
+  
+  def low_chain
+    checkpoint "low_chain" do
+      name = mandatory str ["&", "|", "^", "+", "-"]
+      whitespace
+      right = mandatory medium_priority_operation
+      whitespace
+      {name, right}
+    end
+  end
+  
+  def low_priority_operation
+    checkpoint "low priority operation" do
+      left = mandatory medium_priority_operation
+      whitespace
+      chain = zero_or_more low_chain
+      Binary.from_chain left, chain
+    end
+  end
+
+  def medium_chain
+    checkpoint "medium_chain" do
+      name = mandatory str ["**", "*", "/", "%"]
+      whitespace
+      right = mandatory high_priority_operation
+      whitespace
+      {name, right}
+    end
+  end
+  
+  def medium_priority_operation
+    checkpoint "medium priority operation" do
+      left = mandatory high_priority_operation
+      whitespace
+      chain = zero_or_more medium_chain
+      Binary.from_chain left, chain
+    end
+  end
+
+  def high_chain
+    checkpoint "high_chain" do
+      name = mandatory str ["<=", ">=", "==", "!=", "||", "&&", "<", ">", "^"]
+      whitespace
+      right = mandatory affectation_operation
+      whitespace
+      {name, right}
+    end
+  end
+
+  def high_priority_operation
+    checkpoint "high priority operation" do
+      left = mandatory affectation_operation
+      whitespace
+      chain = zero_or_more high_chain
+      Binary.from_chain left, chain
+    end
+  end
+
+   def affectation_chain
+    checkpoint "affectation_chain" do
+      name = mandatory str "="
+      whitespace
+      right = mandatory access
+      whitespace
+      {name, right}
+    end
+  end
+  
+  def affectation_operation
+    checkpoint "affectation_operation" do
+      left = mandatory access
+      whitespace
+      chain = zero_or_more affectation_chain
+      Binary.from_chain left, chain
+    end
+  end
+
+  def access_chain
+    checkpoint "access_chain" do
+      mandatory char '.'
+      mandatory identifier
+    end
+  end  
+  
+  def access
+    checkpoint "access" do
+      expr = mandatory leaf_expression
+      chain = zero_or_more access_chain
+      chain.reduce(expr) do |expr, field|
+        Access.new expr, field
       end
     end
   end
   
-  # Consume a newline
-  # Here we might have consumed a '\r' before realising if the match failed or not.
-  # So we need a checkpoint.
-  # TODO optimize
-  def newline
-    checkpoint "newline" do
-      char '\r'
-      mandatory char '\n'
+  def operation
+    low_priority_operation
+  end
+
+  def number
+    checkpoint "literal" do
+      base = str "0x"
+      Literal.new (mandatory one_or_more(char ['0'..'9', 'a'..'f', 'A'..'F'])).join.to_i32(base: base ? 16 : 10)
+    end
+  end
+  
+  def literal
+    number
+  end
+
+  def parenthesis
+    checkpoint "parenthesis" do
+      mandatory char '('
+      multiline_whitespace
+      expr = expression
+      multiline_whitespace
+      mandatory char ')'
+      expr
     end
   end
 
-  # Macro for exiting from scope with nil when given expression is null, otherwise returning the given value.
-  # This is usefull to mark an expression as being mandatory inside the scope of a checkpoint.
-  # FIXME: make it more safe to use in loops ?
-  # Or find a better way ? maybe could be replaced by a cosntrut such as
-  # next unless var = expression
-  # this is more explisite that this magic macro
-  macro mandatory(expr)
-    begin
-      value_%_ = begin {{expr}} end
-      next mismatch if value_%_.nil?
-      value_%_.not_nil!
-    end
+  def expression
+    operation
   end
 
-  # Return the first non nil args, or nil if none match.
-  # We need to checkpoint because nothing garantee us that rollbacking won't
-  # bring us backward further than what we have consumed
-  macro or(*args)
-    {% raise "Rule 'or' need more than one argument" unless args.size > 1 %}
-    checkpoint {{args.map(&.id).join " or "}} do
-      {% for arg in args[0...-1] %}
-        value = {{arg}}
-        next value if value
-        rollback
-      {% end %}
-      {{args[-1]}} || error "No matching alternative"
-    end
+  def any_statement : Statement?
+    or(statement_if, statement_while, statement_return ,expression)
   end
 
-  # Return a tuple of args or nil if any call is nil
-  # FIXME: Useless ?
-  macro and(*args)
-    {% raise "Rule 'and' need more than one argument" unless args.size > 1 %}
-    checkpoint {{args.map(&.id).join " and "}} do
-      {% for arg, index in args %}
-        value_{{index}} = {{arg}}
-        next nil unless value_{{index}}
-      {% end %}
-      {
-        {% for arg, index in args[0...-1] %}
-          value_{{index}},
-        {% end %}
-        value_{{args.size - 1}}
-      }
-    end
-  end
-
-  # Return an array of the consumed arg, or nil if first call is nil
-  # FIXME: use a zero_or_more and a nil if empty ?
-  macro one_or_more(arg, separated_by = Nil)
-    stack %{One or more {{arg}}} do
-      results_%_ = [] of typeof({{arg}})
-      loop do
-        checkpoint_%_ = @io.tell
-        {% if separated_by != Nil %}
-          begin
-            begin
-              @io.pos = checkpoint_%_
-              break
-            end unless {{separated_by}}
-          end unless results_%_.empty?
-        {% end %}
-        result_%_ = {{arg}}
-        begin
-          @io.pos = checkpoint_%_
-          break
-        end if result_%_.nil?
-        results_%_.push result_%_.not_nil!
+  def type_name
+    checkpoint "type_name" do
+      head = mandatory char 'A'..'Z'
+      tail = zero_or_more char	['A'..'Z', 'a'..'z', '0'..'1', '_'..'_']
+      return String.build do |io|
+        io << head
+        tail.each do |tail_char|
+          io << tail_char
+        end
       end
-      if results_%_.empty?
-        error "Matched zero times"
+    end
+  end
+
+  def type_constraint(colon = true)
+    checkpoint "type_constraint" do
+      if colon
+        mandatory char ':'
+      end
+      whitespace
+      if ptr = char '*'
+        type_constraint(false).try do |constraint|
+          Pointer.new constraint
+        end
       else
-        results_%_.compact
+        Custom.new mandatory type_name
       end
+    end || Word.new
+  end
+  
+  def variable
+    checkpoint "variable_definition" do
+      mandatory str "var"
+      mandatory whitespace
+      name = mandatory identifier
+      whitespace
+      constraint = type_constraint
+      whitespace
+      char '='
+      whitespace
+      init = expression
+      Variable.new name, constraint, init
     end
   end
 
-  # Return an array of the consumed arg. Never fail.
-  # Fixme: make it a function with blocks ? maybe use proc for the separated by, unless this has bad perf ?
-  macro zero_or_more(arg, separated_by = Nil)
-    stack %{Zero or more {{arg}}} do
-      results_%_ = [] of typeof({{arg}})
-      loop do
-        checkpoint_%_ = @io.tell
-        {% if separated_by != Nil %}
-          unless results_%_.empty?
-            separator_%_ = {{separated_by}}
-            if separator_%_.nil?
-              @io.pos = checkpoint_%_
-              break
-            end
-          end
-        {% end %}
-        result_%_ = {{arg}}
-        begin
-          @io.pos = checkpoint_%_
-          break
-        end if result_%_.nil?
-        results_%_.push result_%_.not_nil!
-      end
-      results_%_.compact.not_nil!
-    end.not_nil!
+  def struct_field
+    checkpoint "structure_field_definition" do
+      name = mandatory identifier
+      whitespace
+      constraint = type_constraint
+      Struct::Field.new name, constraint
+    end
+  end
+  
+  def struct_def
+    checkpoint "structure_definition" do
+      mandatory str "struct"
+      mandatory whitespace
+      name = mandatory type_name
+      multiline_whitespace
+      mandatory char '{'
+      expression_separators
+      fields = mandatory one_or_more struct_field, separated_by: expression_separators
+      expression_separators
+      mandatory char '}'
+      Struct.new name, fields
+    end
   end
 
+  def requirement
+   checkpoint "requirement" do
+     mandatory str "require"
+     mandatory whitespace
+     mandatory char '"'
+     filename = mandatory consume_until "\""
+     mandatory char '"'
+     Requirement.new filename
+   end
+  end
+
+  def function_parameter
+    checkpoint "function_parameter" do
+      name = mandatory identifier
+      whitespace
+      constraint = type_constraint
+      Function::Parameter.new name, constraint
+    end
+  end
+
+  def function
+    checkpoint "function prototype" do
+      mandatory str "fun"
+      mandatory whitespace
+      name = mandatory identifier
+
+      parameters = checkpoint "function parameters" do
+        mandatory char '('
+        params = mandatory one_or_more function_parameter, separated_by: separator
+        mandatory char ')'
+        params
+      end || [] of Function::Parameter
+      whitespace
+      ret_type = type_constraint
+
+      multiline_whitespace
+      mandatory char '{'
+      expression_separators
+
+      variables = zero_or_more variable, separated_by: expression_separators
+      if variables.empty?
+        expression_separators
+      else
+        mandatory expression_separators
+      end
+
+      statements = zero_or_more any_statement, separated_by: expression_separators
+      expression_separators
+      mandatory char '}'
+
+      Function.new name, parameters, ret_type, variables, statements
+    end
+  end
+
+  def top_level
+    or(requirement, function, variable, struct_def)
+  end
+
+  def unit
+    checkpoint "unit" do
+      expression_separators
+      elements = zero_or_more top_level, separated_by: expression_separators
+      expression_separators
+      mandatory read_fully?
+      Unit.from_top_level elements
+    end
+  end
+  
 end

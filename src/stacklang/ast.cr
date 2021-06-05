@@ -1,4 +1,4 @@
-module AST
+module Stacklang::AST
   
   class Unit
     def initialize(@requirements : Array(Requirement), @types : Array(Struct), @globals : Array(Variable), @functions : Array(Function)) end
