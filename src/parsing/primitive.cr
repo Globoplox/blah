@@ -1,7 +1,5 @@
 # fix the error management, it is almost useless now
 class Parser
-  VERSION = "0.1.0"
-
   @checkpoints = [] of (Int32 | Int64)
   @io : IO
   @error : String? = nil

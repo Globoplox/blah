@@ -1,4 +1,4 @@
-require "./parser-primitive"
+require "../parsing/primitive"
 require "./ast"
 
 class Stacklang::Parser < Parser

@@ -1,39 +1,126 @@
-require "./assembler"
+require "../parsing/primitive"
+require "./ast"
 
-module RiSC16::Assembler
+class RiSC16::Assembler::Parser < Parser
+  include RiSC16::Assembler::AST
+  @path : String? = nil
 
-  # Parse an immediate specification.
-  def self.parse_immediate(raw : String): Complex
-    immediate = /^(?<label>:[A-Z_][A-Z_0-9]*)?((?<mod>\+|-)?(?<offset>(0x|0b|(0))?[A-F_0-9]+))?$/i.match raw
-    raise "Bad immediate '#{raw}'" if immediate.nil?
-    label = immediate["label"]?.try &.lchop ':'
-    offset = immediate["offset"]?
-    raise "Invalid immediate '#{raw}'" unless label || offset
-    offset = offset.try &.to_i32(underscore: true, prefix: true) || 0
-    Complex.new label, offset, immediate["mod"]? == "-" && offset != 0
+  def number
+    checkpoint "literal" do
+      sign = str(["-", "+"]) || ""
+      base = case str ["0x", "0b"]
+        when "0x" then 16
+        when "0b" then 2
+        else 10
+      end
+      pp "base: #{base}"
+      (sign + mandatory(one_or_more(char ['0'..'9', 'a'..'f', 'A'..'F'])).join).to_i32 base: base
+    end
   end
   
-  # Parse RRR type parameters.
-  def self.parse_rrr(params)
-    arr = params.split /\s+/, remove_empty: true
-    raise "Unexpected rrr parameters amount: found #{arr.size}, expected 3" unless arr.size == 3
-    arr = arr.map do |register| register.lchop?('r') || register end
-    { arr[0].to_u16, arr[1].to_u16, arr[2].to_u16 }
+  def register
+    checkpoint "register" do
+      mandatory char 'r'
+      Register.new (mandatory char '0'..'7').to_i32 
+    end
+  end
+
+  def reference
+    checkpoint "reference" do
+      mandatory char ':'
+      (mandatory one_or_more char ['0'..'9', '_'..'_', 'a'..'z', 'A'..'Z']).join
+    end
+  end
+
+  def immediate
+    checkpoint "immediate" do
+      symbol = reference
+      offset = number
+      Immediate.new offset || 0, symbol unless symbol.nil? && offset.nil?
+    end
   end
   
-  # Parse RRI type parameters.
-  def self.parse_rri(params, no_i = false)
-    arr = params.split /\s+/, remove_empty: true
-    raise "Unexpected rri type parameters amount: found #{arr.size}, expected #{no_i ? 2 : 3}" unless arr.size == 3 || (no_i && arr.size == 2)
-    arr = arr.map do |register| register.lchop?('r') || register end
-    { (arr[0].lchop?('r') || arr[0]).to_u16, (arr[1].lchop?('r') || arr[1]).to_u16, no_i ? Complex.new(nil, 0, false) : parse_immediate arr[2] }
+  def comment
+    checkpoint "comment" do
+      mandatory char '#'
+      consume_until "\n"
+    end
+  end
+
+  def separator
+    checkpoint "separator" do
+      mandatory whitespace
+    end
+  end
+
+  def instruction
+    checkpoint "instruction" do
+      memo = (mandatory one_or_more char ['a'..'z', '.'..'.']).join
+      had_whitespace = whitespace
+      parameters = zero_or_more or(register, immediate), separated_by: separator
+      pp "had_whitespace: #{had_whitespace}, parameters: #{parameters}"
+      next unless parameters.empty? || had_whitespace
+      Instruction.new memo, parameters
+    end
+  end
+
+  def statement
+    checkpoint "line" do
+      whitespace
+      section = section_specifier
+      whitespace
+      label = label_definition
+      whitespace
+      text = instruction
+      whitespace
+      comment
+      Statement.new section, label, text
+    end
+  end
+
+  def label_definition
+    checkpoint "label" do
+      label = (mandatory one_or_more char ['0'..'9', '_'..'_', 'a'..'z', 'A'..'Z']).join
+      mandatory char ':'
+      label
+    end
   end
   
-  # Parse RT type parameters.
-  def self.parse_ri(params)
-    arr = params.split /\s+/, remove_empty: true
-    raise "Unexpected ri type parameters amount: found #{arr.size}, expected 2" unless arr.size == 2
-    arr = arr.map do |register| register.lchop?('r') || register end
-    { (arr[0].lchop?('r') || arr[0]).to_u16, parse_immediate arr[1] }
+  def section_specifier
+    checkpoint "section" do
+      name = mandatory str "section"
+      whitespace
+      offset = checkpoint "section offset" do
+        mandatory char '+'
+        whitespace
+        mandatory number
+      end
+      Section.new name, offset 
+    end
   end
+  
+  def unit
+    checkpoint "unit" do
+      multiline_whitespace
+      statements = mandatory zero_or_more statement, separated_by: multiline_whitespace
+      multiline_whitespace
+      mandatory read_fully?
+      Unit.new statements.reject &.empty?
+    end
+  end
+
+  def initialize(path : String, debug = false)
+    @path = path
+    File.open path do |io|
+      super(io, debug)
+    end
+  end
+
+  def initialize(io : IO, debug = false)
+    @path = nil
+    super(io, debug)
+  end
+  
 end
+
+pp RiSC16::Assembler::Parser.new(IO::Memory.new(ARGF.gets_to_end), true).unit
