@@ -46,15 +46,15 @@ module RiSC16
 
     # return the instruction encoded as a 16 bit integer.
     def encode
-      instruction = @op.value.to_u16 << 13
-      case @op
+      instruction = @opcode.value.to_u16 << 13
+      case @opcode
       when ISA::Add, ISA::Nand
         instruction |= ((@reg_a & 0b111) << 10) | ((@reg_b & 0b111) << 7) | @reg_c & 0b111
       when ISA::Addi, ISA::Sw, ISA::Lw, ISA::Beq, ISA::Jalr
-        raise "Immediate overflow #{@immediate.to_s base: 16} for #{@op}" if @immediate > ~(~0 << 7)
+        raise "Immediate overflow #{@immediate.to_s base: 16} for #{@opcode}" if @immediate > ~(~0 << 7)
         instruction |= ((@reg_a & 0b111) << 10) | ((@reg_b & 0b111) << 7) | (@immediate & 0b1111111)
       when ISA::Lui
-        raise "Immediate overflow #{@immediate.to_s base: 16} for #{@op}" if @immediate > ~(~0 << 10)
+        raise "Immediate overflow #{@immediate.to_s base: 16} for #{@opcode}" if @immediate > ~(~0 << 10)
         instruction |= ((@reg_a & 0b111) << 10) | (@immediate & 0b_11_1111_1111)
       end
       instruction

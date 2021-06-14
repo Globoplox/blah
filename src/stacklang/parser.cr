@@ -383,3 +383,5 @@ class Stacklang::Parser < Parser
   end
   
 end
+
+pp Stacklang::Parser.new(IO::Memory.new(ARGF.gets_to_end), true).unit

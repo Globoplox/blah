@@ -13,7 +13,6 @@ class RiSC16::Assembler::Parser < Parser
         when "0b" then 2
         else 10
       end
-      pp "base: #{base}"
       (sign + mandatory(one_or_more(char ['0'..'9', 'a'..'f', 'A'..'F'])).join).to_i32 base: base
     end
   end
@@ -58,7 +57,6 @@ class RiSC16::Assembler::Parser < Parser
       memo = (mandatory one_or_more char ['a'..'z', '.'..'.']).join
       had_whitespace = whitespace
       parameters = zero_or_more or(register, immediate), separated_by: separator
-      pp "had_whitespace: #{had_whitespace}, parameters: #{parameters}"
       next unless parameters.empty? || had_whitespace
       Instruction.new memo, parameters
     end
@@ -69,20 +67,30 @@ class RiSC16::Assembler::Parser < Parser
       whitespace
       section = section_specifier
       whitespace
-      label = label_definition
+      label_def = label_definition
+      label, exported = label_def if label_def
       whitespace
       text = instruction
       whitespace
       comment
-      Statement.new section, label, text
+      Statement.new section, label, text, exported || false
     end
   end
 
+  def export_keyword
+    checkpoint "export" do
+      mandatory str "export"
+      mandatory whitespace
+      true
+    end
+  end
+  
   def label_definition
     checkpoint "label" do
+      exported = export_keyword != nil
       label = (mandatory one_or_more char ['0'..'9', '_'..'_', 'a'..'z', 'A'..'Z']).join
       mandatory char ':'
-      label
+      {label, exported}
     end
   end
   
@@ -122,5 +130,3 @@ class RiSC16::Assembler::Parser < Parser
   end
   
 end
-
-pp RiSC16::Assembler::Parser.new(IO::Memory.new(ARGF.gets_to_end), true).unit

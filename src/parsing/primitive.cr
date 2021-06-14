@@ -1,4 +1,7 @@
 # fix the error management, it is almost useless now
+
+# have a consume_while for better efficiency than one_or_more char pattern
+
 class Parser
   @checkpoints = [] of (Int32 | Int64)
   @io : IO
