@@ -70,13 +70,36 @@ module RiSC16::Assembler
           Instruction.new(ISA.parse(memo), reg_a.index.to_u16, reg_b.index.to_u16, immediate: offset).encode.to_io text, ENDIAN
         when "lui"
           reg_a = instruction.parameters[0].as AST::Register
-          immediate = instruction.parameters[2].as AST::Immediate
+          immediate = instruction.parameters[1].as AST::Immediate
           offset = assemble_immediate current_section, text.pos, immediate, Object::Section::Reference::Kind::Lui
           Instruction.new(ISA::Lui, reg_a.index.to_u16, immediate: offset).encode.to_io text, ENDIAN
         when "jalr"
           reg_a = instruction.parameters[0].as AST::Register
           reg_b = instruction.parameters[1].as AST::Register
           Instruction.new(ISA::Jalr, reg_a.index.to_u16, reg_b.index.to_u16).encode.to_io text, ENDIAN
+        when "nop"
+          Instruction.new(ISA::Add).encode.to_io text, ENDIAN
+        when "lli"
+          reg_a = instruction.parameters[0].as AST::Register
+          immediate = instruction.parameters[1].as AST::Immediate
+          offset = assemble_immediate current_section, text.pos, immediate, Object::Section::Reference::Kind::Lli
+          Instruction.new(ISA::Addi, reg_a.index.to_u16, reg_a.index.to_u16, immediate: offset & 0x3fu16).encode.to_io text, ENDIAN
+        when "movi"
+          reg_a = instruction.parameters[0].as AST::Register
+          immediate = instruction.parameters[1].as AST::Immediate
+          offset = assemble_immediate current_section, text.pos, immediate, Object::Section::Reference::Kind::Lui
+          Instruction.new(ISA::Lui, reg_a.index.to_u16, immediate: offset).encode.to_io text, ENDIAN
+          offset = assemble_immediate current_section, text.pos, immediate, Object::Section::Reference::Kind::Lli
+          Instruction.new(ISA::Addi, reg_a.index.to_u16, reg_a.index.to_u16, immediate: offset & 0x3fu16).encode.to_io text, ENDIAN
+        when "halt"
+          Instruction.new(ISA::Jalr, immediate: 1u16).encode.to_io text, ENDIAN
+        when ".word"
+          immediate = instruction.parameters[0].as AST::Immediate
+          offset = assemble_immediate current_section, text.pos, immediate, Object::Section::Reference::Kind::Data
+          offset.to_io text, ENDIAN
+        when ".ascii"
+          string = instruction.parameters[0].as AST::Text
+          string.text.to_slice.each { |byte| byte.to_u16.to_io text, ENDIAN }
         else puts "Unknown statement memo #{memo}"
         end
       end

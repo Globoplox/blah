@@ -16,6 +16,17 @@ class RiSC16::Assembler::Parser < Parser
       (sign + mandatory(one_or_more(char ['0'..'9', 'a'..'f', 'A'..'F'])).join).to_i32 base: base
     end
   end
+
+  def string
+    checkpoint "text" do
+      mandatory char '"'
+      text = consume_until "\""
+      mandatory char '"'
+      text = text.gsub("\\t", "\t").gsub("\\n", "\n").gsub("\\r", "\r").gsub("\\0", "\0")
+      next nil if text =~ /\\[^\\]/
+      Text.new text.gsub("\\\\", "\\")
+    end
+  end
   
   def register
     checkpoint "register" do
@@ -56,7 +67,7 @@ class RiSC16::Assembler::Parser < Parser
     checkpoint "instruction" do
       memo = (mandatory one_or_more char ['a'..'z', '.'..'.']).join
       had_whitespace = whitespace
-      parameters = zero_or_more or(register, immediate), separated_by: separator
+      parameters = zero_or_more or(register, immediate, string), separated_by: separator
       next unless parameters.empty? || had_whitespace
       Instruction.new memo, parameters
     end

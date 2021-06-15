@@ -1,7 +1,12 @@
 module RiSC16::Assembler::AST
 
   abstract class Parameter end
-    
+
+  class Text < Parameter
+    property text : String
+    def initialize(@text) end
+  end
+  
   class Register < Parameter
     property index : Int32
     def initialize(@index) end
