@@ -8,14 +8,15 @@ class RiSC16::Object
   class	Section
     property name : String
     property offset : Int32? = nil
-    property text : Bytes = Bytes.empty
+    property text : Slice(UInt16) = Slice(UInt16).empty
     property definitions : Hash(String, Symbol) = {} of String => Symbol
     property references : Hash(String, Array(Reference)) = {} of String => Array(Reference)
 
     def initialize(@name, @offset = nil) end
     
     class Symbol
-      property address : UInt16 # relative to owner section @text 
+      # We migh want negative 'address' for predefined symbols with negative value
+      property address : Int32 # relative to owner section @text  
       property exported	: Bool
       def initialize(@address, @exported) end
     end
