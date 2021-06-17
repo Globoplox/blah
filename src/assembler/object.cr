@@ -1,11 +1,10 @@
 # Represent a relocatable object.
 # It can be linked into other objects or into a binary. See `RiSC16::Assembler::Linker`.
 class RiSC16::Object
-  @name : String? 
+  property name : String? 
   @sections : Array(Section) = [] of Section
   getter sections
-  getter name
-  
+
   def initialize(@name = nil) end
 
   # A section is a continuous block of code with it's symbols definitions and references.

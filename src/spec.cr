@@ -16,7 +16,7 @@ class RiSC16::Spec
   end
 
   def self.default
-    self.new({} of String => Hash(String, String), {} of String => String)
+    self.new({"io.tty" => {"type" => "tty", "index" => "0"} }, {} of String => String)
   end
 
   def solve(value)

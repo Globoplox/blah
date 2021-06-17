@@ -126,37 +126,3 @@ module RiSC16::Linker
   end
     
 end
-
-require "./parser"
-require "./assembler"
-require "../spec"
-
-spec = RiSC16::Spec.open "./specs/tty.ini", {} of String => String 
-ast =  RiSC16::Assembler::Parser.new(IO::Memory.new(ARGF.gets_to_end), false).unit
-pp "ast", ast
-if ast
-  object = RiSC16::Assembler.assemble ast
-  pp "object", object
-  if object
-    pp object
-
-    File.open "target.o", "w" do |target|
-      object.to_io target
-    end
-    pp "----"
-
-    object_re = File.open "target.o", "r" do |input|
-      RiSC16::Object.from_io input
-    end
-
-    pp object_re
-    
-    File.open "v2.out", "w" do |output|
-      RiSC16::Linker.link_to_binary spec, [object], output
-    end
-
-    File.open "v2_re.out", "w" do |output|
-      RiSC16::Linker.link_to_binary spec, [object_re], output
-    end
-  end
-end
