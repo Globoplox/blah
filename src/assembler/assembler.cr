@@ -91,11 +91,10 @@ module RiSC16::Assembler
           text << Instruction.new(ISA::Jalr, immediate: 1u16).encode
         when ".word"
           immediate = instruction.parameters[0].as AST::Immediate
-          offset = assemble_immediate current_section, text.size, immediate, Object::Section::Reference::Kind::Data
-          offset
+          text << assemble_immediate current_section, text.size, immediate, Object::Section::Reference::Kind::Data
         when ".ascii"
           string = instruction.parameters[0].as AST::Text
-          string.text.to_slice.each { |byte| byte.to_u16 }
+          string.text.to_slice.each { |byte| text << byte.to_u16 }
         when "function"
           stack = instruction.parameters[0].as AST::Register
           call = instruction.parameters[1].as AST::Register

@@ -4,7 +4,7 @@ require "ini"
 class RiSC16::Spec
   @properties : Hash(String, Hash(String, String))
   @io : Array(Peripheral)? = nil
-  # @sections : Array(Section)? = nil
+  @sections : Array(Section)? = nil
   @macros : Hash(String, String)
 
   def initialize(@properties, @macros) end
@@ -27,14 +27,13 @@ class RiSC16::Spec
     end
   end
 
-  # class Section
-  #   property name : String
-  #   property base_address : Word
-  #   property max_size : UInt32? = nil
-  #   def initialize(@name, @base_address, @max_size = nil) end
-  # end
+  class Section
+    property name : String
+    property base_address : UInt32? = nil
+    property max_size : UInt32? = nil
+    def initialize(@name, @base_address, @max_size) end
+  end
 
-  DEFAULT_SECTION_NAME = "RAM"
   DEFAULT_RAM_START = 0u16
   
   def ram_start
@@ -93,11 +92,11 @@ class RiSC16::Spec
     end
   end
 
-  # def sections
-  #   @sections ||= (@properties.keys.compact_map do |key|
-  #     key.lchop?("section.").try do |section_name|
-  #       Section.new section_name, @properties[key]["start"]?.to_u16, @properties[key]["size"]?.try &.to_u16
-  #     end
-  #   end + Section.new DEFAULT_SECTIO_NAME, ram_start, ram_size)
-  # end
+  def sections
+    @sections ||= @properties.keys.compact_map do |key|
+      key.lchop?("section.").try do |section_name|
+        Section.new section_name, @properties[key]["start"]?.try &.to_u32, @properties[key]["size"]?.try &.to_u32
+      end
+    end
+  end
 end

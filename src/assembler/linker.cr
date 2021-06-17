@@ -18,10 +18,28 @@ module RiSC16::Linker
     predefined_symbols
   end
 
-  def link_to_binary(spec, objects, io)
-    predefined_section_size = {} of String => Int32
-    predefined_section_address = {} of String => Int32
+  # linking to a relocatable binary would create an object
+  # everything would be done as it is but the symbol replacement would not be done
+  # all offset should be set relative to whole binary start
+  # there would still be check for undefined ref
+  # all section get an distinct id and all non exported symbol is prefixed, all internal refs to these will follow
+  # then all the section are merged togeter (all symbols and references mergeds, the text is the binary).
+  # the start would be 0
+  # Predefined references and symbols would be solved and removed (as they have an absolute value, that will not change with binary position (infact they are macros))
+  # the loader would have to add the load address to all symbols values, then solve references as its done here.
+  # We could also have an helper func 'relocate' that perform just this (running it trhough link_to_binary would work but it does useless checks)
 
+  def link_to_binary(spec, objects, io, start : Int32? = nil)
+    start ||= spec.ram_start.to_i32
+    predefined_section_size = {} of String => UInt32
+    predefined_section_address = {} of String => UInt32
+    spec.sections.each do |section|
+      max = section.max_size
+      base = section.base_address
+      predefined_section_size[section.name] = max if max
+      predefined_section_address[section.name] = base if base
+    end
+    
     globals = symbols_from_spec(spec)
 
     # check for conflict between exported symbols
@@ -35,11 +53,11 @@ module RiSC16::Linker
     # and adding the size of each. Raise when constraint is not possible and jump directly to offset when their are gaps
     text_size = objects.flat_map(&.sections).group_by(&.name).to_a.sort_by do |(name, sections)|
       predefined_section_address[name]? || Int32::MAX
-    end.reduce(0) do |absolute, (name, sections)|
-      base = predefined_section_address[name]? || absolute
-      raise "Section #{name}, cannot overwrite at offset #{base}, there are already data up to #{absolute}" if base < absolute
+    end.reduce(start) do |absolute, (name, sections)|
+      base = predefined_section_address[name]?.try &.to_i32 || absolute
+      raise "Section #{name} cannot overwrite at offset #{base}, there are already data up to #{absolute}" if base < absolute
       sections.sort_by { |section| section.offset || Int32::MAX }.reduce(base) do |absolute, section|
-        raise "Block offset conflict in section #{name}, cannot overwrite at offset #{section.offset}, there are already data up to #{absolute}" if section.offset || 0 < absolute
+        raise "Block offset conflict in section #{name}, cannot overwrite at offset #{section.offset}, there are already data up to #{absolute}" if (section.offset || Int32::MAX) < absolute
         section.offset ||= absolute
         section.definitions.values.each do |symbol|
           symbol.address = symbol.address + section.offset.not_nil!
@@ -48,11 +66,14 @@ module RiSC16::Linker
           ref.address = (ref.address.to_i32 + section.offset.not_nil!).to_u16
         end
         section.offset.not_nil! + section.text.size
+      end.tap do |at_end|
+        size = at_end - base
+        max = predefined_section_size[name]? || Int32::MAX
+        raise "Section #{name} of size #{size} overflow maximum size constraint #{max}" if size > max
       end
     end
 
-    # check that text_size does not overflow ram ?
-
+    raise "Binary does not fit in ram: #{text_size} words overlfow #{spec.ram_size}" if text_size > spec.ram_size
     binary = Slice(UInt16).new text_size
     
     # write to file
@@ -65,7 +86,6 @@ module RiSC16::Linker
       section.references.each do |name, references|
         symbol = symbols[name]? || raise "Undefined reference to symbol '#{name}'"
         references.each do |reference|
-          pp "Handling reference to #{name} at address #{reference.address} (type #{reference.kind})"
           value = symbol.address + reference.offset
           case reference.kind
             in Object::Section::Reference::Kind::Data
@@ -113,11 +133,30 @@ require "../spec"
 
 spec = RiSC16::Spec.open "./specs/tty.ini", {} of String => String 
 ast =  RiSC16::Assembler::Parser.new(IO::Memory.new(ARGF.gets_to_end), false).unit
+pp "ast", ast
 if ast
   object = RiSC16::Assembler.assemble ast
+  pp "object", object
   if object
+    pp object
+
+    File.open "target.o", "w" do |target|
+      object.to_io target
+    end
+    pp "----"
+
+    object_re = File.open "target.o", "r" do |input|
+      RiSC16::Object.from_io input
+    end
+
+    pp object_re
+    
     File.open "v2.out", "w" do |output|
       RiSC16::Linker.link_to_binary spec, [object], output
+    end
+
+    File.open "v2_re.out", "w" do |output|
+      RiSC16::Linker.link_to_binary spec, [object_re], output
     end
   end
 end

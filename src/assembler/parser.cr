@@ -107,7 +107,9 @@ class RiSC16::Assembler::Parser < Parser
   
   def section_specifier
     checkpoint "section" do
-      name = mandatory str "section"
+      mandatory str "section"
+      mandatory whitespace
+      name = (mandatory one_or_more char ['0'..'9', '_'..'_', 'a'..'z', 'A'..'Z']).join
       whitespace
       offset = checkpoint "section offset" do
         mandatory char '+'
