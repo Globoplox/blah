@@ -44,6 +44,7 @@ module RiSC16::Linker
 
     # check for conflict between exported symbols
     objects.each &.sections.each &.definitions.each do |(name, symbol)|
+      next unless symbol.exported
       raise "duplicate global symbol #{name}" if globals[name]?
       globals[name] = symbol                                                   
     end
@@ -89,29 +90,29 @@ module RiSC16::Linker
           value = symbol.address + reference.offset
           case reference.kind
             in Object::Section::Reference::Kind::Data
-              if value > 0b_0111_1111_1111_1111 || value < - 0b_1111_1111_1111_1111
-                raise "Reference to #{name} overflow from allowed 16 bits for symbol of type #{reference.kind}"
+              if value > 0b_1111_1111_1111_1111 || value < - 0b_1111_1111_1111_1111
+                raise "Reference to #{name} = #{value} overflow from allowed 16 bits for symbol of type #{reference.kind}"
               end
               binary[reference.address] = (value < 0 ? (2 ** 16) + value.bits(0...(16 - 1)) : value).to_u16
             in Object::Section::Reference::Kind::Imm
               if value > 0b_0011_1111 || value < - 0b_0111_1111
-                raise "Reference to #{name} overflow from allowed 7 bits for symbol of type #{reference.kind}"
+                raise "Reference to #{name} = #{value} overflow from allowed 7 bits for symbol of type #{reference.kind}"
               end
               binary[reference.address] = binary[reference.address] & ~0b_0111_1111 | (value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16
             in Object::Section::Reference::Kind::Lui
-              if value > 0b_0111_1111_1111_1111 || value < - 0b_1111_1111_1111_1111
-                raise "Reference to #{name} overflow from allowed 16 bits for symbol of type #{reference.kind}"
+              if value > 0b_1111_1111_1111_1111 || value < - 0b_1111_1111_1111_1111
+                raise "Reference to #{name} = #{value} overflow from allowed 16 bits for symbol of type #{reference.kind}"
               end
               binary[reference.address] = binary[reference.address] & ~0b_11_1111_1111 | ((value < 0 ? (2 ** 16) + value.bits(0...(16 - 1)) : value).to_u16 >> 6)
             in Object::Section::Reference::Kind::Lli 
-              if value > 0b_0011_1111 || value < - 0b_0111_1111
-                raise "Reference to #{name} overflow from allowed 7 bits for symbol of type #{reference.kind}"
+              if value > 0b_1111_1111_1111_1111 || value < - 0b_1111_1111_1111_1111
+                raise "Reference to #{name} = #{value} overflow from allowed 16 bits for symbol of type #{reference.kind}"
               end
               binary[reference.address] = binary[reference.address] & ~0b_0111_1111 | ((value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16 & 0x3f)
             in Object::Section::Reference::Kind::Beq
               value = value - reference.address - 1
               if value > 0b_0011_1111 || value < - 0b_0111_1111
-                raise "Reference to #{name} overflow from allowed 7 bits for symbol of type #{reference.kind}"
+                raise "Reference to #{name} = #{value} overflow from allowed 7 bits for symbol of type #{reference.kind}"
               end
               binary[reference.address] = binary[reference.address] & ~0b_0111_1111 | (value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16
           end

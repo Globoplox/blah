@@ -16,7 +16,11 @@ class RiSC16::Spec
   end
 
   def self.default
-    self.new({"io.tty" => {"type" => "tty", "index" => "0"} }, {} of String => String)
+    self.new(
+      {
+        "io.tty" => {"type" => "tty", "index" => "0"},
+        "section.text" => { "start" => DEFAULT_RAM_START.to_s }
+      }, {} of String => String)
   end
 
   def solve(value)

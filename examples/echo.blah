@@ -1,4 +1,3 @@
-section text + 0
 movi r1 0xff00 # if we read this word from tty, it mean it's closed.
 loop:
     lw r2 r0 :__io_tty_r # read w from tty in r2
@@ -9,8 +8,3 @@ loop:
     beq r0 r0 :loop
 end:
     halt
-section text + 20
-    addi r0 r0 :end
-section wololo
-    .ascii "azertyuiop"
-    addi r0 r0 5

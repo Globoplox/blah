@@ -1,3 +1,4 @@
+section rodata
 export hello: 	.ascii "Hello world !"
 	 	nop
 export garbage: .ascii "garbage"

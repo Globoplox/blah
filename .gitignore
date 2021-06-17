@@ -5,3 +5,5 @@
 *.dwarf
 a.out
 cli
+/build/
+*.ro
