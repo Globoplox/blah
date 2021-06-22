@@ -3,13 +3,11 @@
 # have a consume_while for better efficiency than one_or_more char pattern
 
 class Parser
-  @checkpoints = [] of (Int32 | Int64)
   @io : IO
   @error : String? = nil
-  @stack = [] of String
-
+  @checkpoint : Int32 | Int64 | Nil = nil
+  
   UNEXPECTED_EOF = "Reached end of input unexpectedly"
-
   UNEXPECTED_VALUE = "Encountered unexpected value"
 
   def summary
@@ -18,24 +16,11 @@ class Parser
   
   def initialize(@io, @debug = false) end
 
-  # register an error
   def error(message)
-    @error = String::Builder.build do |io|
-      io << "Error at position "
-      io << @io.tell
-      io << ": "
-      io << message
-      io << "\n"
-      @stack.reverse.each do |frame|
-        io << frame
-        io << "\n"
-      end
-    end
+    @error = "Error at position #{@io.tell}: #{message}"
     nil
   end
 
-  # True if read fully, false otherwise.
-  # Use at the end of the root rule to ensure there is no dandling stuff at the end of input.
   def read_fully?
     if @io.peek.try &.empty? == true
       true
@@ -44,49 +29,27 @@ class Parser
     end
   end
   
-  # register an eof error
   def eof
     error UNEXPECTED_EOF
   end
 
-  # register a mismatch error
   def mismatch
     error UNEXPECTED_VALUE
   end
   
-  # Optional parser for node that register them for debugging.
-  # This does not allow for checkpoints, a node using this must
-  # either never fail or not consume.
-  # Rule of thumb is: it's okay to use this instead of `checkpoint` when wrapping a single consuming call.
   def stack(description)
-    cursor = @stack.size
-    @stack.push "#{description} at #{@io.tell}"
-    yield.tap do @stack.pop end
+    yield
   end
 
-  # Rollback to the last checkpoint.
-  # FIXME: do not use a stack, only a local variable (swap with previous value) cached into a property for use by reollback. 
   def rollback
-    #puts "#{" " * @stack.size}rollbacking to #{@checkpoints[-1]}"
-    @io.pos = @checkpoints[-1]
+    @io.pos = @checkpoint || raise "Illegal rollback"
   end
 
-  # Create a checkpoint and rollback in case of failure.
-  # The rule to avoid mishap is that every parsing rule must rollback
-  # to the state of the parser at the beginning of the ruel if they fail.
-  # This is what checkpoint do.
   def checkpoint(description)
-    stack description do
-      a = @io.tell
-      puts "#{"  " * @stack.size}trying #{description} at #{@io.tell}'" if @debug
-      @io.pos = a
-      @checkpoints.push @io.tell
-      rollback unless value = yield
-      #puts "#{" " * @stack.size}pop"
-      @checkpoints.pop
-      puts "#{"  " * @stack.size}OK" if value if @debug
-      value
-    end
+    pos = @checkpoint = @io.tell
+    value = yield
+    @io.pos = pos unless value
+    value
   end
 
   def consume_until(sample : String): String
@@ -105,7 +68,6 @@ class Parser
     result
   end
   
-  # Consume a single character that must match given sample.
   def char(sample : Array(Char) | Char | Range(Char,Char) | Array(Range(Char, Char))): Char?
     checkpoint "char '#{sample}'" do
       case value = @io.gets(1).try &.char_at 0
@@ -120,7 +82,6 @@ class Parser
     end
   end
 
-  # Consume a single string that must match the given sample.
   def str(sample : Array(String) | String): String?
     checkpoint "string '#{sample}'" do
       sample_size = case sample
@@ -144,60 +105,15 @@ class Parser
     end
   end
 
-  # Consume whitespace.
-  # Here we don't need a checkpoint because we don't consume anything ourselves before the call that
-  # define if we failed or not.
-  def whitespace(multiline = false)
+  def whitespace
     stack "whitespace" do
-      if multiline
-        one_or_more(char([' ', '\t', '\r', '\n']))
-      else
-        one_or_more(char([' ', '\t', '\r']))
-      end
+      one_or_more { char [' ', '\t', '\r'] }
     end
   end
 
   def multiline_whitespace
-    whitespace true
-  end
-
-  # TODO: remove ?
-  def newlines
-    checkpoint "newlines" do
-      whitespace
-      mandatory begin
-        one_or_more(char('\n'), separated_by: begin
-          whitespace
-          true
-        end).tap do  
-          whitespace
-        end
-      end
-    end
-  end
-  
-  # Consume a newline
-  # Here we might have consumed a '\r' before realising if the match failed or not.
-  # So we need a checkpoint.
-  # TODO optimize
-  def newline
-    checkpoint "newline" do
-      char '\r'
-      mandatory char '\n'
-    end
-  end
-
-  # Macro for exiting from scope with nil when given expression is null, otherwise returning the given value.
-  # This is usefull to mark an expression as being mandatory inside the scope of a checkpoint.
-  # FIXME: make it more safe to use in loops ?
-  # Or find a better way ? maybe could be replaced by a cosntrut such as
-  # next unless var = expression
-  # this is more explisite that this magic macro
-  macro mandatory(expr)
-    begin
-      value_%_ = begin {{expr}} end
-      next mismatch if value_%_.nil?
-      value_%_.not_nil!
+    stack "multiline whitespace" do
+      one_or_more { char [' ', '\t', '\r', '\n'] }
     end
   end
 
@@ -216,79 +132,34 @@ class Parser
     end
   end
 
-  # Return a tuple of args or nil if any call is nil
-  # FIXME: Useless ?
-  macro and(*args)
-    {% raise "Rule 'and' need more than one argument" unless args.size > 1 %}
-    checkpoint {{args.map(&.id).join " and "}} do
-      {% for arg, index in args %}
-        value_{{index}} = {{arg}}
-        next nil unless value_{{index}}
-      {% end %}
-      {
-        {% for arg, index in args[0...-1] %}
-          value_{{index}},
-        {% end %}
-        value_{{args.size - 1}}
-      }
+  def one_or_more(separated_by : Proc(S)? = nil, &block : ->V?): Array(V)? forall V, S
+    checkpoint "one or more" do
+      values = zero_or_more(separated_by: separated_by) { yield }
+      next if values.empty?
+      values
     end
   end
 
-  # Return an array of the consumed arg, or nil if first call is nil
-  # FIXME: use a zero_or_more and a nil if empty ?
-  macro one_or_more(arg, separated_by = Nil)
-    stack %{One or more {{arg}}} do
-      results_%_ = [] of typeof({{arg}})
+  def zero_or_more(separated_by : Proc(S)? = nil, &block : ->V?): Array(V) forall V, S
+    stack "zero or more" do
+      results = [] of V
       loop do
-        checkpoint_%_ = @io.tell
-        {% if separated_by != Nil %}
-          begin
-            begin
-              @io.pos = checkpoint_%_
-              break
-            end unless {{separated_by}}
-          end unless results_%_.empty?
-        {% end %}
-        result_%_ = {{arg}}
-        begin
-          @io.pos = checkpoint_%_
-          break
-        end if result_%_.nil?
-        results_%_.push result_%_.not_nil!
-      end
-      if results_%_.empty?
-        error "Matched zero times"
-      else
-        results_%_.compact
-      end
-    end
-  end
-
-  # Return an array of the consumed arg. Never fail.
-  # Fixme: make it a function with blocks ? maybe use proc for the separated by, unless this has bad perf ?
-  macro zero_or_more(arg, separated_by = Nil)
-    stack %{Zero or more {{arg}}} do
-      results_%_ = [] of typeof({{arg}})
-      loop do
-        checkpoint_%_ = @io.tell
-        {% if separated_by != Nil %}
-          unless results_%_.empty?
-            separator_%_ = {{separated_by}}
-            if separator_%_.nil?
-              @io.pos = checkpoint_%_
-              break
-            end
+        local_checkpoint = @io.tell
+        unless results.empty? || separated_by.nil? 
+          if separated_by.call.nil?
+            @io.pos = local_checkpoint
+            break
           end
-        {% end %}
-        result_%_ = {{arg}}
-        begin
-          @io.pos = checkpoint_%_
+        end
+        if (result = yield).nil?
+          @io.pos = local_checkpoint
           break
-        end if result_%_.nil?
-        results_%_.push result_%_.not_nil!
+        else
+          results.push result
+        end
       end
-      results_%_.compact.not_nil!
-    end.not_nil!
+      results
+    end
   end
-
+  
 end
