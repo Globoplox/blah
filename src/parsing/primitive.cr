@@ -10,7 +10,7 @@ class Parser
   UNEXPECTED_EOF = "Reached end of input unexpectedly"
   UNEXPECTED_VALUE = "Encountered unexpected value"
 
-  def summary
+  def error
     @error
   end
   
@@ -36,16 +36,12 @@ class Parser
   def mismatch
     error UNEXPECTED_VALUE
   end
-  
-  def stack(description)
-    yield
-  end
 
   def rollback
     @io.pos = @checkpoint || raise "Illegal rollback"
   end
 
-  def checkpoint(description)
+  def checkpoint
     pos = @checkpoint = @io.tell
     value = yield
     @io.pos = pos unless value
@@ -69,7 +65,7 @@ class Parser
   end
   
   def char(sample : Array(Char) | Char | Range(Char,Char) | Array(Range(Char, Char))): Char?
-    checkpoint "char '#{sample}'" do
+    checkpoint do
       case value = @io.gets(1).try &.char_at 0
       when nil then eof
       else
@@ -83,7 +79,7 @@ class Parser
   end
 
   def str(sample : Array(String) | String): String?
-    checkpoint "string '#{sample}'" do
+    checkpoint do
       sample_size = case sample
       when String then sample.size
       when Array(String) then sample.map(&.size).max_by &.itself
@@ -106,42 +102,34 @@ class Parser
   end
 
   def whitespace
-    stack "whitespace" do
-      one_or_more { char [' ', '\t', '\r'] }
-    end
+    one_or_more ->{ char [' ', '\t', '\r'] }
   end
 
   def multiline_whitespace
-    stack "multiline whitespace" do
-      one_or_more { char [' ', '\t', '\r', '\n'] }
-    end
+    one_or_more ->{ char [' ', '\t', '\r', '\n'] }
   end
 
-  # Return the first non nil args, or nil if none match.
-  # We need to checkpoint because nothing garantee us that rollbacking won't
-  # bring us backward further than what we have consumed
-  macro or(*args)
-    {% raise "Rule 'or' need more than one argument" unless args.size > 1 %}
-    checkpoint {{args.map(&.id).join " or "}} do
-      {% for arg in args[0...-1] %}
-        value = {{arg}}
-        next value if value
-        rollback
-      {% end %}
-      {{args[-1]}} || error "No matching alternative"
+  def or(*alternatives)
+    checkpoint do 
+      alternatives.each do |alt|
+        case result = alt.call
+        when nil then rollback
+        else return result
+        end
+      end
     end
-  end
-
-  def one_or_more(separated_by : Proc(S)? = nil, &block : ->V?): Array(V)? forall V, S
-    checkpoint "one or more" do
-      values = zero_or_more(separated_by: separated_by) { yield }
+  end    
+  
+  def one_or_more(block : ->V?, separated_by : Proc(S)? = nil): Array(V)? forall V, S
+    checkpoint do
+      values = zero_or_more block, separated_by
       next if values.empty?
       values
     end
   end
 
-  def zero_or_more(separated_by : Proc(S)? = nil, &block : ->V?): Array(V) forall V, S
-    stack "zero or more" do
+  def zero_or_more(block : ->V?, separated_by : Proc(S)? = nil): Array(V) forall V, S
+    checkpoint do
       results = [] of V
       loop do
         local_checkpoint = @io.tell
@@ -151,7 +139,7 @@ class Parser
             break
           end
         end
-        if (result = yield).nil?
+        if (result = block.call).nil?
           @io.pos = local_checkpoint
           break
         else
@@ -159,6 +147,14 @@ class Parser
         end
       end
       results
+    end
+  end
+
+  macro rule(prototype)
+    def {{prototype.name}}
+      checkpoint do
+        {{prototype.body}}
+      end
     end
   end
   
