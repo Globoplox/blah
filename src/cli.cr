@@ -103,9 +103,9 @@ module RiSC16
       objects = sources_files.map do |source|
         File.open source do |input|
           if source.ends_with?(".blah")
-            unit = RiSC16::Assembler::Parser.new(input, debug).unit || raise "Parse error in input file #{source}"
+            parser = RiSC16::Assembler::Parser.new input, debug
+            unit = parser.unit(name: source) || raise "Parse error in input file #{source}"
             object = RiSC16::Assembler.assemble(unit)
-            object.name = source
             name = source.gsub(".blah", ".ro")
             if create_intermediary
               File.open Path[(intermediary_dir || Dir.current).not_nil!, Path[name].basename], "w" do |output|

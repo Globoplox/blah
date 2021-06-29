@@ -1,50 +1,37 @@
-# fix the error management, it is almost useless now
-
-# have a consume_while for better efficiency than one_or_more char pattern
-
 class Parser
-  @io : IO
-  @error : String? = nil
-  @checkpoint : Int32 | Int64 | Nil = nil
-  
-  UNEXPECTED_EOF = "Reached end of input unexpectedly"
-  UNEXPECTED_VALUE = "Encountered unexpected value"
 
-  def error
-    @error
+  abstract class Node
+    property line : Int32? = nil
+    property character : Int32? = nil
+  end
+
+  record Checkpoint, position : Int32 | Int64, line : Int32, character : Int32 
+
+  @io : IO
+  @checkpoint : Checkpoint = Checkpoint.new 0, 1, 1
+  @line : Int32 = 1
+  @character : Int32 = 1
+
+  def read_fully?
+    true if @io.peek.try &.empty? == true
   end
   
   def initialize(@io, @debug = false) end
 
-  def error(message)
-    @error = "Error at position #{@io.tell}: #{message}"
-    nil
-  end
-
-  def read_fully?
-    if @io.peek.try &.empty? == true
-      true
-    else
-      error "Unexpected input, Expected EOF"
-    end
-  end
-  
-  def eof
-    error UNEXPECTED_EOF
-  end
-
-  def mismatch
-    error UNEXPECTED_VALUE
-  end
-
   def rollback
-    @io.pos = @checkpoint || raise "Illegal rollback"
+    @io.pos = @checkpoint.position
+    @line = @checkpoint.line
+    @character = @checkpoint.character
   end
 
   def checkpoint
-    pos = @checkpoint = @io.tell
+    saved = @checkpoint = Checkpoint.new @io.tell, @line, @character
     value = yield
-    @io.pos = pos unless value
+    unless value
+      @io.pos = saved.position
+      @line = saved.line
+      @character = saved.character
+    end
     value
   end
 
@@ -61,19 +48,30 @@ class Parser
         result += value.not_nil!
       end
     end
+    if (lines = result.count '\n') != 0
+      @line += lines
+      @character = (result.reverse.index '\n') || 0
+    end
     result
   end
   
   def char(sample : Array(Char) | Char | Range(Char,Char) | Array(Range(Char, Char))): Char?
     checkpoint do
       case value = @io.gets(1).try &.char_at 0
-      when nil then eof
+      when nil then nil
       else
         case sample
         when Char then value if sample == value
         when Array(Char), Range(Char,Char) then value if sample.includes? value
         when Array(Range(Char, Char)) then value if sample.any?(&.includes? value)
         end
+      end
+    end.tap &.try do |result|
+      if result == '\n'
+        @line += 1
+        @character = 0
+      else
+        @character += 1
       end
     end
   end
@@ -86,7 +84,7 @@ class Parser
       else 0
       end
       case value = @io.gets sample_size
-      when nil then eof
+      when nil then nil
       else
         case sample
         when String then value if sample == value
@@ -97,6 +95,11 @@ class Parser
             @io.pos = @io.tell - sample_size + subsample.size            
           end
         end
+      end
+    end.tap &.try do |result|
+      if (lines = result.count '\n') != 0
+        @line += lines
+        @character = (result.reverse.index '\n') || 0
       end
     end
   end
@@ -150,10 +153,16 @@ class Parser
     end
   end
 
-  macro rule(prototype)
-    def {{prototype.name}}
+  macro rule(definition)
+    {% d = definition %}
+    def {{d.receiver}}{{d.receiver ? ".".id : "".id}}{{d.name}}({{d.args.splat}}){{d.return_type ? ":" : "".id}}{{d.return_type}}
       checkpoint do
-        {{prototype.body}}
+        {{d.body}}
+      end.tap do |result|
+        if result.is_a? Node
+          result.line = @line
+          result.character = @character
+        end
       end
     end
   end

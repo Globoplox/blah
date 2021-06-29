@@ -28,7 +28,7 @@ module RiSC16::Assembler
     object.sections << current_section
     text = [] of UInt16
     immediates = [] of {AST::Immediate, Int32, Object::Section::Reference::Kind}
-    all_defintions = [] of String # for error management only
+    all_defintions = {} of String => AST::Statement
 
     unit.statements.each do |statement|
 
@@ -39,9 +39,11 @@ module RiSC16::Assembler
         object.sections << current_section
       end
 
-      statement.symbol.try do |label| # could use ast metadata that do not exists yet to add line and column for sources
-        raise "Duplicate symbol '#{label}'" if label.in? all_defintions
-        all_defintions << label
+      statement.symbol.try do |label|
+        all_defintions[label]?.try do |previous|
+          raise "Duplicate symbol '#{label}' in #{unit.name || "???"} at line #{statement.line}. Previously defined at line #{previous.line}"
+        end
+        all_defintions[label] = statement
         current_section.definitions[label] = Object::Section::Symbol.new text.size, statement.exported
       end
      
@@ -125,7 +127,7 @@ module RiSC16::Assembler
             text << Instruction.new(ISA::Lw, reg_a: reg.index.to_u16, reg_b: stack.index.to_u16, immediate: index.to_u16 + 2).encode
           end
           text << Instruction.new(ISA::Addi, reg_a: stack.index.to_u16, reg_b: stack.index.to_u16, immediate: regs.size.to_u16 + 1).encode
-        else raise "Unknown statement memo #{memo}"
+        else raise "Unknown statement memo '#{memo}' in #{unit.name || "???"} at line #{statement.line}."
         end
       end
 

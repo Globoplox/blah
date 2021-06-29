@@ -1,6 +1,9 @@
-module RiSC16::Assembler::AST
+require "../parsing/primitive"
 
-  abstract class Parameter end
+module RiSC16::Assembler::AST
+  alias Node = Parser::Node
+  
+  abstract class Parameter < Node end
 
   class Text < Parameter
     property text : String
@@ -18,13 +21,13 @@ module RiSC16::Assembler::AST
     def initialize(@offset, @symbol) end
   end
   
-  class Instruction
+  class Instruction < Node
     property memo : String
     property parameters : Array(Parameter)
     def initialize(@memo, @parameters) end
   end
   
-  class Statement
+  class Statement < Node
     property section : Section?
     property exported : Bool
     property symbol : String?
@@ -35,17 +38,17 @@ module RiSC16::Assembler::AST
     end
   end
   
-  class Section
+  class Section < Node
     property name : String
     property offset : Int32?
     def initialize(@name, @offset = nil) end
   end
   
-  class Unit
+  class Unit < Node
     property name : String?
     property statements : Array(Statement)
     getter name
-    def initialize(@statements) end
+    def initialize(@statements, @name = nil) end
   end
 
 end
