@@ -27,11 +27,8 @@ class Parser
   def checkpoint
     saved = @checkpoint = Checkpoint.new @io.tell, @line, @character
     value = yield
-    unless value
-      @io.pos = saved.position
-      @line = saved.line
-      @character = saved.character
-    end
+    @checkpoint = saved
+    rollback unless value
     value
   end
 
