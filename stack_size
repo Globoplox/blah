@@ -1,0 +1,10 @@
+How to prevent memory overflows ?
+
+The program is responsible for not overflowing by his own logic. He know:
+- His loading position (Through static or dynamic linking)
+- His size
+- His stack address
+- He can be given at linking (static or dynamic, again) a stack size. Or it can be made a standard.
+
+How to ensure the stack is not overflowed ?
+- Checking by calculating at each call (need to know remaining stack size, aka stack_start - stack_pointer) ?

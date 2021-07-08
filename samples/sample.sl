@@ -9,6 +9,9 @@ struct Person {
 require "truc/pet.blah" // this extract only protoypes and types
 // BE WARY OF recursive def
 
+
+
+
 fun read_io(src: *, dst: *, limit) {
     var offset = 0x0
     var read = 0x0

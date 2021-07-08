@@ -1,17 +1,23 @@
 module Stacklang
   
   abstract class Type::Any
-    abstract def size : UInt16
+    abstract def size
 
-    # Solve the cosntraint of a struct field and map it to the right type.
-    def self.solve_constraint(ast : AST::Constraint, types : Hash(String, Type::Any), stack : Array(Type::Struct) = [] of Type::Struct) : Type::Any 
+    # Solve the constraint of a struct field and map it to the right type.
+    def self.solve_constraint(ast : AST::Type, types : Hash(String, Type::Struct), stack : Array(Type::Struct) = [] of Type::Struct) : Type::Any
       case ast
       when AST::Word then Type::Word.new
-      when AST::Pointer then Type::Pointer.new types[ast.name]? || raise "Unknown struct name: '{ast.name}'"
+      when AST::Pointer
+        if (target = ast.target).is_a? AST::Custom
+          Type::Pointer.new types[target.name]? || raise "Pointer to unknow struct name: '#{target.name}'"
+        else
+          Type::Pointer.new solve_constraint target, types
+        end
       when AST::Custom
-        actual_type = types[ast.name]? || raise "Unknown struct name: '{ast.name}'"
+        
+        actual_type = types[ast.name]? || raise "Unknown struct name: '#{ast.name}'"
         raise "Type #{actual_type.name} is recursive. This is illegal. Use a pointer to #{actual_type.name} instead." if actual_type.in? stack
-        actual_type.solve types, stack
+        actual_type.solve types, stack + [actual_type]
         actual_type
       else raise "Unknown Type Kind #{typeof(ast)}"
       end
@@ -28,7 +34,7 @@ module Stacklang
     def initialize(@pointer_of : Type::Any) end
   end
   
-  class Type::Struct
+  class Type::Struct < Type::Any
     class Field
       property name
       property any
@@ -41,7 +47,7 @@ module Stacklang
     @size : UInt16? = nil
     
     def initialize(@ast_struct : AST::Struct)
-      @name = ast.name
+      @name = @ast_struct.name
       @fields = [] of Field
     end
 
@@ -50,12 +56,12 @@ module Stacklang
     end
 
     # Compute the size and fields of the structures. It needs all other structure types to be given.
-    def solve(other_types : Hash(String, Type::Any), stack : Array(Type::Struct) = [] of Type::Struct)
+    def solve(other_types : Hash(String, Type::Struct), stack : Array(Type::Struct) = [] of Type::Struct)
       @size ||= begin
         offset = 0u16
         @fields = @ast_struct.fields.map do |ast_field|
-          constraint = Type::Any.solve_constraint ast_field, other_types, stack + [self]
-          Field.new ast_field.name, constraint, (offset += constaint.size) 
+          constraint = Type::Any.solve_constraint ast_field.constraint, other_types, stack + [self]
+          Field.new ast_field.name.name, constraint, (offset += constraint.size) 
         end
         offset
       end

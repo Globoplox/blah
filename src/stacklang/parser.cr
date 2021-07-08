@@ -238,6 +238,8 @@ class Stacklang::Parser < Parser
       end
     elsif name = type_name
       Custom.new name
+    elsif char '_'
+      Word.new
     else
       Word.new
     end
@@ -336,5 +338,3 @@ class Stacklang::Parser < Parser
   end
   
 end
-
-pp Stacklang::Parser.new(IO::Memory.new(ARGF.gets_to_end), true).unit.try &.dump STDOUT
