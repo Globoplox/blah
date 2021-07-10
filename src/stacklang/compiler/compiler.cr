@@ -2,6 +2,7 @@ require "./unit"
 require "../parser"
 require "../../assembler/object"
 
+# TODO: getting more than one path is useless.
 class Stacklang::Compiler
   @units : Hash(Path, Unit)
 
@@ -35,5 +36,3 @@ class Stacklang::Compiler
   end
     
 end
-
-pp Stacklang::Compiler.new(ARGV).compile

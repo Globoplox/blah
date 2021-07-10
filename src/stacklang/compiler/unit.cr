@@ -1,5 +1,6 @@
 require "./compiler"
 require "./types"
+require "./function"
 require "../../assembler/object"
 
 # We compile ONLY the thing in the current unit, the requirements are for info only (globals and functions are not compiled).
@@ -21,8 +22,10 @@ class Stacklang::Unit
   
   @requirements: Array(Unit)? = nil
   @self_structs : Array(Type::Struct)? = nil
+  @self_functions : Array(Function)? = nil
+  @self_globals : Array(Global)? = nil
   @structs : Hash(String, Type::Struct)? = nil
-  @local_globals : Array(Global)? = nil
+  @functions : Hash(String, Function)? = nil
                                    
   def initialize(@ast : AST::Unit, @path : Path, @compiler : Compiler)
   end
@@ -54,6 +57,23 @@ class Stacklang::Unit
     traverse.reject(&.== self)
   end
 
+  def self_functions
+    @self_functions ||= @ast.functions.map do |ast|
+      Function.new ast, self
+    end
+  end
+
+  def functions
+    @functions ||= begin
+      (self_functions + externs.flat_map(&.self_functions)).group_by do |function|
+	function.name
+      end.transform_values do |functions|
+        raise "Name clash for function '#{functions.first.name}'" if functions.size > 1
+        functions.first
+      end               
+    end
+  end
+
   def self_structs
     @self_structs ||= @ast.types.map do |ast|
       Type::Struct.new ast
@@ -77,11 +97,11 @@ class Stacklang::Unit
   end
 
   def typeinfo(constraint)
-    Types::Any.solve_constraint constraint, structs
+    Type::Any.solve_constraint constraint, structs
   end
 
   def self_globals : Array(Global)
-    @local_globals ||= @ast.globals.map do |variable|
+    @self_globals ||= @ast.globals.map do |variable|
       raise "Initialization of global variable is not implemented" if variable.initialization
       Global.new variable.name.name, Type::Any.solve_constraint variable.constraint, structs
     end
@@ -89,7 +109,6 @@ class Stacklang::Unit
 
   def compile
     RiSC16::Object.new(path.to_s).tap do |object|
-
       object.sections << RiSC16::Object::Section.new("globals").tap do |section|
         size = self_globals.reduce(0u16) do |size, local|
           raise "Duplicate local global #{local.name} in #{path}" if section.definitions[local.symbol]?
@@ -98,9 +117,10 @@ class Stacklang::Unit
         end
         section.text = Slice(UInt16).new size
       end
-      
+      self_functions.each do |function| 
+        object.sections << function.compile
+      end
     end
-    
   end
   
 end

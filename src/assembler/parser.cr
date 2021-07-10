@@ -95,7 +95,7 @@ class RiSC16::Assembler::Parser < Parser
     offset = checkpoint do
       next unless char '+'
       whitespace
-      next unless number
+      number
     end
     Section.new name.join, offset 
   end

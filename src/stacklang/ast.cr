@@ -1,6 +1,13 @@
 module Stacklang::AST
+  alias Node = Parser::Node
+
+  class Node
+    def to_s
+      String.build { |io| dump io }
+    end
+  end
   
-  class Unit
+  class Unit < Node
     getter requirements
     getter types
     getter globals
@@ -34,7 +41,7 @@ module Stacklang::AST
     end
   end
 
-  class Requirement
+  class Requirement < Node
     getter target
     
     def initialize(@target : String) end
@@ -44,11 +51,11 @@ module Stacklang::AST
     end
   end
   
-  abstract class Statement
+  abstract class Statement < Node
     abstract def dump(io, indent = 0)
   end
 
-  abstract class Type
+  abstract class Type < Node
     abstract def dump(io, indent = 0)
   end
 
@@ -77,7 +84,7 @@ module Stacklang::AST
     end
 end
   
-  class Variable
+  class Variable < Node
     getter name
     getter constraint
     getter initialization
@@ -133,15 +140,16 @@ end
   end
 
   class Return < Statement
-    def initialize(@value : Expression) end
-
+    def initialize(@value : Expression?) end
+    getter value
+    
     def dump(io, indent = 0)
       io << "return "
-      @value.dump io, indent
+      @value.try &.dump io, indent
     end
   end
 
-  class Function
+  class Function < Node
     class Parameter
       def initialize(@name : Identifier, @constraint : Type) end
       getter name
@@ -153,7 +161,14 @@ end
         @constraint.dump io, indent
       end
     end
-    def initialize(@name : Identifier, @parameters : Array(Parameter), @return_type : Type, @variables : Array(Variable), @body : Array(Statement)) end
+
+    getter name
+    getter parameters
+    getter variables
+    getter return_type
+    getter body
+    
+    def initialize(@name : Identifier, @parameters : Array(Parameter), @return_type : Type?, @variables : Array(Variable), @body : Array(Statement)) end
 
     def dump(io, indent = 0)
       io << "fun "
@@ -181,7 +196,7 @@ end
     end
   end
 
-  class Struct
+  class Struct < Node
     getter name
     getter fields
     
@@ -214,7 +229,8 @@ end
 
   class Literal < Expression
     def initialize(@number : Int32) end
-
+    getter number
+    
     def dump(io, indent = 0)
       io << "0x"
       io << @number.to_s base: 16

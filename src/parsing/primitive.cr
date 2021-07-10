@@ -48,6 +48,8 @@ class Parser
     if (lines = result.count '\n') != 0
       @line += lines
       @character = (result.reverse.index '\n') || 0
+    else
+      @character += result.size
     end
     result
   end
@@ -97,6 +99,8 @@ class Parser
       if (lines = result.count '\n') != 0
         @line += lines
         @character = (result.reverse.index '\n') || 0
+      else
+        @character += result.size
       end
     end
   end

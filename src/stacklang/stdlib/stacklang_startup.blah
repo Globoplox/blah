@@ -1,0 +1,34 @@
+section text + 0x0
+movi r7 :__stack
+movi r6 :__function_main
+jalr r6 r6 0x0 # call main
+lw r6 r7 -1 # we take return word of main
+sw r6 r7 -2 # put it as first param of putw
+movi r6 :__function_putw
+jalr r6 r6 0x0 # call putw
+halt
+
+export __global_hex_prefix: .ascii "0x"
+       			    nop
+
+export __global_hex_digits: .ascii "0123456789ABCDEF"
+       			    nop
+
+export __function_putw:
+        # Expect: r6 store return address, r7 is stack ptr
+        movi r1 :__global_hex_prefix
+        lw r2 r1 0
+	sw r2 r0 :__io_tty_r
+        lw r2 r1 1
+        sw r2 r0 :__io_tty_r
+        # load first paramter, which we expect to be a word
+        lw r1 r7 -0x2 # pos of first word-size parameter
+	movi r5 :__global_hex_digits
+        movi r2 0x000f
+        nand r3 r1 r2
+        nand r3 r3 r3
+	add r3 r3 r5
+	lw r3 r3 0
+        sw r3 r0 :__io_tty_r
+        # bitshift > 8 then do again
+        jalr r0 r6 0x0 # return

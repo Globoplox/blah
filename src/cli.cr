@@ -4,6 +4,7 @@ require "./assembler/parser"
 require "./assembler/assembler"
 require "./assembler/linker"
 require "./vm"
+require "./stacklang/compiler"
 
 module RiSC16
 
@@ -101,23 +102,33 @@ module RiSC16
         Dir.mkdir_p intermediary_dir unless Dir.exists? intermediary_dir
       end
       objects = sources_files.map do |source|
-        File.open source do |input|
-          if source.ends_with?(".blah")
-            parser = RiSC16::Assembler::Parser.new input, debug
-            unit = parser.unit(name: source) || raise "Parse error in input file #{source}"
-            object = RiSC16::Assembler.assemble(unit)
-            name = source.gsub(".blah", ".ro")
-            if create_intermediary
-              File.open Path[(intermediary_dir || Dir.current).not_nil!, Path[name].basename], "w" do |output|
-                object.to_io output
-              end
+        if source.ends_with?(".sl")
+          object = Stacklang::Compiler.new([source]).compile.first
+          name = source.gsub(".blah", ".ro")
+          if create_intermediary
+            File.open Path[(intermediary_dir || Dir.current).not_nil!, Path[name].basename], "w" do |output|
+              object.to_io output
             end
-            object
-          elsif source.ends_with? ".ro"
-            object = RiSC16::Object.from_io input, name: source
-            object
-          else raise "Unknown type of input file: #{source}" 
           end
+          object
+        elsif source.ends_with?(".blah")
+          unit = File.open source do |input|
+            parser = RiSC16::Assembler::Parser.new input, debug
+            parser.unit(name: source) || raise "Parse error in input file #{source}"
+          end
+          object = RiSC16::Assembler.assemble(unit)
+          name = source.gsub(".blah", ".ro")
+          if create_intermediary
+            File.open Path[(intermediary_dir || Dir.current).not_nil!, Path[name].basename], "w" do |output|
+              object.to_io output
+            end
+          end
+          object
+        elsif source.ends_with? ".ro"
+          File.open source do |input|
+            RiSC16::Object.from_io input, name: source
+          end
+        else raise "Unknown type of input file: #{source}" 
         end
       end
 

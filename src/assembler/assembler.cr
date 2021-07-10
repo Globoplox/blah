@@ -132,7 +132,7 @@ module RiSC16::Assembler
       end
 
     end
-    current_section.text =  Slice.new text.size do |i| text[i] end
+    current_section.text = Slice.new text.size do |i| text[i] end
     object
   end
 end

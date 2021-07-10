@@ -27,11 +27,25 @@ module Stacklang
 
   class Type::Word < Type::Any
     getter size = 1u16
+
+    def self.new
+      @@i ||= new _init: true 
+    end
+
+    def initialize(_init)
+    end
+    
+    def to_s
+      "_"
+    end
   end
 
   class Type::Pointer < Type::Any
     getter size = 1u16
     def initialize(@pointer_of : Type::Any) end
+    def to_s
+      "*#{@pointer_of.to_s}"
+    end
   end
   
   class Type::Struct < Type::Any
@@ -49,6 +63,10 @@ module Stacklang
     def initialize(@ast_struct : AST::Struct)
       @name = @ast_struct.name
       @fields = [] of Field
+    end
+
+    def to_s
+      @name
     end
 
     def size : UInt16

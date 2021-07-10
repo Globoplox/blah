@@ -3,3 +3,7 @@ require "./globals.sl" // just to check if it go boom
 
 var jack : Person
 var bean : Pet
+
+fun main:_ {
+    return 0xf
+}

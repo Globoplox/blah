@@ -1,6 +1,10 @@
 require "../parsing/primitive"
 require "./ast"
 
+# FIXME: line and char counts
+# TODO: Cast
+# TODO: Function PTR
+# TODO: Minimalistic Operator Overloading ?
 class Stacklang::Parser < Parser
   include Stacklang::AST
 
@@ -21,19 +25,35 @@ class Stacklang::Parser < Parser
     separator = false
     loop do
       check = @io.tell
+      line = @line
+      character = @character
       case c = @io.gets 1
-      when ";", "\n" then separator = true
-      when " ", "\t", "\r" then next
+      when ";"
+        @character += 1
+        separator = true
+      when "\n"
+        @character = 0
+        @line += 1
+        separator = true
+      when " ", "\t", "\r"
+        @character += 1
+        next
       when "/"
+        @character += 1
         c = @io.gets 1
         if c == "/"
+          @character += 1
           consume_until "\n"
         else
           @io.pos = check
+          @line = line
+          @character = character
           break
         end
       else
         @io.pos = check
+        @line	= line
+        @character =	character
         break
       end
     end
@@ -64,8 +84,8 @@ class Stacklang::Parser < Parser
 
   rule def statement_return
     next unless str "return"
-    next unless whitespace
-    next unless expr = expression 
+    whitespace
+    expr = expression 
     Return.new expr
   end
 
@@ -226,9 +246,9 @@ class Stacklang::Parser < Parser
     end
   end
 
-  rule def type_constraint(colon = true)
+  rule def type_constraint(colon = true, explicit = false)
     if colon
-      next Word.new unless char ':'
+      next (explicit ? nil : Word.new) unless char ':'
     end
 
     whitespace
@@ -240,7 +260,7 @@ class Stacklang::Parser < Parser
       Custom.new name
     elsif char '_'
       Word.new
-    else
+    elsif !explicit
       Word.new
     end
   end
@@ -306,7 +326,7 @@ class Stacklang::Parser < Parser
       params
     end || [] of Function::Parameter
     whitespace
-    next unless ret_type = type_constraint
+    ret_type = type_constraint explicit: true
     
     multiline_whitespace
     next unless char '{'
