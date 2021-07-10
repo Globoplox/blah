@@ -82,6 +82,10 @@ module Stacklang
           Field.new ast_field.name.name, constraint, (offset += constraint.size) 
         end
         offset
+      end.tap do |size|
+        # Temporary check.
+        # This is because for now compiler generate memcpy that use an immediate index instead of looping on size
+        raise "Structure cannot be bigger than 63 words for now" if size > 63
       end
     end
 

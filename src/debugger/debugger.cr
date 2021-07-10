@@ -15,18 +15,19 @@ module RiSC16
 
   class Debugger
 
-    @units : Array(Assembler::Unit)
+    #@units : Array(Assembler::Unit)
     @input = IO::Memory.new
     @output = IO::Memory.new
     @vm : VM
-    @locs : Hash(UInt16, Array(Assembler::Loc))
+    #@locs : Hash(UInt16, Array(Assembler::Loc))
     @cursor = 0
     @spec : Spec
     @breakpoints = Set(Int32).new
     
-    def initialize(@units, io, @spec)
+    #def initialize(@units, io, @spec)
+    def initialize(io, @spec)
       @vm = VM.from_spec(@spec, io_override: {"tty" => VM::MMIO.new(@input, @output)}).tap &.load io      
-      @locs = {} of UInt16 => Array(Assembler::Loc)
+      #@locs = {} of UInt16 => Array(Assembler::Loc)
       #unit.each_with_address do |address, loc|
       #  (@locs[address] = @locs[address]? || [] of Assembler::Loc).push loc
       #end
@@ -42,7 +43,7 @@ module RiSC16
           "#{i.opcode} r#{i.reg_a} r#{i.reg_b} r#{i.reg_c}"
         end
       in ISA::Addi, ISA::Sw, ISA::Lw, ISA::Beq, ISA::Jalr
-        if i.opcode.jalr? && i.immediate
+        if i.opcode.jalr? && i.immediate != 0
           "halt 0x#{i.immediate.to_w}"
         else
           "#{i.opcode} r#{i.reg_a} r#{i.reg_b} 0x#{i.immediate.to_w}"
@@ -63,10 +64,10 @@ module RiSC16
         code = Table.new(
           x: 0, y: 0,
           height: NCurses.maxy / 2, width: NCurses.maxx // 2,
-          columns: [3, 7, 20, 30], title: "CODE",
+          columns: [3, 8, 20, 30], title: "CODE",
           range: (0..((@spec.ram_start + @spec.ram_size).to_i))
         ) do |address|
-          labels = (@locs[address]?.try(&.map &.label).try &.compact.join ", ") || " "
+          labels = "" # (@locs[address]?.try(&.map &.label).try &.compact.join ", ") || " "
           dis = disassemble @vm.ram[address]
           cursor = case {@breakpoints.includes?(address), address}
           when {_, @vm.pc} then ">"

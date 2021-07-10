@@ -5,6 +5,7 @@ require "./assembler/assembler"
 require "./assembler/linker"
 require "./vm"
 require "./stacklang/compiler"
+require "./debugger"
 
 module RiSC16
 
@@ -59,7 +60,7 @@ module RiSC16
       parser.on("-d DEFINE", "--define=DEFINE", "Define a value for specs.") { |it| it.split('=').tap { |it| macros[it[0]] = it[1] }  }
       parser.on("-u", "--unclutter", "Do not serialize the relocatable files.") { create_intermediary = false }
       parser.on("-b DIR", "--build-dir=DIR", "Specify the directory for relocatable files.") { |directory| intermediary_dir = directory }
-      parser.on("-g", "--debug", "Run with improved logging.") { debug = true }
+      parser.on("-g", "--debug", "Run in debugger.") { debug = true }
       parser.on("-i", "--intermediary-only", "Do not build exectuable.") { intermediary_only = true }
       parser.on("-r", "--also-run", "Run the created executable.") { also_run = true }
 
@@ -145,7 +146,11 @@ module RiSC16
         
         if also_run
           binary.rewind
-          VM.from_spec(spec).tap(&.load binary).run
+          if debug
+            Debugger.new(binary, spec).run
+          else
+            VM.from_spec(spec).tap(&.load binary).run
+          end
         end
       end
     

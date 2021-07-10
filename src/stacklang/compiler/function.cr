@@ -123,14 +123,20 @@ class Stacklang::Function
 
   # Helper function for assembling immediate value
   def assemble_immediate(immediate, kind)
-    bits = case kind
-      when .imm?, .beq? then 7
-       else 16
+    if immediate.is_a? String
+      references = @section.references[immediate] ||= [] of Object::Section::Reference
+      references << Object::Section::Reference.new @text.size.to_u16, 0, kind
+      0u16
+    else
+      bits = case kind
+        when .imm?, .beq? then 7
+        else 16
+      end
+      value = (immediate < 0 ? (2 ** bits) + immediate.bits(0...(bits - 1)) : immediate).to_u16
+      value = value >> 6 if kind.lui?
+      value = value & 0x3fu16 if kind.lli?
+      value
     end
-    value = (immediate < 0 ? (2 ** bits) + immediate.bits(0...(bits - 1)) : immediate).to_u16
-    value = value >> 6 if kind.lui?
-    value = value & 0x3fu16 if kind.lli?
-    value
   end
   
   # There could be a lot of optimization here
@@ -144,15 +150,14 @@ class Stacklang::Function
     selected
   end
 
-  # Represent an offset to the stack. Can be used to represent:
+  # Represent an addres, offset to the stack. Can be used to represent:
   # - a variable
   # - a field of a variable
   # - a paramter of a futur call
   # - the return value of current function
   class Offset
     getter offset : Int32
-    # def self.for_self_variable(variable, fields = [] of Identifier)
-      
+    # def self.for_self_variable(variable, fields = [] of Identifier)  
     # end
 
     # def self.for_futur_call(prototype, parameter_name)
@@ -161,6 +166,12 @@ class Stacklang::Function
     # end
 
     def initialize(@offset) end
+  end
+
+  # Reprensent an absolute address
+  class Absolute
+    getter value : Int32 | String
+    def initialize(@value) end
   end
 
   # Compile a literal.
@@ -187,15 +198,66 @@ class Stacklang::Function
     Type::Word.new
   end
 
-  # TODO: handle globals
+  # TODO: handle copy with index in a temporary register with a beq loop ?
+  # that would be much better than these infamous dump of lw sw
+  # which will fail when the size is biger than 64 anyway
+
+  def compile_global(global : Unit::Global, into : Registers | Offset | Absolute | Nil): Type::Any?
+    return nil if into.nil? # An expression composed of just a global is useless (it can't have a side effect)
+    case into
+    when Registers
+      raise "Cannot load multiple-word variable in register" if global.type_info.size > 1
+      # load address of global (we use the target register as a buffer)
+      @text << Instruction.new(ISA::Lui, into.value, immediate: assemble_immediate global.symbol, Kind::Lui).encode
+      @text << Instruction.new(ISA::Addi, into.value, into.value, immediate: assemble_immediate global.symbol, Kind::Lli).encode
+      # dereference
+      @text << Instruction.new(ISA::Lw, into.value, into.value).encode
+    when Offset
+      # load address of global
+      source_register = grab_register # will contain the global address
+      @text << Instruction.new(ISA::Lui, source_register.value, immediate: assemble_immediate global.symbol, Kind::Lui).encode
+      @text << Instruction.new(ISA::Addi, source_register.value, source_register.value, immediate: assemble_immediate global.symbol, Kind::Lli).encode
+      # reserve temporary register
+      tmp_register = grab_register excludes: [source_register]
+      # load destination address
+      dest_register = STACK_REGISTER
+      # copy
+      (0...(global.type_info.size)).each do |index|
+        @text << Instruction.new(ISA::Lw, tmp_register.value, source_register.value, assemble_immediate index, Kind::Imm).encode
+        @text << Instruction.new(ISA::Sw, tmp_register.value, dest_register.value, immediate: assemble_immediate into.offset + index, Kind::Imm).encode
+      end
+    when Absolute
+      # load address of global
+      source_register = grab_register # will contain the global address
+      @text << Instruction.new(ISA::Lui, source_register.value, immediate: assemble_immediate global.symbol, Kind::Lui).encode
+      @text << Instruction.new(ISA::Addi, source_register.value, source_register.value, immediate: assemble_immediate global.symbol, Kind::Lli).encode
+      # reserve temporary register
+      tmp_register = grab_register excludes: [source_register] # will contain the value to transfer
+      # load destination address
+      dest_register = grab_register excludes: [source_register, tmp_register] # will contain the destination addess
+      @text << Instruction.new(ISA::Lui, dest_register.value, immediate: assemble_immediate into.value, Kind::Lui).encode
+      @text << Instruction.new(ISA::Addi, dest_register.value, dest_register.value, immediate: assemble_immediate into.value, Kind::Lli).encode
+      # copy
+      (0...(global.type_info.size)).each do |index|
+        @text << Instruction.new(ISA::Lw, tmp_register.value, source_register.value, immediate: assemble_immediate index, Kind::Imm).encode
+        @text << Instruction.new(ISA::Sw, tmp_register.value, dest_register.value, immediate: assemble_immediate index, Kind::Imm).encode
+      end
+    end
+    global.type_info
+  end
+  
+  # TODO: handle Absolute
   def compile_identifier(identifier : AST::Identifier, into : Registers | Offset | Nil): Type::Any?
     return nil if into.nil? # An expression composed of just an identifier is useless (it can't have a side effect)
 
     variable = @variables[identifier.name]?
 
-    # Check if global
+    if variable.nil?
+      global = @unit.globals[identifier.name]?
+      global || raise "Unknown identifier #{identifier.name} in #{@unit.path} at line #{identifier.line}" 
+      return compile_global global, into: into
+    end
                  
-    variable || raise "Unknown identifier #{identifier.name} in #{@unit.path} at line #{identifier.line}" 
     raise "Cannot use variable #{identifier.name} before it is initalized" unless variable.initialized
     
     if into.is_a? Registers
@@ -213,13 +275,14 @@ class Stacklang::Function
       variable.register = register
     else
       if variable.register
-        # Reg => Ram
+        # Reg => Stack
         raise "Cannot read multiple-word variable from register" if variable.constraint.size > 1
         # if var in register, store it
         @text << Instruction.new(ISA::Sw, variable.register.not_nil!.value, STACK_REGISTER.value, assemble_immediate into.offset, Kind::Imm).encode
       else
-        # Stack => Ram
+        # Stack => Stack
         unless into.as(Offset).offset == variable.offset # no need to move stuff in it's current place
+          # TODO: what happen if the size if bigger than what the immediate can hold ? 
           # else: load it (into tmp), then store it (loop)
           # we need to grab a temporary register to put the value in before writing at necessary offset
           register = grab_register
@@ -263,8 +326,6 @@ class Stacklang::Function
         offset = Offset.new @return_value_offset.not_nil!.to_i32
         returned_value_type = compile_expression returned_value, into: offset
         if @return_type.not_nil! != returned_value_type
-          pp @return_type
-          pp returned_value_type
           raise "Function #{@ast.name.name} at #{@unit.path} must return #{@return_type.to_s}, but return expression has type #{returned_value_type.try(&.to_s) || "nothing"} at line #{ret.line}"
         end
       end

@@ -14,6 +14,8 @@ export __global_hex_prefix: .ascii "0x"
 export __global_hex_digits: .ascii "0123456789ABCDEF"
        			    nop
 
+export __global_error_code_success: .word 0xe
+
 export __function_putw:
         # Expect: r6 store return address, r7 is stack ptr
         movi r1 :__global_hex_prefix

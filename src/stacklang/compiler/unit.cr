@@ -25,8 +25,9 @@ class Stacklang::Unit
   @self_functions : Array(Function)? = nil
   @self_globals : Array(Global)? = nil
   @structs : Hash(String, Type::Struct)? = nil
-  @functions : Hash(String, Function)? = nil
-                                   
+  @functions : Hash(String, Function)? = nil                                       
+  @globals : Hash(String, Global)? = nil
+                                       
   def initialize(@ast : AST::Unit, @path : Path, @compiler : Compiler)
   end
   
@@ -107,6 +108,18 @@ class Stacklang::Unit
     end
   end
 
+  def globals : Hash(String, Global)
+    @globals ||= begin
+      required_globals = externs.flat_map(&.self_globals)
+      all_globals = (self_globals + required_globals).group_by do |global|
+        global.name
+      end.transform_values do |globals|
+	raise "Name clash for global '#{globals.first.name}'" if globals.size >	1
+        globals.first
+      end
+    end
+  end
+  
   def compile
     RiSC16::Object.new(path.to_s).tap do |object|
       object.sections << RiSC16::Object::Section.new("globals").tap do |section|
