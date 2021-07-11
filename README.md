@@ -30,7 +30,7 @@ Overall, it can:
 - [Assemble](./src/assembler/assembler.cr) a `.blah` flavored RiSC16 assembly file into a kind of [relocatable object](./src/assembler/object.cr).
 - [Link](./src/assembler/linker.cr) one or multiple `.ro` file into a stactic binary.
 - [Load and run](./vm/vm.cr) a static binary
-- [Debug](./debugger/debugger.cr) a program with a curse UI allowing disassembly, stepping, breakpoints, memory and register display.
+- [Debug](./src/debugger/debugger.cr) a program with a curse UI allowing disassembly, stepping, breakpoints, memory and register display.
 - [Compile](./src/stacklang/compiler/compiler.cr) a `.sl` stacklang file into an `.ro` file.
 
 Specification files controls some characteristic of the VM and must be known at compile time (such as ram size, stack start address, io).  
@@ -46,7 +46,7 @@ The linker will generate various symbol automatically:
 - `__io_<name>_r` which containt the offset to 0 of the address associed io. 
 This is usefull because IO use end of address-space addresses by default, 
 and this allows to read/write from an io in a single load/store instruction from 0 (through the always null register r0) with offset `__io_<name>_r`. 
-Alternativewould require loading the address into a register before dereferencing it, 
+Alternative would require loading the address into a register before dereferencing it, 
 which would almost always mean an additional two instructions (move immediate `__io_<name>_a`).  
 
 Instruction can be sorted in various continuous blocks within a section. 
@@ -74,7 +74,7 @@ Exemples:
 
 Stacklang can `require` another `.sl` file relative to itself. This will not compile required file, but this allow to gather prototyping informations,
 such as structure of types, prototype of functions and globals.  
-As they are not compiled, the required files muse be compiled and linked along to avoid undefined reference at link time.
+As they are not compiled, the required files must be compiled and linked along to avoid undefined reference at link time.
 This also allows to require prototypes and actually link with another implementation (useful for interoperability between assembly and stacklang).
 
 ### ABI
@@ -82,6 +82,7 @@ This also allows to require prototypes and actually link with another implementa
 Stacklang export symbols for each global and functions with this naming pattern:
 - `__global_<name>` for global.
 - `__function_<name>` for functions.
+  
 This allows to access a stacklang implemented global or function from assembly.
 The oposite is also possible but the compiler must be made aware of the prototypes by requiring a file that will declare globals and functions type information. 
 This prototype file must not be linked.
@@ -100,6 +101,7 @@ The ABI is defined this way:
 - Return value, when any, are left in place in the stack. The caller has the responsability of ignoring it or ensuring it saved/used befire it get overwrited
 by future calls.
 - So to fetch the return value of a call to a funtion that return a single word, the caller must read the address R7 - 1. 
+- Any register may be scrambled. Callee can stack them if he wish.
 
 ## Roadmap
 - [x] Write an assembler able to ouput raw bitcode
