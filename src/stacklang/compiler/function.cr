@@ -5,6 +5,8 @@ require "./unit"
 # TODO: handle copy with index in a temporary register with a beq loop ?
 # that would be much better than these infamous dump of lw sw
 # which will fail when the size is biger than 64 anyway
+# Also now with the Memory type, dumping a memory location to another can be made generic to reduce a little
+# the size of this file.
 class Stacklang::Function
   include RiSC16
   alias Kind = Object::Section::Reference::Kind
@@ -147,16 +149,16 @@ class Stacklang::Function
   end
 
   class Memory
-    getter symbol_offset : Int32 # use if value is a string
+    property symbol_offset : Int32 # offset to symbol_offset but work also when value is a string
     getter value : Int32 | String # the offset to reference_register
     getter reference_register : Registers # the register containing the address
     def initialize(@reference_register, @value, @symbol_offset) end
 
-    def self.offset(value)
+    def self.offset(value : Int32)
       new STACK_REGISTER, value, 0
     end
 
-    def self.absolute(register, value = 0, symbol_offset = 0)
+    def self.absolute(register : Registers, value : Int32 | String = 0, symbol_offset : Int32 = 0)
       new register, value, symbol_offset
     end
   end
@@ -188,7 +190,7 @@ class Stacklang::Function
     case into
 
     when Registers
-      raise "Cannot load multiple-word variable in register" if global.type_info.size > 1
+      raise "Cannot load multiple-word variable in register. Check that you are not dereferencing a struct." if global.type_info.size > 1
       # load address of global (we use the target register as a buffer)
       @text << Instruction.new(ISA::Lui, into.value, immediate: assemble_immediate global.symbol, Kind::Lui).encode
       @text << Instruction.new(ISA::Addi, into.value, into.value, immediate: assemble_immediate global.symbol, Kind::Lli).encode
@@ -206,7 +208,7 @@ class Stacklang::Function
         # safer version would
         # grab a tmp, movi the real offset, add it into ref register
         #then use tmp to inc and add to both register (unless ref_reg is stack, then another temp should be used as cache)
-        @text << Instruction.new(ISA::Lw, tmp_register.value, source_register.value, assemble_immediate index, Kind::Imm).encode
+        @text << Instruction.new(ISA::Lw, tmp_register.value, source_register.value, immediate: assemble_immediate index, Kind::Imm).encode
         @text << Instruction.new(ISA::Sw, tmp_register.value, into.reference_register.value, immediate: assemble_immediate into.value, Kind::Imm, into.symbol_offset + index).encode
       end
     end
@@ -226,17 +228,17 @@ class Stacklang::Function
     case {into, variable.register}
 
     when {Registers, Registers} # Reg => Register
-      raise "Cannot load multiple-word variable in register" if variable.constraint.size > 1
+      raise "Cannot load multiple-word variable in register. Check that you are not dereferencing a struct." if variable.constraint.size > 1
       @text << Instruction.new(ISA::Add, into.value, variable.register.not_nil!.value).encode unless variable.register == into
       variable.register = into
 
     when {Registers, Nil} # Stack => Register
-      raise "Cannot load multiple-word variable in register" if variable.constraint.size > 1
-      @text << Instruction.new(ISA::Lw, into.value, STACK_REGISTER.value, assemble_immediate variable.offset, Kind::Imm).encode
+      raise "Cannot load multiple-word variable in register. Check that you are not dereferencing a struct." if variable.constraint.size > 1
+      @text << Instruction.new(ISA::Lw, into.value, STACK_REGISTER.value, immediate: assemble_immediate variable.offset, Kind::Imm).encode
       variable.register = into
 
     when {Memory, Registers} # Registers  => Ram
-      raise "Cannot read multiple-word variable from register" if variable.constraint.size > 1
+      raise "Cannot read multiple-word variable from register" if variable.constraint.size > 1 # Should never happen.
       @text << Instruction.new(ISA::Sw, variable.register.not_nil!.value, into.reference_register.value, assemble_immediate into.value, Kind::Imm, into.symbol_offset).encode
 
     when {Memory, Nil} # Stack => Ram
@@ -244,8 +246,8 @@ class Stacklang::Function
       # unless into.reference_register.r7? and into.value == variable.offset
         tmp_register = grab_register excludes: [into.reference_register]
         (0...(variable.constraint.size)).each do |index|
-          @text << Instruction.new(ISA::Lw, tmp_register.value, STACK_REGISTER.value, assemble_immediate variable.offset + index, Kind::Imm).encode
-          @text << Instruction.new(ISA::Sw, tmp_register.value, into.reference_register.value, assemble_immediate into.value, Kind::Imm, into.symbol_offset + index).encode
+          @text << Instruction.new(ISA::Lw, tmp_register.value, STACK_REGISTER.value, immediate: assemble_immediate variable.offset + index, Kind::Imm).encode
+          @text << Instruction.new(ISA::Sw, tmp_register.value, into.reference_register.value, immediate: assemble_immediate into.value, Kind::Imm, into.symbol_offset + index).encode
         end
       # end
     end
@@ -262,52 +264,112 @@ class Stacklang::Function
   #   # depending on the into, copy the return value
   # end
 
-    #--
+
+  # Try to obtain a memory location from an expression.
+  def compile_lvalue(expression : AST::Expression) : {Memory, Type::Any}?
+    case expression
+
+    when AST::Identifier
+      variable = @variables[expression.name]?
+      if variable
+        {Memory.offset(variable.offset), variable.constraint}
+      else
+        global = @unit.globals[expression.name]? || raise "Unknown identifier #{expression.name} in #{@unit.path} at line #{expression.line}"
+        dest_register = grab_register
+        @text << Instruction.new(ISA::Lui, dest_register.value, immediate: assemble_immediate global.symbol, Kind::Lui).encode
+        @text << Instruction.new(ISA::Addi, dest_register.value, dest_register.value, immediate: assemble_immediate global.symbol, Kind::Lli).encode
+        {Memory.absolute(dest_register), global.type_info}
+      end
+
+    when AST::Access
+      lvalue_result = compile_lvalue expression.operand
+      if lvalue_result
+        lvalue, constraint = lvalue_result
+        if constraint.is_a? Type::Struct
+          field = constraint.fields.find &.name.== expression.field.name
+          field || raise "No such field #{expression.field.name} for struct #{constraint.to_s} in #{@unit.path} at line #{expression.line}"
+          lvalue.symbol_offset += field.offset
+          {lvalue, field.constraint}
+        else
+          raise "Cannot access field #{expression.field} on expression #{expression.operand} of type #{constraint.to_s} in #{@unit.path} at line #{expression.line}"
+        end
+      else 
+        raise "Cannot compute lvalue for #{expression.to_s} in #{@unit.path} at lien #{expression.line}"
+      end
+      
+    when AST::Unary
+      if expression.name == "*"
+        # si dereferencement
+        # on compute juste la lvalue et on dereference.
+        # Si ca a pas de lvalue possible (genre valeur de retour d'un call, my_ptr + 1 ou chépakoi), alors compile dans un registre et creer la memory a partir de
+        # ce registre. Dans tout les cas ont peux pas dereference autre chose qu'un pointeur donc le type devrait TOUJOURS rentrer dans un registre.
+        # *(&toto) = <=> toto (c'est la compilation de '&' qui stock dans son into l'address.
+
+        lvalue_result = compile_lvalue expression.operand
+        if lvalue_result
+          lvalue, constraint = lvalue_result
+          if constraint.is_a? Type::Pointer
+            # maybe also allow words with a warning ?
+            @text << Instruction.new(ISA::Lw, lvalue.reference_register.value, lvalue.reference_register.value, immediate: assemble_immediate lvalue.value, Kind::Imm, lvalue.symbol_offset).encode
+            {Memory.absolute(lvalue.reference_register), constraint.pointer_of}
+          else
+            raise "Cannot dereference an expression of type #{constraint.to_s} in #{@unit.path} at line #{expression.line}"
+          end
+        else
+          destination_register = grab_register
+          constraint = compile_expression expression.operand, into: destination_register
+          if constraint.is_a? Type::Pointer
+            # maybe also allow words with a warning ?
+            @text << Instruction.new(ISA::Lw, destination_register.value, destination_register.value).encode
+            {Memory.absolute(destination_register), constraint.pointer_of}
+          else
+            raise "Cannot dereference an expression of type #{constraint.to_s} in #{@unit.path} at line #{expression.line}"
+          end
+
+        end
+      else
+        nil
+      end
+    else nil
+    end
+  end
+
+  def compile_assignement(left_side : AST::Expression, right_side : AST::Expression, into : Registers | Memory | Nil): Type::Any
+    lvalue_result = compile_lvalue left_side
+    lvalue_result || raise "Expression #{left_side.to_s} is not a valid left value for an assignement in #{@unit.path} at line #{left_side.line}"
+    lvalue, destination_type = lvalue_result
+    source_type = compile_expression right_side, into: lvalue
+
+    if source_type != destination_type
+      raise "Cannot assign expression of type #{source_type.to_s} to lvalue of type #{destination_type.to_s} in #{@unit.path} at line #{left_side.line}"
+    end
     
-  # def compile_lvalue(expression : AST::Expression) : {Offset | Absolute, Type::Any}
-  #   case expression
-  #   when AST::Identifier
-  #   # var => offset
-  #   # global => absolute
-  #   # si access: compute la lvalue,
-  #     # si absolute/offset, add l'offset a la valeur (devrai rajouter un champ offset a zero sur absolute a stocker avec la ref au symbol)
-  #   # si dereferencement
-  #     # compile la valeur dans un registre SI POSSIBLE, sinon dans un offset ou un absolute (faudra rajouter un type d'into pour dire "le plus simple" et retourner l'into)
-  #     # si c'est un registre, faudra un nouveau type en plus de offset/absolute pour specifier le registre a utiliser
-  #       # ou alors trouver un moyen de les fusioners en un truc)
-  #     # la fonction "le plus simple" pourrait etre une overload pour différent type
-  #   # sinon interdit. par ex le retour d'un call: ne peux pas etre affecté, doit d'abord etre copié dans une variable. (par contre
-  #     # on peux faire (identifer = call()).field = value normalement
-  #   else raise "Expression #{expression.to_s} is not a valid left value for an assignement in #{@unit.path} at line #{expression.line}"
-  # end
+    # TODO: then if there is an into copy from lvalue to into (for (foo = bar) + 2 kind of expression)
+    raise "UNSUPPORTED Cannot use affection value for now" if into
+    destination_type
+  end
 
-  # def compile_assignement(left_side : AST::Expression, right_side : AST::Expression, into: Registers | Offset | Absolute | Nil): Type::Any
-  #   lvalue = compile_lvalue left_size
-  #   compile_expression right_size, into: lvalue
-  #   # then if there is an into copy from lvalue to into
-  # end
-
-  # def compile_binary(binary : AST::Binary, into: Registers | Offset | Absolute | Nil): Type::Any?
-  #   case binary.name
-  #   when "=" then compile_assignement binary.left, binary.right, into: into
-  #   else nil
-  #   end
-  # end
+  def compile_binary(binary : AST::Binary, into : Registers | Memory | Nil): Type::Any?
+    case binary.name
+    when "=" then compile_assignement binary.left, binary.right, into: into
+    else raise "UNSUPPORTED binary"
+    end
+  end
   
-  # def compile_operator(operator : AST::Operator, into: Registers | Offset | Absolute | Nil): Type::Any?
-  #   case operator
-  #   when AST::Unary then nil
-  #   when AST::Binary then compile_binary operator, into: into
-  #   when AST::Access then nil
-  #   end
-  # end
+  def compile_operator(operator : AST::Operator, into : Registers | Memory | Nil): Type::Any?
+    case operator
+    when AST::Unary then raise "UNSUPPORTED unary"
+    when AST::Binary then compile_binary operator, into: into
+    when AST::Access then raise "UNSUPPORTED access"
+    end
+  end
   
   def compile_expression(expression : AST::Expression, into : Registers | Memory | Nil): Type::Any?
     case expression
     when AST::Literal then compile_literal expression, into: into
     when AST::Identifier then compile_identifier expression, into: into
     when AST::Call then nil
-    when AST::Operator then nil #compile_operator expression, into: into
+    when AST::Operator then compile_operator expression, into: into
     end                                                          
   end
 
@@ -342,7 +404,7 @@ class Stacklang::Function
     when AST::Return then compile_return statement   
     when AST::While then nil
     when AST::If then nil
-    when AST::Expression then nil
+    when AST::Expression then compile_expression statement, nil
     end
   end
 

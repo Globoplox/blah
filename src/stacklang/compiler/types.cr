@@ -42,6 +42,7 @@ module Stacklang
 
   class Type::Pointer < Type::Any
     getter size = 1u16
+    getter pointer_of
     def initialize(@pointer_of : Type::Any) end
     def to_s
       "*#{@pointer_of.to_s}"
@@ -51,9 +52,9 @@ module Stacklang
   class Type::Struct < Type::Any
     class Field
       property name
-      property any
       property offset
-      def initialize(@name : String, @type : Type::Any, @offset : UInt16) end
+      property constraint
+      def initialize(@name : String, @constraint : Type::Any, @offset : UInt16) end
     end
 
     property name : String

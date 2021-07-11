@@ -266,7 +266,8 @@ end
 
   class Access < Operator
     def initialize(@operand : Expression, @field : Identifier) end
-
+    getter operand
+    getter field
     def dump(io, indent = 0)
       @operand.dump io, indent
       io << "."
@@ -276,7 +277,8 @@ end
 
   class Unary < Operator
     def initialize(@operand : Expression, @name : String) end
-
+    getter operand
+    getter name
     def dump(io, indent = 0)
       io << @name
       @operand.dump io, indent

@@ -122,12 +122,30 @@ class Stacklang::Parser < Parser
 
   rule def unary_operation
     next unless operator = str ["!", "*", "&"]
-    next unless expr = expression
+    next unless expr = leaf_expression
+    # else *foo.bar would be *(foo.bar) instead of (*foo).bar
+    # and more importantly *foo = bar would be *(foo = bar)
+    # So if we want to use an unary on a complex expression, wrap it with parenthesis
     Unary.new expr, operator
   end
 
   def leaf_expression
     or ->unary_operation, ->parenthesis, ->call, ->identifier, ->literal
+  end
+
+  rule def affectation_chain
+    next unless name = str "="
+    whitespace
+    next unless right = low_priority_operation
+    whitespace
+    {name, right}
+  end
+  
+  rule def affectation_operation
+    next unless left = low_priority_operation
+    whitespace
+    chain = zero_or_more ->affectation_chain
+    Binary.from_chain left, chain
   end
   
   rule def low_chain
@@ -163,30 +181,15 @@ class Stacklang::Parser < Parser
   rule def high_chain
     next unless name = str ["<=", ">=", "==", "!=", "||", "&&", "<", ">", "^"]
     whitespace
-    next unless right = affectation_operation
+    next unless right = access
     whitespace
     {name, right}
   end
 
   rule def high_priority_operation
-    next unless left = affectation_operation
-    whitespace
-    chain = zero_or_more ->high_chain
-    Binary.from_chain left, chain
-  end
-
-  rule def affectation_chain
-    next unless name = str "="
-    whitespace
-    next unless right = access
-    whitespace
-    {name, right}
-  end
-  
-  rule def affectation_operation
     next unless left = access
     whitespace
-    chain = zero_or_more ->affectation_chain
+    chain = zero_or_more ->high_chain
     Binary.from_chain left, chain
   end
 
@@ -205,7 +208,7 @@ class Stacklang::Parser < Parser
   end
   
   def operation
-    low_priority_operation
+    affectation_operation
   end
 
   rule def number
