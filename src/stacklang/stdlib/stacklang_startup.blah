@@ -28,7 +28,7 @@ export __global_hex_prefix: .ascii "0x"
 export __global_hex_digits: .ascii "0123456789ABCDEF"
        			    nop
 
-export __global_error_code_success: .word 0x5
+export __global_error_code_success: .word 0xc
 
 # notice putw do not need to move its stack because it does not call any other function. Stack frame looks like this:
 # r7 - 2 | parameter of type word

@@ -5,8 +5,7 @@ require "./unit"
 # TODO: handle copy with index in a temporary register with a beq loop ?
 # that would be much better than these infamous dump of lw sw
 # which will fail when the size is biger than 64 anyway
-# Also now with the Memory type, dumping a memory location to another can be made generic to reduce a little
-# the size of this file.
+
 class Stacklang::Function
   include RiSC16
   alias Kind = Object::Section::Reference::Kind
@@ -162,69 +161,59 @@ class Stacklang::Function
       new register, value, symbol_offset
     end
   end
-  
-  # Compile a literal.
-  # Produce the code necessary to put the literal value in a register or an offset.
-  # Return the type of the literal.
+
+  # Generate code to copy a section of memory to another place
+  # Todo: make it less dumb
+  def move(memory : Memory, constraint : Type::Any, into : Memory)
+    tmp_register = grab_register excludes: [into.reference_register, memory.reference_register]
+    (0...(constraint.size)).each do |index|
+      # safer version would
+      # grab a tmp, movi the real offset, add it into ref register
+      #then use tmp to inc and add to both register (unless ref_reg is stack, then another temp should be used as cache)
+      @text << Instruction.new(
+        ISA::Lw, tmp_register.value, memory.reference_register.value, immediate: assemble_immediate memory.value, Kind::Imm, memory.symbol_offset + index
+      ).encode
+      @text << Instruction.new(
+        ISA::Sw, tmp_register.value, into.reference_register.value, immediate: assemble_immediate into.value, Kind::Imm, into.symbol_offset + index
+      ).encode
+    end
+  end
+
   def compile_literal(literal : AST::Literal, into : Registers | Memory | Nil): Type::Any?
     return nil if into.nil? # An expression composed of just a literal is useless (it can't have a side effect)
     case into
-
     when Registers
       @text << Instruction.new(ISA::Lui, into.value, immediate: assemble_immediate literal.number, Kind::Lui).encode
       @text << Instruction.new(ISA::Addi, into.value, into.value, immediate: assemble_immediate literal.number, Kind::Lli).encode
-
     when Memory
       tmp_register = grab_register excludes: [into.reference_register]
       @text << Instruction.new(ISA::Lui, tmp_register.value, immediate: assemble_immediate literal.number, Kind::Lui).encode
       @text << Instruction.new(ISA::Addi, tmp_register.value, tmp_register.value, immediate: assemble_immediate literal.number, Kind::Lli).encode
       @text << Instruction.new(ISA::Sw, tmp_register.value, into.reference_register.value, immediate: assemble_immediate into.value, Kind::Imm, into.symbol_offset).encode
-
     end
     Type::Word.new
   end
 
-
+  # TODO: better errors
   def compile_global(global : Unit::Global, into : Registers | Memory | Nil): Type::Any?
     return nil if into.nil? # An expression composed of just a global is useless (it can't have a side effect)
     case into
-
     when Registers
       raise "Cannot load multiple-word variable in register. Check that you are not dereferencing a struct." if global.type_info.size > 1
-      # load address of global (we use the target register as a buffer)
       @text << Instruction.new(ISA::Lui, into.value, immediate: assemble_immediate global.symbol, Kind::Lui).encode
       @text << Instruction.new(ISA::Addi, into.value, into.value, immediate: assemble_immediate global.symbol, Kind::Lli).encode
-      # dereference
       @text << Instruction.new(ISA::Lw, into.value, into.value).encode
-
-    when Memory # same as offset, same as absolute, but consider destination adress already loaded
-      # load address of global
-      source_register = grab_register excludes: [into.reference_register] # will contain the global address
-      @text << Instruction.new(ISA::Lui, source_register.value, immediate: assemble_immediate global.symbol, Kind::Lui).encode
-      @text << Instruction.new(ISA::Addi, source_register.value, source_register.value, immediate: assemble_immediate global.symbol, Kind::Lli).encode
-      # reserve temporary register
-      tmp_register = grab_register excludes: [into.reference_register, source_register]
-      (0...(global.type_info.size)).each do |index|
-        # safer version would
-        # grab a tmp, movi the real offset, add it into ref register
-        #then use tmp to inc and add to both register (unless ref_reg is stack, then another temp should be used as cache)
-        @text << Instruction.new(ISA::Lw, tmp_register.value, source_register.value, immediate: assemble_immediate index, Kind::Imm).encode
-        @text << Instruction.new(ISA::Sw, tmp_register.value, into.reference_register.value, immediate: assemble_immediate into.value, Kind::Imm, into.symbol_offset + index).encode
-      end
+    when Memory
+      source, _ = compile_global_lvalue global
+      move source, global.type_info, into
     end
-    
     global.type_info
   end
-  
-  def compile_identifier(identifier : AST::Identifier, into : Registers | Memory | Nil): Type::Any?
+
+  # TODO: better errors
+  def compile_variable(variable : Variable, into : Registers | Memory | Nil): Type::Any?
     return nil if into.nil? # An expression composed of just an identifier is useless (it can't have a side effect)
-    variable = @variables[identifier.name]?
-    if variable.nil?
-      global = @unit.globals[identifier.name]?
-      global || raise "Unknown identifier #{identifier.name} in #{@unit.path} at line #{identifier.line}" 
-      return compile_global global, into: into
-    end
-    raise "Cannot use variable #{identifier.name} before it is initalized" unless variable.initialized
+    raise "Cannot use variable #{variable.name} before it is initalized" unless variable.initialized
     case {into, variable.register}
 
     when {Registers, Registers} # Reg => Register
@@ -233,25 +222,32 @@ class Stacklang::Function
       variable.register = into
 
     when {Registers, Nil} # Stack => Register
-      raise "Cannot load multiple-word variable in register. Check that you are not dereferencing a struct." if variable.constraint.size > 1
+      raise "Cannot read multiple-word variable from register" if variable.constraint.size > 1 # Should never happen.
       @text << Instruction.new(ISA::Lw, into.value, STACK_REGISTER.value, immediate: assemble_immediate variable.offset, Kind::Imm).encode
       variable.register = into
 
     when {Memory, Registers} # Registers  => Ram
-      raise "Cannot read multiple-word variable from register" if variable.constraint.size > 1 # Should never happen.
+      raise "Cannot load multiple-word variable in register. Check that you are not dereferencing a struct." if variable.constraint.size > 1
       @text << Instruction.new(ISA::Sw, variable.register.not_nil!.value, into.reference_register.value, assemble_immediate into.value, Kind::Imm, into.symbol_offset).encode
 
     when {Memory, Nil} # Stack => Ram
-      # maybe remove gurad, likely useless. Same optimization could be done for global with some kind of beq but annoying.
-      # unless into.reference_register.r7? and into.value == variable.offset
-        tmp_register = grab_register excludes: [into.reference_register]
-        (0...(variable.constraint.size)).each do |index|
-          @text << Instruction.new(ISA::Lw, tmp_register.value, STACK_REGISTER.value, immediate: assemble_immediate variable.offset + index, Kind::Imm).encode
-          @text << Instruction.new(ISA::Sw, tmp_register.value, into.reference_register.value, immediate: assemble_immediate into.value, Kind::Imm, into.symbol_offset + index).encode
-        end
-      # end
+      source, _ = compile_variable_lvalue variable
+      move source, variable.constraint, into
     end
+    
     variable.constraint
+  end
+
+  def compile_identifier(identifier : AST::Identifier, into : Registers | Memory | Nil): Type::Any?
+    return nil if into.nil? # An expression composed of just an identifier is useless (it can't have a side effect)
+    variable = @variables[identifier.name]?
+    if variable
+      compile_variable variable, into: into
+    else
+      global = @unit.globals[identifier.name]?
+      global || raise "Unknown identifier #{identifier.name} in #{@unit.path} at line #{identifier.line}" 
+      compile_global global, into: into
+    end
   end
 
   # def compile_call(call : AST::Call, into : Registers | Offset | Nil): Type::Any?
@@ -264,38 +260,53 @@ class Stacklang::Function
   #   # depending on the into, copy the return value
   # end
 
+  # Get the memory location and type of an access expression
+  def compile_access_lvalue(access : AST::Access) : {Memory, Type::Any}?
+    lvalue_result = compile_lvalue access.operand
+    if lvalue_result
+      lvalue, constraint = lvalue_result
+      if constraint.is_a? Type::Struct
+        field = constraint.fields.find &.name.== access.field.name
+        field || raise "No such field #{access.field.name} for struct #{constraint.to_s} in #{@unit.path} at line #{access.line}"
+        lvalue.symbol_offset += field.offset
+        {lvalue, field.constraint}
+      else
+        raise "Cannot access field #{access.field} on expression #{access.operand} of type #{constraint.to_s} in #{@unit.path} at line #{access.line}"
+      end
+    else 
+      raise "Cannot compute lvalue for #{access.to_s} in #{@unit.path} at line #{access.line}"
+    end
+  end
 
+  # Get a memory location for a global
+  def compile_global_lvalue(global : Unit::Global) : {Memory, Type::Any}
+    dest_register = grab_register
+    @text << Instruction.new(ISA::Lui, dest_register.value, immediate: assemble_immediate global.symbol, Kind::Lui).encode
+    @text << Instruction.new(ISA::Addi, dest_register.value, dest_register.value, immediate: assemble_immediate global.symbol, Kind::Lli).encode
+    {Memory.absolute(dest_register), global.type_info}
+  end
+
+  # Get a memory location for a variable
+  def compile_variable_lvalue(variable : Variable) : {Memory, Type::Any}
+    {Memory.offset(variable.offset), variable.constraint}
+  end
+
+  # Get a momeory location for an identifier
+  def compile_identifier_lvalue(identifier : AST::Identifier) : {Memory, Type::Any}
+    variable = @variables[identifier.name]?
+    if variable
+      compile_variable_lvalue variable
+    else
+      global = @unit.globals[identifier.name]? || raise "Unknown identifier #{identifier.name} in #{@unit.path} at line #{identifier.line}"
+      compile_global_lvalue global                                         
+    end
+  end
+  
   # Try to obtain a memory location from an expression.
   def compile_lvalue(expression : AST::Expression) : {Memory, Type::Any}?
     case expression
-
-    when AST::Identifier
-      variable = @variables[expression.name]?
-      if variable
-        {Memory.offset(variable.offset), variable.constraint}
-      else
-        global = @unit.globals[expression.name]? || raise "Unknown identifier #{expression.name} in #{@unit.path} at line #{expression.line}"
-        dest_register = grab_register
-        @text << Instruction.new(ISA::Lui, dest_register.value, immediate: assemble_immediate global.symbol, Kind::Lui).encode
-        @text << Instruction.new(ISA::Addi, dest_register.value, dest_register.value, immediate: assemble_immediate global.symbol, Kind::Lli).encode
-        {Memory.absolute(dest_register), global.type_info}
-      end
-
-    when AST::Access
-      lvalue_result = compile_lvalue expression.operand
-      if lvalue_result
-        lvalue, constraint = lvalue_result
-        if constraint.is_a? Type::Struct
-          field = constraint.fields.find &.name.== expression.field.name
-          field || raise "No such field #{expression.field.name} for struct #{constraint.to_s} in #{@unit.path} at line #{expression.line}"
-          lvalue.symbol_offset += field.offset
-          {lvalue, field.constraint}
-        else
-          raise "Cannot access field #{expression.field} on expression #{expression.operand} of type #{constraint.to_s} in #{@unit.path} at line #{expression.line}"
-        end
-      else 
-        raise "Cannot compute lvalue for #{expression.to_s} in #{@unit.path} at lien #{expression.line}"
-      end
+    when AST::Identifier then compile_identifier_lvalue expression
+    when AST::Access then compile_access_lvalue expression
       
     when AST::Unary
       if expression.name == "*"
@@ -343,9 +354,15 @@ class Stacklang::Function
     if source_type != destination_type
       raise "Cannot assign expression of type #{source_type.to_s} to lvalue of type #{destination_type.to_s} in #{@unit.path} at line #{left_side.line}"
     end
-    
-    # TODO: then if there is an into copy from lvalue to into (for (foo = bar) + 2 kind of expression)
-    raise "UNSUPPORTED Cannot use affection value for now" if into
+
+    case into
+    when Registers
+      raise "Cannot load multiple-word term in register. Check that you are not dereferencing a struct." if destination_type.size > 1
+      @text << Instruction.new(ISA::Lw, into.value, lvalue.reference_register.value, immediate: assemble_immediate lvalue.value, Kind::Imm, lvalue.symbol_offset).encode
+    when Memory then
+      move lvalue, destination_type, into: into
+    end
+
     destination_type
   end
 
@@ -360,7 +377,10 @@ class Stacklang::Function
     case operator
     when AST::Unary then raise "UNSUPPORTED unary"
     when AST::Binary then compile_binary operator, into: into
-    when AST::Access then raise "UNSUPPORTED access"
+    when AST::Access then raise "Unsup access"
+      # memory, constraint = compile_access_lvalue expression || raise "Illegal expression #{expression.to_s} in #{@unit.path} at #{expression.line}"
+      # move memory, into: into
+      # constraint
     end
   end
   
