@@ -285,7 +285,10 @@ end
 
   class Binary < Operator
     def initialize(@left : Expression, @name : String, @right : Expression) end
-
+    getter name
+    getter left
+    getter right
+    
     def dump(io, indent = 0)
       @left.dump io, indent
       io << " #{@name} "

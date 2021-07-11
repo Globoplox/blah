@@ -322,13 +322,52 @@ class Stacklang::Function
   #   # call
   #   # depending on the into, copy the return value
   # end
+
+  def compile_lvalue(expression : AST::Expression) : {Offset | Absolute, Type::Any}
+    case expression
+    when AST::Identifier
+    # var => offset
+    # global => absolute
+    # si access: compute la lvalue,
+      # si absolute/offset, add l'offset a la valeur (devrai rajouter un champ offset a zero sur absolute a stocker avec la ref au symbol)
+    # si dereferencement
+      # compile la valeur dans un registre SI POSSIBLE, sinon dans un offset ou un absolute (faudra rajouter un type d'into pour dire "le plus simple" et retourner l'into)
+      # si c'est un registre, faudra un nouveau type en plus de offset/absolute pour specifier le registre a utiliser
+        # ou alors trouver un moyen de les fusioners en un truc)
+      # la fonction "le plus simple" pourrait etre une overload pour différent type
+    # sinon interdit. par ex le retour d'un call: ne peux pas etre affecté, doit d'abord etre copié dans une variable. (par contre
+      # on peux faire (identifer = call()).field = value normalement
+    else raise "Expression #{expression.to_s} is not a valid left value for an assignement in #{@unit.path} at line #{expression.line}"
+  end
+
+  def compile_assignement(left_side : AST::Expression, right_side : AST::Expression, into: Registers | Offset | Absolute | Nil): Type::Any
+    lvalue = compile_lvalue left_size
+    compile_expression right_size, into: lvalue
+    # then if there is an into copy from lvalue to into
+  end
+
+  def compile_binary(binary : AST::Binary, into: Registers | Offset | Absolute | Nil): Type::Any?
+    case binary.name
+    when "=" then compile_assignement binary.left, binary.right, into: into
+    else nil
+    end
+  end
+  
+  def compile_operator(operator : AST::Operator, into: Registers | Offset | Absolute | Nil): Type::Any?
+    case operator
+    when AST::Unary then nil
+    when AST::Binary then compile_binary operator, into: into
+    when AST::Access then nil
+    end
+  end
   
   def compile_expression(expression : AST::Expression, into : Registers | Offset | Absolute | Nil): Type::Any?
     case expression
     when AST::Literal then compile_literal expression, into: into
     when AST::Identifier then compile_identifier expression, into: into
     when AST::Call then nil
-    when AST::Operator then nil
+    when AST::Operator then compile_operator expression, into: into
+      if 
     end                                                          
   end
 
