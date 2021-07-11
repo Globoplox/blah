@@ -1,21 +1,39 @@
+# Minimal startup file for stacklang programs.
+# This setup the stack pointer, call the stackang main and print the return valueof the main.
+
 section text + 0x0
+
+# Linker will provide the __stack symbol automatically. It does not need to be defined.
+# The same is true for __io_* symbols.
 movi r7 :__stack
-movi r6 :__function_main
+
+# stacklang generate exported symbol __function_<function name in stacklang> for each symbol
+# linker will substiture reference with runtime address of the function.
+movi r6 :__function_main 
+
+# Per abi, we always call function storing the return address in r6. 
 jalr r6 r6 0x0 # call main
-lw r6 r7 -1 # we take return word of main
-sw r6 r7 -2 # put it as first param of putw
+
+lw r6 r7 -1 # we take return word of main (assuming stacklang prototype is main():_ )
+
+sw r6 r7 -2 # put it as first param of putw (assuming stacklang prototype is putw(:w) )
 movi r6 :__function_putw
 jalr r6 r6 0x0 # call putw
 halt
 
+# We can define accessible by stacklang by following the symbol naming pattern __global_<global name in stacklang>
 export __global_hex_prefix: .ascii "0x"
        			    nop
 
 export __global_hex_digits: .ascii "0123456789ABCDEF"
        			    nop
 
-export __global_error_code_success: .word 0xe
+export __global_error_code_success: .word 0x8
 
+# notice putw do not need to move its stack because it does not call any other function. Stack frame looks like this:
+# r7 - 2 | parameter of type word
+# r7 - 1 | usually return address (here we don't store it because we never overwrite r6, which contain the return address per abi)
+# r7     | (stack ptr of caller)
 export __function_putw:
         # Expect: r6 store return address, r7 is stack ptr
         movi r1 :__global_hex_prefix
