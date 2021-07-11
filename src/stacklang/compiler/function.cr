@@ -24,15 +24,7 @@ class Stacklang::Function
 
   STACK_REGISTER = Registers::R7
   RETURN_ADRESS_REGISTER = Registers::R6 # Calling convention: the return address is initialy stored in r6
-  
-  # CALLING CONVENTION:
-  # CALLEE MUST INCREASE STACK POINTER 
-  # CALLEE PASS PARAMETER ON THE STACK
-  # CALLER MUST PUT RETURN ADDRESS IN R6
-  # CALLER MUST RESTORE SAVED REGISTERS HIMESELF
 
-  # Variable with a size > 1 are never cached
-  # because it make no sense
   class Variable
     property register : Registers? = nil
     property initialized = true # because we ignore initialisation for now
@@ -125,12 +117,13 @@ class Stacklang::Function
   end
 
   # Helper function for assembling immediate value
-  def assemble_immediate(immediate, kind)
+  def assemble_immediate(immediate, kind, symbol_offset = 0)
     if immediate.is_a? String
       references = @section.references[immediate] ||= [] of Object::Section::Reference
-      references << Object::Section::Reference.new @text.size.to_u16, 0, kind
+      references << Object::Section::Reference.new @text.size.to_u16, symbol_offset, kind
       0u16
     else
+      immediate += symbol_offset
       bits = case kind
         when .imm?, .beq? then 7
         else 16
@@ -153,34 +146,25 @@ class Stacklang::Function
     selected
   end
 
-  # Represent an addres, offset to the stack. Can be used to represent:
-  # - a variable
-  # - a field of a variable
-  # - a paramter of a futur call
-  # - the return value of current function
-  class Offset
-    getter offset : Int32
-    # def self.for_self_variable(variable, fields = [] of Identifier)  
-    # end
+  class Memory
+    getter symbol_offset : Int32 # use if value is a string
+    getter value : Int32 | String # the offset to reference_register
+    getter reference_register : Registers # the register containing the address
+    def initialize(@reference_register, @value, @symbol_offset) end
 
-    # def self.for_futur_call(prototype, parameter_name)
-    #   # offset is going to be negative:
-    #   # current_stack_ptr (our 0) - called function stack_frame_size + parameter offset  
-    # end
+    def self.offset(value)
+      new STACK_REGISTER, value, 0
+    end
 
-    def initialize(@offset) end
+    def self.absolute(register, value = 0, symbol_offset = 0)
+      new register, value, symbol_offset
+    end
   end
-
-  # Reprensent an absolute address
-  class Absolute
-    getter value : Int32 | String
-    def initialize(@value) end
-  end
-
+  
   # Compile a literal.
   # Produce the code necessary to put the literal value in a register or an offset.
   # Return the type of the literal.
-  def compile_literal(literal : AST::Literal, into : Registers | Offset | Nil): Type::Any?
+  def compile_literal(literal : AST::Literal, into : Registers | Memory | Nil): Type::Any?
     return nil if into.nil? # An expression composed of just a literal is useless (it can't have a side effect)
     case into
 
@@ -188,27 +172,18 @@ class Stacklang::Function
       @text << Instruction.new(ISA::Lui, into.value, immediate: assemble_immediate literal.number, Kind::Lui).encode
       @text << Instruction.new(ISA::Addi, into.value, into.value, immediate: assemble_immediate literal.number, Kind::Lli).encode
 
-    when Offset
-      tmp_register = grab_register
+    when Memory
+      tmp_register = grab_register excludes: [into.reference_register]
       @text << Instruction.new(ISA::Lui, tmp_register.value, immediate: assemble_immediate literal.number, Kind::Lui).encode
       @text << Instruction.new(ISA::Addi, tmp_register.value, tmp_register.value, immediate: assemble_immediate literal.number, Kind::Lli).encode
-      @text << Instruction.new(ISA::Sw, tmp_register.value, STACK_REGISTER.value, immediate: assemble_immediate into.offset, Kind::Imm).encode
-
-    when Absolute
-      tmp_register = grab_register
-      @text << Instruction.new(ISA::Lui, tmp_register.value, immediate: assemble_immediate literal.number, Kind::Lui).encode
-      @text << Instruction.new(ISA::Addi, tmp_register.value, tmp_register.value, immediate: assemble_immediate literal.number, Kind::Lli).encode
-      dest_register = grab_register excludes: [tmp_register]
-      @text << Instruction.new(ISA::Lui, dest_register.value, immediate: assemble_immediate into.value, Kind::Lui).encode
-      @text << Instruction.new(ISA::Addi, dest_register.value, dest_register.value, immediate: assemble_immediate into.value, Kind::Lli).encode
-      @text << Instruction.new(ISA::Sw, tmp_register.value, dest_register.value).encode
+      @text << Instruction.new(ISA::Sw, tmp_register.value, into.reference_register.value, immediate: assemble_immediate into.value, Kind::Imm, into.symbol_offset).encode
 
     end
     Type::Word.new
   end
 
 
-  def compile_global(global : Unit::Global, into : Registers | Offset | Absolute | Nil): Type::Any?
+  def compile_global(global : Unit::Global, into : Registers | Memory | Nil): Type::Any?
     return nil if into.nil? # An expression composed of just a global is useless (it can't have a side effect)
     case into
 
@@ -220,42 +195,26 @@ class Stacklang::Function
       # dereference
       @text << Instruction.new(ISA::Lw, into.value, into.value).encode
 
-    when Offset
+    when Memory # same as offset, same as absolute, but consider destination adress already loaded
       # load address of global
-      source_register = grab_register # will contain the global address
+      source_register = grab_register excludes: [into.reference_register] # will contain the global address
       @text << Instruction.new(ISA::Lui, source_register.value, immediate: assemble_immediate global.symbol, Kind::Lui).encode
       @text << Instruction.new(ISA::Addi, source_register.value, source_register.value, immediate: assemble_immediate global.symbol, Kind::Lli).encode
       # reserve temporary register
-      tmp_register = grab_register excludes: [source_register]
-      # load destination address
-      dest_register = STACK_REGISTER
-      # copy
+      tmp_register = grab_register excludes: [into.reference_register, source_register]
       (0...(global.type_info.size)).each do |index|
+        # safer version would
+        # grab a tmp, movi the real offset, add it into ref register
+        #then use tmp to inc and add to both register (unless ref_reg is stack, then another temp should be used as cache)
         @text << Instruction.new(ISA::Lw, tmp_register.value, source_register.value, assemble_immediate index, Kind::Imm).encode
-        @text << Instruction.new(ISA::Sw, tmp_register.value, dest_register.value, immediate: assemble_immediate into.offset + index, Kind::Imm).encode
-      end
-
-    when Absolute
-      # load address of global
-      source_register = grab_register # will contain the global address
-      @text << Instruction.new(ISA::Lui, source_register.value, immediate: assemble_immediate global.symbol, Kind::Lui).encode
-      @text << Instruction.new(ISA::Addi, source_register.value, source_register.value, immediate: assemble_immediate global.symbol, Kind::Lli).encode
-      # reserve temporary register
-      tmp_register = grab_register excludes: [source_register] # will contain the value to transfer
-      # load destination address
-      dest_register = grab_register excludes: [source_register, tmp_register] # will contain the destination addess
-      @text << Instruction.new(ISA::Lui, dest_register.value, immediate: assemble_immediate into.value, Kind::Lui).encode
-      @text << Instruction.new(ISA::Addi, dest_register.value, dest_register.value, immediate: assemble_immediate into.value, Kind::Lli).encode
-      # copy
-      (0...(global.type_info.size)).each do |index|
-        @text << Instruction.new(ISA::Lw, tmp_register.value, source_register.value, immediate: assemble_immediate index, Kind::Imm).encode
-        @text << Instruction.new(ISA::Sw, tmp_register.value, dest_register.value, immediate: assemble_immediate index, Kind::Imm).encode
+        @text << Instruction.new(ISA::Sw, tmp_register.value, into.reference_register.value, immediate: assemble_immediate into.value, Kind::Imm, into.symbol_offset + index).encode
       end
     end
+    
     global.type_info
   end
   
-  def compile_identifier(identifier : AST::Identifier, into : Registers | Offset | Absolute | Nil): Type::Any?
+  def compile_identifier(identifier : AST::Identifier, into : Registers | Memory | Nil): Type::Any?
     return nil if into.nil? # An expression composed of just an identifier is useless (it can't have a side effect)
     variable = @variables[identifier.name]?
     if variable.nil?
@@ -276,39 +235,19 @@ class Stacklang::Function
       @text << Instruction.new(ISA::Lw, into.value, STACK_REGISTER.value, assemble_immediate variable.offset, Kind::Imm).encode
       variable.register = into
 
-    when {Offset, Registers} # Registers  => Stack
+    when {Memory, Registers} # Registers  => Ram
       raise "Cannot read multiple-word variable from register" if variable.constraint.size > 1
-      @text << Instruction.new(ISA::Sw, variable.register.not_nil!.value, STACK_REGISTER.value, assemble_immediate into.offset, Kind::Imm).encode
+      @text << Instruction.new(ISA::Sw, variable.register.not_nil!.value, into.reference_register.value, assemble_immediate into.value, Kind::Imm, into.symbol_offset).encode
 
-    when {Offset, Nil} # Stack => Stack
-      unless into.as(Offset).offset == variable.offset # no need to move stuff in it's current place
-        tmp_register = grab_register
-        (0...(variable.constraint.size)).each do |index| # basically a memcpy
+    when {Memory, Nil} # Stack => Ram
+      # maybe remove gurad, likely useless. Same optimization could be done for global with some kind of beq but annoying.
+      # unless into.reference_register.r7? and into.value == variable.offset
+        tmp_register = grab_register excludes: [into.reference_register]
+        (0...(variable.constraint.size)).each do |index|
           @text << Instruction.new(ISA::Lw, tmp_register.value, STACK_REGISTER.value, assemble_immediate variable.offset + index, Kind::Imm).encode
-          @text << Instruction.new(ISA::Sw, tmp_register.value, STACK_REGISTER.value, assemble_immediate into.offset + index, Kind::Imm).encode
+          @text << Instruction.new(ISA::Sw, tmp_register.value, into.reference_register.value, assemble_immediate into.value, Kind::Imm, into.symbol_offset + index).encode
         end
-      end
-
-    when {Absolute, Registers} # Register => Ram
-      raise "Cannot read multiple-word variable from register" if variable.constraint.size > 1
-      # load destination address
-      dest_register = grab_register # will contain the destination addess
-      @text << Instruction.new(ISA::Lui, dest_register.value, immediate: assemble_immediate into.value, Kind::Lui).encode
-      @text << Instruction.new(ISA::Addi, dest_register.value, dest_register.value, immediate: assemble_immediate into.value, Kind::Lli).encode
-      # write
-      @text << Instruction.new(ISA::Sw, variable.register.not_nil!.value, dest_register.value).encode
-
-    when {Absolute, Nil} # Stack => Ram
-      # load destination address
-      dest_register = grab_register # will contain the destination addess
-      @text << Instruction.new(ISA::Lui, dest_register.value, immediate: assemble_immediate into.value, Kind::Lui).encode
-      @text << Instruction.new(ISA::Addi, dest_register.value, dest_register.value, immediate: assemble_immediate into.value, Kind::Lli).encode
-      # reserve temporary register
-      tmp_register = grab_register excludes: [dest_register] # will contain the value to transfer
-      (0...(variable.constraint.size)).each do |index|
-        @text << Instruction.new(ISA::Lw, tmp_register.value, STACK_REGISTER.value, assemble_immediate variable.offset + index, Kind::Imm).encode
-        @text << Instruction.new(ISA::Sw, tmp_register.value, dest_register.value, assemble_immediate index, Kind::Imm).encode
-      end
+      # end
     end
     variable.constraint
   end
@@ -323,51 +262,52 @@ class Stacklang::Function
   #   # depending on the into, copy the return value
   # end
 
-  def compile_lvalue(expression : AST::Expression) : {Offset | Absolute, Type::Any}
-    case expression
-    when AST::Identifier
-    # var => offset
-    # global => absolute
-    # si access: compute la lvalue,
-      # si absolute/offset, add l'offset a la valeur (devrai rajouter un champ offset a zero sur absolute a stocker avec la ref au symbol)
-    # si dereferencement
-      # compile la valeur dans un registre SI POSSIBLE, sinon dans un offset ou un absolute (faudra rajouter un type d'into pour dire "le plus simple" et retourner l'into)
-      # si c'est un registre, faudra un nouveau type en plus de offset/absolute pour specifier le registre a utiliser
-        # ou alors trouver un moyen de les fusioners en un truc)
-      # la fonction "le plus simple" pourrait etre une overload pour différent type
-    # sinon interdit. par ex le retour d'un call: ne peux pas etre affecté, doit d'abord etre copié dans une variable. (par contre
-      # on peux faire (identifer = call()).field = value normalement
-    else raise "Expression #{expression.to_s} is not a valid left value for an assignement in #{@unit.path} at line #{expression.line}"
-  end
+    #--
+    
+  # def compile_lvalue(expression : AST::Expression) : {Offset | Absolute, Type::Any}
+  #   case expression
+  #   when AST::Identifier
+  #   # var => offset
+  #   # global => absolute
+  #   # si access: compute la lvalue,
+  #     # si absolute/offset, add l'offset a la valeur (devrai rajouter un champ offset a zero sur absolute a stocker avec la ref au symbol)
+  #   # si dereferencement
+  #     # compile la valeur dans un registre SI POSSIBLE, sinon dans un offset ou un absolute (faudra rajouter un type d'into pour dire "le plus simple" et retourner l'into)
+  #     # si c'est un registre, faudra un nouveau type en plus de offset/absolute pour specifier le registre a utiliser
+  #       # ou alors trouver un moyen de les fusioners en un truc)
+  #     # la fonction "le plus simple" pourrait etre une overload pour différent type
+  #   # sinon interdit. par ex le retour d'un call: ne peux pas etre affecté, doit d'abord etre copié dans une variable. (par contre
+  #     # on peux faire (identifer = call()).field = value normalement
+  #   else raise "Expression #{expression.to_s} is not a valid left value for an assignement in #{@unit.path} at line #{expression.line}"
+  # end
 
-  def compile_assignement(left_side : AST::Expression, right_side : AST::Expression, into: Registers | Offset | Absolute | Nil): Type::Any
-    lvalue = compile_lvalue left_size
-    compile_expression right_size, into: lvalue
-    # then if there is an into copy from lvalue to into
-  end
+  # def compile_assignement(left_side : AST::Expression, right_side : AST::Expression, into: Registers | Offset | Absolute | Nil): Type::Any
+  #   lvalue = compile_lvalue left_size
+  #   compile_expression right_size, into: lvalue
+  #   # then if there is an into copy from lvalue to into
+  # end
 
-  def compile_binary(binary : AST::Binary, into: Registers | Offset | Absolute | Nil): Type::Any?
-    case binary.name
-    when "=" then compile_assignement binary.left, binary.right, into: into
-    else nil
-    end
-  end
+  # def compile_binary(binary : AST::Binary, into: Registers | Offset | Absolute | Nil): Type::Any?
+  #   case binary.name
+  #   when "=" then compile_assignement binary.left, binary.right, into: into
+  #   else nil
+  #   end
+  # end
   
-  def compile_operator(operator : AST::Operator, into: Registers | Offset | Absolute | Nil): Type::Any?
-    case operator
-    when AST::Unary then nil
-    when AST::Binary then compile_binary operator, into: into
-    when AST::Access then nil
-    end
-  end
+  # def compile_operator(operator : AST::Operator, into: Registers | Offset | Absolute | Nil): Type::Any?
+  #   case operator
+  #   when AST::Unary then nil
+  #   when AST::Binary then compile_binary operator, into: into
+  #   when AST::Access then nil
+  #   end
+  # end
   
-  def compile_expression(expression : AST::Expression, into : Registers | Offset | Absolute | Nil): Type::Any?
+  def compile_expression(expression : AST::Expression, into : Registers | Memory | Nil): Type::Any?
     case expression
     when AST::Literal then compile_literal expression, into: into
     when AST::Identifier then compile_identifier expression, into: into
     when AST::Call then nil
-    when AST::Operator then compile_operator expression, into: into
-      if 
+    when AST::Operator then nil #compile_operator expression, into: into
     end                                                          
   end
 
@@ -378,8 +318,7 @@ class Stacklang::Function
         raise "Function #{@ast.name.name} at #{@unit.path} must return nothing, but return something at line #{ret.line}"
       else
         # offset for the return value to be written directly to the stack, in the place reserved for the return address
-        offset = Offset.new @return_value_offset.not_nil!.to_i32
-        returned_value_type = compile_expression returned_value, into: offset
+        returned_value_type = compile_expression returned_value, into: Memory.offset  @return_value_offset.not_nil!.to_i32
         if @return_type.not_nil! != returned_value_type
           raise "Function #{@ast.name.name} at #{@unit.path} must return #{@return_type.to_s}, but return expression has type #{returned_value_type.try(&.to_s) || "nothing"} at line #{ret.line}"
         end
