@@ -372,15 +372,25 @@ class Stacklang::Function
     else raise "UNSUPPORTED binary"
     end
   end
+
+  def compile_access(access : AST::Access,  into : Registers | Memory | Nil): Type::Any?
+    return nil unless into
+    memory, constraint = compile_access_lvalue access || raise "Illegal expression #{access.to_s} in #{@unit.path} at #{access.line}"
+    case into
+    when Registers
+      raise "Cannot load multiple-word term in register. Check that you are not dereferencing a struct." if constraint.size > 1
+      @text << Instruction.new(ISA::Lw, into.value, memory.reference_register.value, immediate: assemble_immediate memory.value, Kind::Imm, memory.symbol_offset).encode
+    when Memory
+      move memory, constraint, into: into
+    end
+    constraint
+  end
   
   def compile_operator(operator : AST::Operator, into : Registers | Memory | Nil): Type::Any?
     case operator
     when AST::Unary then raise "UNSUPPORTED unary"
     when AST::Binary then compile_binary operator, into: into
-    when AST::Access then raise "Unsup access"
-      # memory, constraint = compile_access_lvalue expression || raise "Illegal expression #{expression.to_s} in #{@unit.path} at #{expression.line}"
-      # move memory, into: into
-      # constraint
+    when AST::Access then compile_access operator, into: into
     end
   end
   
