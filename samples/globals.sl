@@ -8,27 +8,31 @@ var bean : Pet
 
 fun main(i_can_take_param):_ {
     var major_person: Person
-    var a
+    var a = 0x5
     var b
     var c
-    
+
     major_person.age = 18
 
     jack = major_person
 
     // This is a write a address 0 but lets see in debugger if it behave as it should
+    // write into dereferenecment
     *(jack.friends) = jack
 
+    // some fuckery:
+    *null_ptr = 0xf0f0
+    
     // We take the non initialized (== 0) ptr to friend and we write jack on it.
     //once done, we should see jack age (so 18) in ram at address 1 (offset of field age to beginning of struct Person is 1)
 
-    major_person.age = 6
-    a = major_person.age
-    return a
+    // write into access, read of external interop global
+    major_person.age = error_code_success
+    // multiple assignment
+    a = b = c = major_person.age
 
-    // = is right associative 
-    //a = b = c = error_code_success
-    //return b
+   // return
+    return b
     
     // It works IF: stack as a 0x12 in offset 1
     // Absolute addresse 0x0001 containt a 0x12 too

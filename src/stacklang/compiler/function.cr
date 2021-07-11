@@ -28,17 +28,21 @@ class Stacklang::Function
 
   class Variable
     property register : Registers? = nil
-    property initialized = true # because we ignore initialisation for now
+    property initialized
     @offset : Int32 # offset to the stack frame
     @name : String
     @constraint : Type::Any
-    #@initialisation ignored rn
+    @initialization : AST::Expression?
 
     getter name
     getter constraint
     getter offset
-    
-    def initialize(@name, @offset, @constraint) end
+    getter initialization
+
+    # Carefull, no zero init
+    def initialize(@name, @offset, @constraint, @initialization)
+      @initialized = @initialization.nil?
+    end
   end
     
   class Prototype # All offsets are relative to the CALLER stack
@@ -81,15 +85,14 @@ class Stacklang::Function
 
     local_variables = @ast.variables.map do |variable|
       typeinfo = @unit.typeinfo variable.constraint
-      Variable.new(variable.name.name, @frame_size.to_i32, typeinfo).tap do
+      Variable.new(variable.name.name, @frame_size.to_i32, typeinfo, variable.initialization).tap do
         @frame_size += typeinfo.size
       end
-      # we ignore initialisation rn
     end
     
     parameters = @ast.parameters.map do |parameter|
       typeinfo = @unit.typeinfo parameter.constraint
-      Variable.new(parameter.name.name, @frame_size.to_i32, typeinfo).tap do 
+      Variable.new(parameter.name.name, @frame_size.to_i32, typeinfo, nil).tap do 
         @frame_size += typeinfo.size
       end
     end
@@ -447,6 +450,12 @@ class Stacklang::Function
     @text << Instruction.new(ISA::Sw, reg_a: RETURN_ADRESS_REGISTER.value, reg_b: STACK_REGISTER.value, immediate: @return_address_offset).encode
 
     # Then: initialize variables
+    @variables.values.each do |variable|
+      if value = variable.initialization
+        compile_assignement AST::Identifier.new(variable.name), value, nil
+      end
+      variable.initialized = true
+    end
 
     @ast.body.each do |statement|
       compile_statement statement

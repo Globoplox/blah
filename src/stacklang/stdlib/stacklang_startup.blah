@@ -30,6 +30,8 @@ export __global_hex_digits: .ascii "0123456789ABCDEF"
 
 export __global_error_code_success: .word 0xc
 
+export __global_null_ptr: nop
+
 # notice putw do not need to move its stack because it does not call any other function. Stack frame looks like this:
 # r7 - 2 | parameter of type word
 # r7 - 1 | usually return address (here we don't store it because we never overwrite r6, which contain the return address per abi)
