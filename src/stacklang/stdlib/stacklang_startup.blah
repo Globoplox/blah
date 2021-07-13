@@ -28,7 +28,7 @@ export __global_hex_prefix: .ascii "0x"
 export __global_hex_digits: .ascii "0123456789ABCDEF"
        			    nop
 
-export __global_error_code_success: .word 0x2
+export __global_error_code_success: .word 0xc
 
 export __global_null_ptr: nop
 
