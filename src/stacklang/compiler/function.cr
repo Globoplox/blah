@@ -416,9 +416,10 @@ class Stacklang::Function
           lvalue, constraint = lvalue_result
           if constraint.is_a? Type::Pointer
             # maybe also allow words with a warning ?
-            @text << Instruction.new(ISA::Lw, lvalue.reference_register.value, lvalue.reference_register.value, immediate: assemble_immediate lvalue.value, Kind::Imm, lvalue.symbol_offset).encode
+            result_register = grab_register excludes: [lvalue.reference_register]
+            @text << Instruction.new(ISA::Lw, result_register.value, lvalue.reference_register.value, immediate: assemble_immediate lvalue.value, Kind::Imm, lvalue.symbol_offset).encode
             pp "Dereferencement produce ram address #{lvalue.reference_register}"
-            {Memory.absolute(lvalue.reference_register), constraint.pointer_of}
+            {Memory.absolute(result_register), constraint.pointer_of}
           else
             raise "Cannot dereference an expression of type #{constraint.to_s} in #{@unit.path} at line #{expression.line}"
           end
