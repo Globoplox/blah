@@ -121,9 +121,9 @@ class Stacklang::Parser < Parser
   end
 
   rule def unary_operation
-    next unless operator = str ["!", "*", "&"]
+    next unless operator = str ["!", "*", "&", "-"]
     next unless expr = leaf_expression
-    # else *foo.bar would be *(foo.bar) instead of (*foo).bar
+    # Has to be leaf else *foo.bar would be *(foo.bar) instead of (*foo).bar
     # and more importantly *foo = bar would be *(foo = bar)
     # So if we want to use an unary on a complex expression, wrap it with parenthesis
     Unary.new expr, operator
@@ -140,6 +140,10 @@ class Stacklang::Parser < Parser
     whitespace
     {name, right}
   end
+
+  # Please note that all Binary operation are flattened and then
+  # Linked into a tree of expression with varying kind of associativity
+  # depending on the operator. See #Binary.from_chain
   
   rule def affectation_operation
     next unless left = low_priority_operation

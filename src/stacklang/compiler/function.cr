@@ -227,6 +227,23 @@ class Stacklang::Function
     def self.absolute(register : Registers, value : Int32 | String = 0, symbol_offset : Int32 = 0)
       new register, value, symbol_offset, nil
     end
+
+    def cache_to_s
+      if var = @within_var
+        "AKA var #{var.name} whose value is cached in #{var.register}"
+      end
+    end
+
+    def rel_to_s
+      case ref = @reference_register
+      when Registers then "#{ref}"
+      when Variable then "address found in var #{ref.name} (cached in #{ref.register})"
+      end
+    end
+
+    def to_s(io)
+      io << "Memory (#{cache_to_s}) at address relative to #{rel_to_s}"
+    end
   end
 
   # This is the big one.
@@ -244,6 +261,7 @@ class Stacklang::Function
   # thanks to caching within register can be disabled by setting *force_to_memory* to true.
   # That should be usefull only when storing a var because it's cache register is needed for something else.
   def move(memory : Memory | Registers, constraint : Type::Any, into : Memory | Registers, force_to_memory = false)
+    pp "MOVE #{memory} into #{into}"
     # If the source is a memory location holding a variable that is already cached into a register, then use this register directly.
     memory = memory.within_var.try(&.register) || memory if memory.is_a? Memory
 
@@ -265,17 +283,16 @@ class Stacklang::Function
     end if memory.is_a? Memory
 
     # If the destination is a memory location relative to an address stored into a variable, we need to get that address into a register.
-    unless force_to_memory == false && (var = into.within_var) && var.constraint.size == 1
-      into.reference_register.as?(Variable).try do |address_variable|
-        # If the var containing that address is cached in a register, just use the cache.
-        if (address_register = address_variable.register)
-          into.reference_register = address_register
-        else
-          # Else we need to dereference it? For this we grab a register, ensuring we are not going to grab a register necessary for next steps.
-          address_register = grab_register excludes: [memory.as?(Registers) || memory.as?(Memory).not_nil!.reference_register].compact
-          @text << Instruction.new(ISA::Lw, address_register.value, STACK_REGISTER.value, immediate: assemble_immediate address_variable.offset, Kind::Imm).encode
-          into.reference_register = address_variable.register = address_register
-        end
+    # In this case, 
+    into.reference_register.as?(Variable).try do |address_variable|
+      # If the var containing that address is cached in a register, just use the cache.
+      if (address_register = address_variable.register)
+        into.reference_register = address_register
+      else
+        # Else we need to dereference it? For this we grab a register, ensuring we are not going to grab a register necessary for next steps.
+        address_register = grab_register excludes: [memory.as?(Registers) || memory.as?(Memory).not_nil!.reference_register].compact
+        @text << Instruction.new(ISA::Lw, address_register.value, STACK_REGISTER.value, immediate: assemble_immediate address_variable.offset, Kind::Imm).encode
+        into.reference_register = address_variable.register = address_register
       end
     end if into.is_a? Memory
     
@@ -284,9 +301,12 @@ class Stacklang::Function
       @text << Instruction.new(ISA::Add, into.value, memory.value).encode unless into == memory
 
     when {Registers, Memory}
+      pp "Reg => Mem"
       if force_to_memory == false && (var = into.within_var) && var.constraint.size == 1
+        pp "Into is word-size var, optimizing"
         var.register = memory
       else
+        pp "Store #{memory} to #{into} + #{into.value} + #{into.symbol_offset}"
         @text << Instruction.new(ISA::Sw, memory.value, into.reference_register!.value, immediate: assemble_immediate into.value, Kind::Imm, into.symbol_offset).encode
       end
 
@@ -321,6 +341,7 @@ class Stacklang::Function
   # Generate code necessary to move a single-word literal value in any location.
   def compile_literal(literal : AST::Literal, into : Registers | Memory | Nil): Type::Any?
     # An expression composed of just a literal is useless (it can't have a side effect).
+    pp "Literal (#{literal.number}) move into #{into}"
     return nil if into.nil?
     case into
     when Registers
@@ -429,37 +450,17 @@ class Stacklang::Function
     when AST::Access then compile_access_lvalue expression
     when AST::Unary
       if expression.name == "*"
-        # We try to fetch the memory location of the dereferenced value if any.
-        lvalue_result = compile_lvalue expression.operand
-        if lvalue_result
-          # NOTE: this whole lvalue thing is likely useless.
-          # A dereferencable value is always a pointer, which fit a register. Just computing the value into a register would always work.
-          # Here we need to dereference the lvalue anyway so there is not any opti done here.
-          lvalue, constraint = lvalue_result
-          if constraint.is_a? Type::Pointer
-            # We know that output of lvalue cannot be a memory whose base adress is stored in a temporary var.
-            result_register = grab_register excludes: [lvalue.reference_register!]
-            @text << Instruction.new(ISA::Lw, result_register.value, lvalue.reference_register!.value, immediate: assemble_immediate lvalue.value, Kind::Imm, lvalue.symbol_offset).encode
-            {Memory.absolute(result_register), constraint.pointer_of}
-          else
-            raise "Cannot dereference an expression of type #{constraint.to_s} in #{@unit.path} at line #{expression.line}"
-          end
+        pp "deref has no lvalue"
+        destination_register = grab_register
+        pp "Deref: compiling putting value in register #{destination_register}"
+        constraint = compile_expression expression.operand, into: destination_register
+        pp "Now derefencing it"
+        if constraint.is_a? Type::Pointer || constraint.is_a? Type::Word # TODO remove, itwas just for lol
+          {Memory.absolute(destination_register), constraint.is_a?(Type::Pointer) ? constraint.pointer_of : Type::Word.new} # TODO remove check
         else
-          # We fetch the value of the pointer and dereference it.
-          # NOTE: we cannot reuse the register for dereferenced value. It might belong to a var. 
-          destination_register = grab_register
-          constraint = compile_expression expression.operand, into: destination_register
-          if constraint.is_a? Type::Pointer || constraint.is_a? Type::Word # TODO remove, itwas just for lol
-            # maybe also allow words with a warning ?
-            @text << Instruction.new(ISA::Lw, destination_register.value, destination_register.value).encode
-            {Memory.absolute(destination_register), constraint.is_a?(Type::Pointer) ? constraint.pointer_of : Type::Word.new} # TODO remove check
-          else
-            raise "Cannot dereference an expression of type #{constraint.to_s} in #{@unit.path} at line #{expression.line}"
-          end
-
+          raise "Cannot dereference an expression of type #{constraint.to_s} in #{@unit.path} at line #{expression.line}"
         end
-      else
-        nil
+      else nil
       end
     else nil
     end
@@ -469,6 +470,7 @@ class Stacklang::Function
   # The left side of the assignement must be solvable to a memory location (a lvalue).
   # The written value can also be written to another location (An assignement do have a type and an expression).
   def compile_assignement(left_side : AST::Expression, right_side : AST::Expression, into : Registers | Memory | Nil): Type::Any
+    pp "Assignment, fetch lvalue"
     lvalue_result = compile_lvalue left_side
     lvalue_result || raise "Expression #{left_side.to_s} is not a valid left value for an assignement in #{@unit.path} at line #{left_side.line}"
     lvalue, destination_type = lvalue_result
@@ -477,8 +479,11 @@ class Stacklang::Function
     # So we compute the base address of the destination in a register and make this register the cache of a temporary value.
     # This way, if the register is grabbed, the register will be written to a reserved space before.
     # Move will read this value back in a register if it is cached.
+    pp "Create TMP for lvalue address"
     with_temporary(lvalue.reference_register!, Type::Pointer.new destination_type) do |temporary|
+      pp "TMP: #{temporary} cached in (#{temporary.register})"
       lvalue.reference_register = temporary
+      pp "Now move rightside into memory at TMP"
       source_type = compile_expression right_side, into: lvalue
       if source_type != destination_type
         raise "Cannot assign expression of type #{source_type.to_s} to lvalue of type #{destination_type.to_s} in #{@unit.path} at line #{left_side.line}"

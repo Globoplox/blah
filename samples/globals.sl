@@ -7,6 +7,10 @@ var jack : Person
 var bean : Pet
 
 fun main:_ {
+   //*0x0 = 0xf0f0
+   //*null_ptr = 0xf0f0
+   
+   //return 0x0	
    var major_person: Person
     //var a = 0x5
     //var b
@@ -26,6 +30,7 @@ fun main:_ {
 
     // some fuckery:
     *null_ptr = 0xf0f0
+    // same as but only if implict cast to ptr allowed: *0x0 = 0xf0f0
     
     // We take the non initialized (== 0) ptr to friend and we write jack on it.
     //once done, we should see jack age (so 18) in ram at address 1 (offset of field age to beginning of struct Person is 1)
