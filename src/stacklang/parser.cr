@@ -129,8 +129,32 @@ class Stacklang::Parser < Parser
     Unary.new expr, operator
   end
 
+  rule def sizeof
+    next unless str "sizeof"
+    whitespace
+    next unless char '('
+    whitespace
+    next unless constraint = type_constraint false, true
+    whitespace
+    next unless char ')'
+    Sizeof.new constraint
+  end
+
+  rule def cast
+    next unless char '('
+    whitespace
+    next unless constraint = type_constraint false, true
+    whitespace
+    next unless separator
+    whitespace
+    next unless target =  expression
+    whitespace
+    next unless char ')'
+    Cast.new constraint, target
+  end
+
   def leaf_expression
-    or ->unary_operation, ->parenthesis, ->call, ->identifier, ->literal
+    or ->sizeof, ->cast, ->unary_operation, ->parenthesis, ->call, ->identifier, ->literal
   end
 
   rule def affectation_chain

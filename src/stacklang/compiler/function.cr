@@ -188,8 +188,9 @@ class Stacklang::Function
     tmp = Variable.new "__temporary_var_#{@temporaries.size}", -(@temporaries.size + 1), constraint, nil
     tmp.register = register
     @temporaries.push tmp
-    yield tmp
+    ret = yield tmp
     @temporaries.pop
+    ret
   end
 
   # Ensure a variable value is written to ram and not in a cache so the register can be used for something else.
@@ -229,9 +230,6 @@ class Stacklang::Function
   # Represent a memory location as an offset to an address stored in a register or a variable.
   # It can also be specified that this memory is mapped to a variable. This allows use of cached values.
   # That memory can be used as a source or a destination.
-  #
-  # TODO: the value is never actually a symbol. This case should be removed. <= YES IT DOES, into can be a destination to a Global ?
-  # This will also allow to remove #assembler_immediate symbol_offset parameter, and the symbol_offset property.
   class Memory
     property value : Int32
     property reference_register : Registers | Variable # the register containing the address. Or a variable If the address is stored in a variable
@@ -340,9 +338,9 @@ class Stacklang::Function
   end
 
   # Generate code necessary to move a single-word literal value in any location.
-  def compile_literal(literal : AST::Literal, into : Registers | Memory | Nil): Type::Any?
+  def compile_literal(literal : AST::Literal, into : Registers | Memory | Nil): Type::Any
     # An expression composed of just a literal is useless (it can't have a side effect).
-    return nil if into.nil?
+    return Type::Word.new if into.nil?
     case into
     when Registers
       @text << Instruction.new(ISA::Lui, into.value, immediate: assemble_immediate literal.number, Kind::Lui).encode
@@ -357,19 +355,26 @@ class Stacklang::Function
     Type::Word.new
   end
 
+  # Generate code necessary to move a sizeof literal value in any location.
+  def compile_sizeof(ast : AST::Sizeof, into : Registers | Memory | Nil): Type::Any
+    # An expression composed of just a literal is useless (it can't have a side effect).
+    return Type::Word.new if into.nil?
+    compile_literal AST::Literal.new(@unit.typeinfo(ast.constraint).size.to_i32), into: into
+  end
+
   # Generate code necessary to move a global variable value in any location.
-  def compile_global(global : Unit::Global, into : Registers | Memory | Nil): Type::Any?
+  def compile_global(global : Unit::Global, into : Registers | Memory | Nil): Type::Any
     # An expression composed of just a global is useless (it can't have a side effect).
-    return nil if into.nil?
+    return Type::Word.new if into.nil?
     source = compile_global_lvalue global
     move source, global.type_info, into
     global.type_info
   end
 
   # Generate code necessary to move a variable value in any location.
-  def compile_variable(variable : Variable, into : Registers | Memory | Nil): Type::Any?
+  def compile_variable(variable : Variable, into : Registers | Memory | Nil): Type::Any
     # An expression composed of just a variable is useless (it can't have a side effect).
-    return nil if into.nil?
+    return Type::Word.new if into.nil?
     error "Cannot use variable #{variable.name} before it is initalized" unless variable.initialized
     source = compile_variable_lvalue variable
     move source, variable.constraint, into
@@ -377,9 +382,9 @@ class Stacklang::Function
   end
 
   # Generate code necessary to move any value represened by an identifier in any location.
-  def compile_identifier(identifier : AST::Identifier, into : Registers | Memory | Nil): Type::Any?
+  def compile_identifier(identifier : AST::Identifier, into : Registers | Memory | Nil): Type::Any
     # An expression composed of just an identifier is useless (it can't have a side effect).
-    return nil if into.nil?
+    return Type::Word.new if into.nil?
     variable = @variables[identifier.name]?
     if variable
       compile_variable variable, into: into
@@ -488,37 +493,44 @@ class Stacklang::Function
     destination_type
   end
 
-  # def compile_addition(left_side : AST::Expression, right_side : AST::Expression, into : Registers | Memory | Nil): Type::Any
-  #   if into.nil?
-  #     compile_expression left_side
-  #     compile_expression right_side
-  #   else
-  #     left_side_register = grab_register excludes: into.used_registers
-  #     left_side_type = compile_expression left_side, into: left_side_register
-  #     with_temporary(left_side_register, left_side_type) do |temporary|
-  #       right_side_register = grab_register excludes: into.used_registers, left_side_register
-  #       right_side_type = compile_expression right_side, into: right_side_register
-  #       # TODO: typecheck
-  #       left_side_register = cache temporary, excludes: [right_side_register]
-  #       result_register = grab_register, excludes: [left_side_register, right_side_register]
-  #       # TODO: No multiplication by size when ptr + word yet because i can't multiply yet :( 
-  #       @text << Instruction.new(ISA::Add, result_register, left_side_register, right_side_type).encode
-  #       move 
-  #     end
-  #   end
-  # end
+  def compile_addition(left_side : AST::Expression, right_side : AST::Expression, into : Registers | Memory | Nil): Type::Any
+    if into.nil?
+      compile_expression left_side, into: nil
+      compile_expression right_side, into: nil
+      Type::Word.new
+    else
+      left_side_register = grab_register excludes: into.used_registers
+      left_side_type = compile_expression left_side, into: left_side_register
+      error "Cannot add with nothing", node: left_side unless left_side_type
+      with_temporary(left_side_register, left_side_type) do |temporary|
+        right_side_register = grab_register excludes: into.used_registers + [left_side_register]
+        right_side_type = compile_expression right_side, into: right_side_register
+        ret_type = case {left_side_type, right_side_type}
+        when {Type::Word, Type::Word} then Type::Word.new
+        when {Type::Pointer, Type::Word} then left_side_type
+        when {Type::Word, Type::Pointer} then right_side_type
+        else error "Cannot add value of types #{left_side_type} and #{right_side_type} together", node: left_side
+        end        
+        left_side_register = cache temporary, excludes: [right_side_register]
+        result_register = grab_register excludes: [left_side_register, right_side_register]
+        @text << Instruction.new(ISA::Add, result_register.value, left_side_register.value, right_side_register.value).encode
+        move result_register, ret_type, into: into
+        ret_type
+      end
+    end
+  end
   
   # Compile a binary operator value, and move it's value if necessary.
-  def compile_binary(binary : AST::Binary, into : Registers | Memory | Nil): Type::Any?
+  def compile_binary(binary : AST::Binary, into : Registers | Memory | Nil): Type::Any
     case binary.name
     when "=" then compile_assignement binary.left, binary.right, into: into
-    # when "+" then compile_addition binary.left, binary.right, into: into      
+    when "+" then compile_addition binary.left, binary.right, into: into      
     else error "Unusupported binary operation '#{binary.name}'", node: binary
     end
   end
 
   # Compile a unary operator value, and move it's value if necessary.
-  def compile_unary(unary : AST::Unary, into : Registers | Memory | Nil): Type::Any?
+  def compile_unary(unary : AST::Unary, into : Registers | Memory | Nil): Type::Any
     case unary.name
     when "&"
       lvalue_result = compile_lvalue unary.operand
@@ -559,28 +571,31 @@ class Stacklang::Function
   end
 
   # Compile the value of an access and move it's value if necessary.
-  def compile_access(access : AST::Access,  into : Registers | Memory | Nil): Type::Any?
+  def compile_access(access : AST::Access,  into : Registers | Memory | Nil): Type::Any
     memory, constraint = compile_access_lvalue access || raise "Illegal expression #{access.to_s} in #{@unit.path} at #{access.line}"
     move memory, constraint, into: into if into
     constraint
   end
 
   # Compile the value of any operation and move it's value if necessary.
-  def compile_operator(operator : AST::Operator, into : Registers | Memory | Nil): Type::Any?
+  def compile_operator(operator : AST::Operator, into : Registers | Memory | Nil): Type::Any
     case operator
     when AST::Unary then compile_unary operator, into: into
     when AST::Binary then compile_binary operator, into: into
     when AST::Access then compile_access operator, into: into
+    else error "Unsuported operator", node: operator
     end
   end
   
   # Compile the value of any expression and move it's value if necessary.
-  def compile_expression(expression : AST::Expression, into : Registers | Memory | Nil): Type::Any?
+  def compile_expression(expression : AST::Expression, into : Registers | Memory | Nil): Type::Any
     case expression
     when AST::Literal then compile_literal expression, into: into
+    when AST::Sizeof then compile_sizeof expression, into: into
+    #when AST::Cast then compile_cast expression, into: into
     when AST::Identifier then compile_identifier expression, into: into
-    when AST::Call then nil
     when AST::Operator then compile_operator expression, into: into
+    else error "Unsupported expression", node: expression
     end                                                          
   end
 

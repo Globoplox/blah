@@ -236,6 +236,30 @@ end
       io << @number.to_s base: 16
     end
   end
+
+  class Sizeof < Expression
+    def initialize(@constraint : Type) end
+    getter constraint
+    
+    def dump(io, indent = 0)
+      io << "sizeof("
+      @constraint.dump io
+      io << ")"
+    end
+  end
+
+  class Cast < Expression
+    def initialize(@constraint : Type, @target : Expression) end
+    getter constraint
+    getter target
+    
+    def dump(io, indent = 0)
+      io << "("
+      @constraint.dump io
+      io << ")"
+      @target.dump io
+    end
+  end
     
   class Identifier < Expression
     def initialize(@name : String) end
