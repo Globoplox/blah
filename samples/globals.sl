@@ -9,6 +9,7 @@ var space
 
 fun main:_ {
     var ptr :* = &error_code_success
+    ptr = 0x9
     *ptr = 0xb
     return error_code_success
     

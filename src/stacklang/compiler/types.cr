@@ -35,8 +35,8 @@ module Stacklang
     def initialize(_init)
     end
     
-    def to_s
-      "_"
+    def to_s(io)
+      io << "_"
     end
   end
 
@@ -45,8 +45,9 @@ module Stacklang
     getter pointer_of
     def initialize(@pointer_of : Type::Any) end
 
-    def to_s
-      "*#{@pointer_of.to_s}"
+    def to_s(io)
+      io << '*'
+      @pointer_of.to_s io
     end
 
     def ==(other : Type::Any)
@@ -71,8 +72,8 @@ module Stacklang
       @fields = [] of Field
     end
 
-    def to_s
-      @name
+    def to_s(io)
+      io << @name
     end
 
     def size : UInt16
@@ -90,10 +91,6 @@ module Stacklang
           field
         end
         offset
-      end.tap do |size|
-        # Temporary check.
-        # This is because for now compiler generate memcpy that use an immediate index instead of looping on size
-        raise "Structure cannot be bigger than 63 words for now" if size > 63
       end
     end
 

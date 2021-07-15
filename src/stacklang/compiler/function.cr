@@ -6,7 +6,6 @@ require "./unit"
 # TODO: handle copy with index in a temporary register with a beq loop ?
 # TODO: when doing a movi and the value is a flat 0, we could do a sw r0, ,0 instead of a movi
 # TODO: a dedicated function for generating movi
-# TODO: Function to generate error
 # TODO: subvar for struct var to allow for register caching. Carefull of single word struct (register cache is shared).
 # TODO: Language feature: function ptr, cast
 # TODO: type inference for initialized local variables
@@ -94,16 +93,6 @@ class Stacklang::Function
   # A stack of temporary variables, to cache temporary values stored in register while doing other computation. 
   @temporaries = [] of Variable
 
-  # Run a computation step while ensuring a register value is kept or cached in stack.
-  # (Unless an mistake in the compiler cause use of register it shouldn't).
-  def with_temporary(register : Registers, constraint : Type::Any)
-    tmp = Variable.new "__temporary_var_#{@temporaries.size}", -(@temporaries.size + 1), constraint, nil
-    tmp.register = register
-    @temporaries.push tmp
-    yield tmp
-    @temporaries.pop
-  end
-
   # Allow to share the prototype of the function to external symbols.
   getter prototype
 
@@ -162,6 +151,13 @@ class Stacklang::Function
     @section.definitions["__function_#{@ast.name.name}"] = Object::Section::Symbol.new 0, true
   end
 
+  def error(error, node = nil)
+    location = node.try do |node|
+      " at line #{node.line}"
+    end
+    raise "#{error}. #{@unit.path}/#{@ast.name.name}#{location}."
+  end
+
   # Helper function for assembling immediate value.
   # It provide a value for the immediate, or store the reference for linking if the value is a symbol.
   def assemble_immediate(immediate, kind, symbol_offset = 0)
@@ -182,11 +178,32 @@ class Stacklang::Function
     end
   end
 
+  # Run a computation step while ensuring a register value is kept or cached in stack.
+  # (Unless an mistake in the compiler cause use of register it shouldn't).
+  # To be used with #uncache or #move.
+  def with_temporary(register : Registers, constraint : Type::Any)
+    tmp = Variable.new "__temporary_var_#{@temporaries.size}", -(@temporaries.size + 1), constraint, nil
+    tmp.register = register
+    @temporaries.push tmp
+    yield tmp
+    @temporaries.pop
+  end
+
   # Ensure a variable value is written to ram and not in a cache so the register can be used for something else.
   def store(variable)
     variable.register.try do |register|
       lvalue = compile_variable_lvalue variable
       move register, variable.constraint, lvalue, force_to_memory: true
+    end
+  end
+
+  # Cache a variable in a register.
+  # Used to fetch temporary varaibles.
+  def cache(variable, excludes): Registers
+    variable.register || begin
+      register = grab_register excludes: excludes
+      @text << Instruction.new(ISA::Lw, register.value, STACK_REGISTER.value, immediate: assemble_immediate variable.offset, Kind::Imm).encode
+      variable.register = register
     end
   end
 
@@ -276,7 +293,6 @@ class Stacklang::Function
   # That should be usefull only when storing a var because it's cache register is needed for something else.
   # TODO: allow destination to be "ANY REGISTER" to avoid grabbing and copying when value might already be in a register
   def move(memory : Memory | Registers, constraint : Type::Any, into : Memory | Registers, force_to_memory = false)
-    pp "MOVE #{memory} into #{into}"
     # If the source is a memory location holding a variable that is already cached into a register, then use this register directly.
     memory = memory.within_var.try(&.register) || memory if memory.is_a? Memory
 
@@ -285,15 +301,8 @@ class Stacklang::Function
       # If the var containing that address is cached in a register, just use the cache.
       if (address_register = address_variable.register)
         memory.reference_register = address_register
-      else
-        # Else we need to dereference it? For this we grab a register, ensuring we are not going to grab a register necessary for next steps. 
-        address_register = grab_register(excludes: [
-            into.as?(Registers) ||
-            into.as?(Memory).not_nil!.within_var.try(&.register) ||
-            into.as?(Memory).not_nil!.reference_register ||
-            into.as?(Memory).not_nil!.reference_register.as?(Variable).try(&.register)].compact)
-        @text << Instruction.new(ISA::Lw, address_register.value, STACK_REGISTER.value, immediate: assemble_immediate address_variable.offset, Kind::Imm).encode
-        memory.reference_register = address_variable.register = address_register
+      else # Extract it out of cache
+        memory.reference_register = cache address_variable, excludes: into.used_registers
       end
     end if memory.is_a? Memory
 
@@ -303,11 +312,8 @@ class Stacklang::Function
       # If the var containing that address is cached in a register, just use the cache.
       if (address_register = address_variable.register)
         into.reference_register = address_register
-      else
-        # Else we need to dereference it? For this we grab a register, ensuring we are not going to grab a register necessary for next steps.
-        address_register = grab_register excludes: [memory.as?(Registers) || memory.as?(Memory).not_nil!.reference_register].compact
-        @text << Instruction.new(ISA::Lw, address_register.value, STACK_REGISTER.value, immediate: assemble_immediate address_variable.offset, Kind::Imm).encode
-        into.reference_register = address_variable.register = address_register
+      else # Extract it out of cache
+        into.reference_register = cache address_variable, excludes: memory.used_registers
       end
     end if into.is_a? Memory
     
@@ -316,17 +322,14 @@ class Stacklang::Function
       @text << Instruction.new(ISA::Add, into.value, memory.value).encode unless into == memory
 
     when {Registers, Memory}
-      pp "Reg => Mem"
       if force_to_memory == false && (var = into.within_var) && var.constraint.size == 1
-        pp "Into is word-size var, optimizing"
         var.register = memory
       else
-        pp "Store #{memory} to #{into} + #{into.value} + #{into.symbol_offset}"
         @text << Instruction.new(ISA::Sw, memory.value, into.reference_register!.value, immediate: assemble_immediate into.value, Kind::Imm, into.symbol_offset).encode
       end
 
     when {Memory, Registers}
-      raise "Illegal move of multiple word into register" if constraint.size > 1
+      error "Illegal move of multiple word into register" if constraint.size > 1
       @text << Instruction.new(ISA::Lw, into.value, memory.reference_register!.value, immediate: assemble_immediate memory.value, Kind::Imm, memory.symbol_offset).encode
 
     when {Memory, Memory}
@@ -356,7 +359,6 @@ class Stacklang::Function
   # Generate code necessary to move a single-word literal value in any location.
   def compile_literal(literal : AST::Literal, into : Registers | Memory | Nil): Type::Any?
     # An expression composed of just a literal is useless (it can't have a side effect).
-    pp "Literal (#{literal.number}) move into #{into}"
     return nil if into.nil?
     case into
     when Registers
@@ -385,7 +387,7 @@ class Stacklang::Function
   def compile_variable(variable : Variable, into : Registers | Memory | Nil): Type::Any?
     # An expression composed of just a variable is useless (it can't have a side effect).
     return nil if into.nil?
-    raise "Cannot use variable #{variable.name} before it is initalized" unless variable.initialized
+    error "Cannot use variable #{variable.name} before it is initalized" unless variable.initialized
     source = compile_variable_lvalue variable
     move source, variable.constraint, into
     variable.constraint
@@ -400,7 +402,7 @@ class Stacklang::Function
       compile_variable variable, into: into
     else
       global = @unit.globals[identifier.name]?
-      global || raise "Unknown identifier #{identifier.name} in #{@unit.path} at line #{identifier.line}" 
+      global || error "Unknown identifier #{identifier.name}", node: identifier 
       compile_global global, into: into
     end
   end
@@ -422,14 +424,14 @@ class Stacklang::Function
       lvalue, constraint = lvalue_result
       if constraint.is_a? Type::Struct
         field = constraint.fields.find &.name.== access.field.name
-        field || raise "No such field #{access.field.name} for struct #{constraint.to_s} in #{@unit.path} at line #{access.line}"
+        field || error "No such field #{access.field.name} for struct #{constraint}", node: access
         lvalue.symbol_offset += field.offset
         {lvalue, field.constraint}
       else
-        raise "Cannot access field #{access.field} on expression #{access.operand} of type #{constraint.to_s} in #{@unit.path} at line #{access.line}"
+        error "Cannot access field #{access.field} on expression #{access.operand} of type #{constraint}", node: access
       end
     else 
-      raise "Cannot compute lvalue for #{access.to_s} in #{@unit.path} at line #{access.line}"
+      error "Cannot compute lvalue for #{access}", node: access
     end
   end
 
@@ -452,7 +454,7 @@ class Stacklang::Function
     if variable
       {compile_variable_lvalue(variable), variable.constraint}
     else
-      global = @unit.globals[identifier.name]? || raise "Unknown identifier #{identifier.name} in #{@unit.path} at line #{identifier.line}"
+      global = @unit.globals[identifier.name]? || error "Unknown identifier #{identifier.name}", node: identifier
       {compile_global_lvalue(global), global.type_info}             
     end
   end
@@ -467,15 +469,12 @@ class Stacklang::Function
     when AST::Unary
       if expression.name == "*"
         # TODO: use Any register destination instead of grabbing one 
-        pp "deref has no lvalue"
         destination_register = grab_register
-        pp "Deref: compiling putting value in register #{destination_register}"
         constraint = compile_expression expression.operand, into: destination_register
-        pp "Now derefencing it"
         if constraint.is_a? Type::Pointer
           {Memory.absolute(destination_register), constraint.pointer_of}
         else
-          raise "Cannot dereference an expression of type #{constraint.to_s} in #{@unit.path} at line #{expression.line}"
+          error "Cannot dereference an expression of type #{constraint}", node: expression
         end
       else nil
       end
@@ -487,7 +486,6 @@ class Stacklang::Function
   # The left side of the assignement must be solvable to a memory location (a lvalue).
   # The written value can also be written to another location (An assignement do have a type and an expression).
   def compile_assignement(left_side : AST::Expression, right_side : AST::Expression, into : Registers | Memory | Nil): Type::Any
-    pp "Assignment, fetch lvalue"
     lvalue_result = compile_lvalue left_side
     lvalue_result || raise "Expression #{left_side.to_s} is not a valid left value for an assignement in #{@unit.path} at line #{left_side.line}"
     lvalue, destination_type = lvalue_result
@@ -496,25 +494,43 @@ class Stacklang::Function
     # So we compute the base address of the destination in a register and make this register the cache of a temporary value.
     # This way, if the register is grabbed, the register will be written to a reserved space before.
     # Move will read this value back in a register if it is cached.
-    pp "Create TMP for lvalue address"
     with_temporary(lvalue.reference_register!, Type::Pointer.new destination_type) do |temporary|
-      pp "TMP: #{temporary} cached in (#{temporary.register})"
       lvalue.reference_register = temporary
-      pp "Now move rightside into memory at TMP"
       source_type = compile_expression right_side, into: lvalue
       if source_type != destination_type
-        raise "Cannot assign expression of type #{source_type.to_s} to lvalue of type #{destination_type.to_s} in #{@unit.path} at line #{left_side.line}"
+        error "Cannot assign expression of type #{source_type} to lvalue of type #{destination_type}", node: right_side
       end
     end
     move lvalue, destination_type, into: into if into
     destination_type
   end
 
+  # def compile_addition(left_side : AST::Expression, right_side : AST::Expression, into : Registers | Memory | Nil): Type::Any
+  #   if into.nil?
+  #     compile_expression left_side
+  #     compile_expression right_side
+  #   else
+  #     left_side_register = grab_register excludes: into.used_registers
+  #     left_side_type = compile_expression left_side, into: left_side_register
+  #     with_temporary(left_side_register, left_side_type) do |temporary|
+  #       right_side_register = grab_register excludes: into.used_registers, left_side_register
+  #       right_side_type = compile_expression right_side, into: right_side_register
+  #       # TODO: typecheck
+  #       left_side_register = cache temporary, excludes: [right_side_register]
+  #       result_register = grab_register, excludes: [left_side_register, right_side_register]
+  #       # TODO: No multiplication by size when ptr + word yet because i can't multiply yet :( 
+  #       @text << Instruction.new(ISA::Add, result_register, left_side_register, right_side_type).encode
+  #       move 
+  #     end
+  #   end
+  # end
+  
   # Compile a binary operator value, and move it's value if necessary.
   def compile_binary(binary : AST::Binary, into : Registers | Memory | Nil): Type::Any?
     case binary.name
     when "=" then compile_assignement binary.left, binary.right, into: into
-    else raise "UNSUPPORTED binary"
+    # when "+" then compile_addition binary.left, binary.right, into: into      
+    else error "Unusupported binary operation '#{binary.name}'", node: binary
     end
   end
 
@@ -523,7 +539,7 @@ class Stacklang::Function
     case unary.name
     when "&"
       lvalue_result = compile_lvalue unary.operand
-      lvalue_result || raise "Expression #{unary.operand.to_s} is not a valid operand for & in #{@unit.path} at line #{unary.line}"
+      lvalue_result || error "Expression #{unary.operand.to_s} is not a valid operand for operator '&'", node: unary
       lvalue, targeted_type = lvalue_result
       ptr_type = Type::Pointer.new targeted_type
       into.try do |destination|
@@ -543,19 +559,19 @@ class Stacklang::Function
     when "*"
       if into.nil? # We optimize to nothing unless operand might have side-effects 
         expression_type = compile_expression unary.operand, into: nil
-        raise "Cannot dereference non-pointer type #{expression_type} in #{@unit.path} line #{unary.line}" unless expression_type.is_a? Type::Pointer
+        error "Cannot dereference non-pointer type #{expression_type}", node: unary unless expression_type.is_a? Type::Pointer
         expression_type.pointer_of
       else
         address_register = grab_register excludes: into.try &.used_registers || [] of Registers
         expression_type = compile_expression unary.operand, into: address_register
-        raise "Cannot dereference non-pointer type #{expression_type} in #{@unit.path} line #{unary.line}" unless expression_type.is_a? Type::Pointer
+        error "Cannot dereference non-pointer type #{expression_type}", node: unary unless expression_type.is_a? Type::Pointer
         # We use a temporary var to reuse the dereferencement capability of move
         with_temporary(address_register, expression_type) do |temporary|
           move Memory.absolute(temporary), expression_type.pointer_of, into
         end
         expression_type.pointer_of
       end
-    else raise "UNSUPPORTED unary"
+    else error "Unsupported unary operation '#{unary.name}'", node: unary
     end
   end
 
@@ -590,16 +606,16 @@ class Stacklang::Function
   def compile_return(ret : AST::Return)
     if returned_value = ret.value
       if @return_type.nil?
-        raise "Function #{@ast.name.name} at #{@unit.path} must return nothing, but return something at line #{ret.line}"
+        error "Must return nothing, but return something at line", node: ret
       else
         # offset for the return value to be written directly to the stack, in the place reserved for the return address
         returned_value_type = compile_expression returned_value, into: Memory.offset @return_value_offset.not_nil!.to_i32
         if @return_type.not_nil! != returned_value_type
-          raise "Function #{@ast.name.name} at #{@unit.path} must return #{@return_type.to_s}, but return expression has type #{returned_value_type.try(&.to_s) || "nothing"} at line #{ret.line}"
+          error "Must return #{@return_type.to_s}, but return expression has type #{returned_value_type.try(&.to_s) || "nothing"}", node: ret
         end
       end
     elsif @return_type
-      raise "Function #{@ast.name.name} at #{@unit.path} must return #{@return_type.to_s}, but no return value is given at line #{ret.line}"
+      error "Must return #{@return_type.to_s}, but no return value is given", node: ret
     end
     @text << Instruction.new(ISA::Lw, reg_a: RETURN_ADRESS_REGISTER.value, reg_b: STACK_REGISTER.value, immediate: @return_address_offset).encode
     @text << Instruction.new(ISA::Addi, reg_a: STACK_REGISTER.value, reg_b: STACK_REGISTER.value, immediate: @frame_size).encode
