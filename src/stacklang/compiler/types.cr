@@ -80,7 +80,9 @@ module Stacklang
         offset = 0u16
         @fields = @ast_struct.fields.map do |ast_field|
           constraint = Type::Any.solve_constraint ast_field.constraint, other_types, stack + [self]
-          Field.new ast_field.name.name, constraint, (offset += constraint.size) 
+          field = Field.new ast_field.name.name, constraint, offset
+          offset += constraint.size
+          field
         end
         offset
       end.tap do |size|

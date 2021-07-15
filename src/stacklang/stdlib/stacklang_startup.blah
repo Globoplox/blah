@@ -30,7 +30,15 @@ export __global_hex_digits: .ascii "0123456789ABCDEF"
 
 export __global_error_code_success: .word 0xc
 
+export __global_error_code_success_ptr: .word :__global_error_code_success
+
 export __global_null_ptr: nop
+
+export __global_color_green: .word 0x0000
+			     .word 0x7777
+			     .word 0x0000
+
+export __global_color_green_ptr: .word :__global_color_green
 
 # notice putw do not need to move its stack because it does not call any other function. Stack frame looks like this:
 # r7 - 2 | parameter of type word

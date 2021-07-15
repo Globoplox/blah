@@ -15,6 +15,11 @@ class Stacklang::Function
   
   enum Registers : UInt16
     R0;R1;R2;R3;R4;R5;R6;R7
+
+    # Return an array containg self
+    def	used_registers:	Array(Registers)
+      [self]
+    end
   end
 
   # Register free to be used for temporary values and cache
@@ -224,9 +229,16 @@ class Stacklang::Function
     end
 
     # Create an absolute memory location relative to any register. 
-    def self.absolute(register : Registers, value : Int32 | String = 0, symbol_offset : Int32 = 0)
+    def self.absolute(register : Registers | Variable, value : Int32 | String = 0, symbol_offset : Int32 = 0)
       new register, value, symbol_offset, nil
     end
+
+    # Return a list of registers that this memory is using
+    def used_registers: Array(Registers)
+      [within_var.try(&.register), reference_register.as?(Registers) || reference_register.as(Variable).register].compact
+    end
+
+    # TODO: delete these debug routines
 
     def cache_to_s
       if var = @within_var
@@ -260,6 +272,7 @@ class Stacklang::Function
   # All variable cache optimisation where a variable memory destination is not really written to
   # thanks to caching within register can be disabled by setting *force_to_memory* to true.
   # That should be usefull only when storing a var because it's cache register is needed for something else.
+  # TODO: allow destination to be "ANY REGISTER" to avoid grabbing and copying when value might already be in a register
   def move(memory : Memory | Registers, constraint : Type::Any, into : Memory | Registers, force_to_memory = false)
     pp "MOVE #{memory} into #{into}"
     # If the source is a memory location holding a variable that is already cached into a register, then use this register directly.
@@ -450,13 +463,14 @@ class Stacklang::Function
     when AST::Access then compile_access_lvalue expression
     when AST::Unary
       if expression.name == "*"
+        # TODO: use Any register destination instead of grabbing one 
         pp "deref has no lvalue"
         destination_register = grab_register
         pp "Deref: compiling putting value in register #{destination_register}"
         constraint = compile_expression expression.operand, into: destination_register
         pp "Now derefencing it"
-        if constraint.is_a? Type::Pointer || constraint.is_a? Type::Word # TODO remove, itwas just for lol
-          {Memory.absolute(destination_register), constraint.is_a?(Type::Pointer) ? constraint.pointer_of : Type::Word.new} # TODO remove check
+        if constraint.is_a? Type::Pointer
+          {Memory.absolute(destination_register), constraint.pointer_of}
         else
           raise "Cannot dereference an expression of type #{constraint.to_s} in #{@unit.path} at line #{expression.line}"
         end
@@ -501,6 +515,28 @@ class Stacklang::Function
     end
   end
 
+  # Compile a unary operator value, and move it's value if necessary.
+  def compile_unary(unary : AST::Unary, into : Registers | Memory | Nil): Type::Any?
+    case unary.name
+    when "*"
+      if into.nil? # We optimize to nothing unless operand might have side-effects 
+        expression_type = compile_expression unary.operand, into: nil
+        raise "Cannot dereference non-pointer type #{expression_type} in #{@unit.path} line #{unary.line}" unless expression_type.is_a? Type::Pointer
+        expression_type.pointer_of
+      else
+        address_register = grab_register excludes: into.try &.used_registers || [] of Registers
+        expression_type = compile_expression unary.operand, into: address_register
+        raise "Cannot dereference non-pointer type #{expression_type} in #{@unit.path} line #{unary.line}" unless expression_type.is_a? Type::Pointer
+        # We use a temporary var to reuse the dereferencement capability of move
+        with_temporary(address_register, expression_type) do |temporary|
+          move Memory.absolute(temporary), expression_type.pointer_of, into
+        end
+        expression_type.pointer_of
+      end
+    else raise "UNSUPPORTED unary"
+    end
+  end
+
   # Compile the value of an access and move it's value if necessary.
   def compile_access(access : AST::Access,  into : Registers | Memory | Nil): Type::Any?
     memory, constraint = compile_access_lvalue access || raise "Illegal expression #{access.to_s} in #{@unit.path} at #{access.line}"
@@ -511,7 +547,7 @@ class Stacklang::Function
   # Compile the value of any operation and move it's value if necessary.
   def compile_operator(operator : AST::Operator, into : Registers | Memory | Nil): Type::Any?
     case operator
-    when AST::Unary then raise "UNSUPPORTED unary"
+    when AST::Unary then compile_unary operator, into: into
     when AST::Binary then compile_binary operator, into: into
     when AST::Access then compile_access operator, into: into
     end
