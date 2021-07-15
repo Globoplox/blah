@@ -9,6 +9,7 @@ require "./unit"
 # TODO: Function to generate error
 # TODO: subvar for struct var to allow for register caching. Carefull of single word struct (register cache is shared).
 # TODO: Language feature: function ptr, cast
+# TODO: type inference for initialized local variables
 class Stacklang::Function
   include RiSC16
   alias Kind = Object::Section::Reference::Kind
@@ -17,6 +18,7 @@ class Stacklang::Function
     R0;R1;R2;R3;R4;R5;R6;R7
 
     # Return an array containg self
+    # Useful when dealing with Registers | Memory unions
     def	used_registers:	Array(Registers)
       [self]
     end
@@ -457,6 +459,7 @@ class Stacklang::Function
   
   # Get the memory location represented by an expression.
   # This is limited to global, variable, dereferenced pointer and access to them.
+  # TODO: Optimization when we do not need the Memory target and only care for side effect ?
   def compile_lvalue(expression : AST::Expression) : {Memory, Type::Any}?
     case expression
     when AST::Identifier then compile_identifier_lvalue expression
@@ -518,6 +521,25 @@ class Stacklang::Function
   # Compile a unary operator value, and move it's value if necessary.
   def compile_unary(unary : AST::Unary, into : Registers | Memory | Nil): Type::Any?
     case unary.name
+    when "&"
+      lvalue_result = compile_lvalue unary.operand
+      lvalue_result || raise "Expression #{unary.operand.to_s} is not a valid operand for & in #{@unit.path} at line #{unary.line}"
+      lvalue, targeted_type = lvalue_result
+      ptr_type = Type::Pointer.new targeted_type
+      into.try do |destination|
+        if lvalue.value.is_a? String || lvalue.value || lvalue.symbol_offset
+          offset_register = grab_register excludes: lvalue.used_registers
+          # We get the real address in a register, for this we need to movi address if symbol
+          @text << Instruction.new(ISA::Lui, offset_register.value, immediate: assemble_immediate lvalue.value, Kind::Lui, lvalue.symbol_offset).encode
+          @text << Instruction.new(ISA::Addi, offset_register.value, offset_register.value, immediate: assemble_immediate lvalue.value, Kind::Lli, lvalue.symbol_offset).encode
+          @text. << Instruction.new(ISA::Add, offset_register.value, offset_register.value, lvalue.reference_register!.value).encode
+          address_register = offset_register
+        else
+          address_register = lvalue.reference_register!
+        end
+        move address_register, ptr_type, into: destination
+      end
+      ptr_type
     when "*"
       if into.nil? # We optimize to nothing unless operand might have side-effects 
         expression_type = compile_expression unary.operand, into: nil

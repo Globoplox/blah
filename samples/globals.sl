@@ -8,8 +8,9 @@ require "../src/stacklang/stdlib/stacklang_startup_prototypes.sl"
 var space
 
 fun main:_ {
-    var color : Color = *color_green_ptr
-    return color.g
+    var ptr :* = &error_code_success
+    *ptr = 0xb
+    return error_code_success
     
 // glob_color.r = 0x0
     // glob_color.g = 0xff

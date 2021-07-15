@@ -44,8 +44,13 @@ module Stacklang
     getter size = 1u16
     getter pointer_of
     def initialize(@pointer_of : Type::Any) end
+
     def to_s
       "*#{@pointer_of.to_s}"
+    end
+
+    def ==(other : Type::Any)
+      other.is_a?(Pointer) && other.pointer_of == @pointer_of
     end
   end
   
