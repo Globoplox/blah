@@ -9,6 +9,10 @@ require "./unit"
 # TODO: subvar for struct var to allow for register caching. Carefull of single word struct (register cache is shared).
 # TODO: Language feature: function ptr, cast
 # TODO: type inference for initialized local variables
+# TODO: maybe we could even cache globals. Variable would need to have a 'reference_register', address & offset should be added instead of
+#       Relying on immediates ?
+# TODO: Accessing a global lvalue could maybe not cause immediate loading address. It could be delegated to move
+#       by allowing to define reference_register as a symbol. The load step could then handle a movi by itself if needed ? 
 class Stacklang::Function
   include RiSC16
   alias Kind = Object::Section::Reference::Kind
@@ -160,13 +164,12 @@ class Stacklang::Function
 
   # Helper function for assembling immediate value.
   # It provide a value for the immediate, or store the reference for linking if the value is a symbol.
-  def assemble_immediate(immediate, kind, symbol_offset = 0)
+  def assemble_immediate(immediate, kind)
     if immediate.is_a? String
       references = @section.references[immediate] ||= [] of Object::Section::Reference
-      references << Object::Section::Reference.new @text.size.to_u16, symbol_offset, kind
+      references << Object::Section::Reference.new @text.size.to_u16, 0, kind
       0u16
     else
-      immediate += symbol_offset
       bits = case kind
         when .imm?, .beq? then 7
         else 16
@@ -227,11 +230,10 @@ class Stacklang::Function
   # It can also be specified that this memory is mapped to a variable. This allows use of cached values.
   # That memory can be used as a source or a destination.
   #
-  # TODO: the value is never actually a symbol. This case should be removed.
+  # TODO: the value is never actually a symbol. This case should be removed. <= YES IT DOES, into can be a destination to a Global ?
   # This will also allow to remove #assembler_immediate symbol_offset parameter, and the symbol_offset property.
   class Memory
-    property symbol_offset : Int32 # offset to symbol_offset but work also when value is a string
-    getter value : Int32 | String # the offset to reference_register
+    property value : Int32
     property reference_register : Registers | Variable # the register containing the address. Or a variable If the address is stored in a variable
     getter within_var : Variable? # used to identify that the ram correspond to a var, that could be currently cached into a register
 
@@ -240,40 +242,21 @@ class Stacklang::Function
       @reference_register.as Registers
     end
         
-    def initialize(@reference_register, @value, @symbol_offset, @within_var) end
+    def initialize(@reference_register, @value, @within_var) end
 
     # Create a memory that is an offset to the stack. Used to create memory for variable.
     def self.offset(value : Int32, var : Variable? = nil)
-      new STACK_REGISTER, value, 0, var
+      new STACK_REGISTER, value, var
     end
 
     # Create an absolute memory location relative to any register. 
-    def self.absolute(register : Registers | Variable, value : Int32 | String = 0, symbol_offset : Int32 = 0)
-      new register, value, symbol_offset, nil
+    def self.absolute(register : Registers | Variable)
+      new register, 0, nil
     end
 
     # Return a list of registers that this memory is using
     def used_registers: Array(Registers)
       [within_var.try(&.register), reference_register.as?(Registers) || reference_register.as(Variable).register].compact
-    end
-
-    # TODO: delete these debug routines
-
-    def cache_to_s
-      if var = @within_var
-        "AKA var #{var.name} whose value is cached in #{var.register}"
-      end
-    end
-
-    def rel_to_s
-      case ref = @reference_register
-      when Registers then "#{ref}"
-      when Variable then "address found in var #{ref.name} (cached in #{ref.register})"
-      end
-    end
-
-    def to_s(io)
-      io << "Memory (#{cache_to_s}) at address relative to #{rel_to_s}"
     end
   end
 
@@ -325,18 +308,18 @@ class Stacklang::Function
       if force_to_memory == false && (var = into.within_var) && var.constraint.size == 1
         var.register = memory
       else
-        @text << Instruction.new(ISA::Sw, memory.value, into.reference_register!.value, immediate: assemble_immediate into.value, Kind::Imm, into.symbol_offset).encode
+        @text << Instruction.new(ISA::Sw, memory.value, into.reference_register!.value, immediate: assemble_immediate into.value, Kind::Imm).encode
       end
 
     when {Memory, Registers}
       error "Illegal move of multiple word into register" if constraint.size > 1
-      @text << Instruction.new(ISA::Lw, into.value, memory.reference_register!.value, immediate: assemble_immediate memory.value, Kind::Imm, memory.symbol_offset).encode
+      @text << Instruction.new(ISA::Lw, into.value, memory.reference_register!.value, immediate: assemble_immediate memory.value, Kind::Imm).encode
 
     when {Memory, Memory}
       if force_to_memory == false &&  (var = into.within_var) && var.constraint.size == 1
         target_register = var.register || grab_register excludes: [memory.reference_register!]
         @text << Instruction.new(
-          ISA::Lw, target_register.value, memory.reference_register!.value, immediate: assemble_immediate memory.value, Kind::Imm, memory.symbol_offset
+          ISA::Lw, target_register.value, memory.reference_register!.value, immediate: assemble_immediate memory.value, Kind::Imm
         ).encode
         var.register = target_register
 
@@ -345,10 +328,10 @@ class Stacklang::Function
         tmp_register = grab_register excludes: [into.reference_register!, memory.reference_register!]
         (0...(constraint.size)).each do |index|
           @text << Instruction.new(
-            ISA::Lw, tmp_register.value, memory.reference_register!.value, immediate: assemble_immediate memory.value, Kind::Imm, memory.symbol_offset + index
+            ISA::Lw, tmp_register.value, memory.reference_register!.value, immediate: assemble_immediate memory.value + index, Kind::Imm
           ).encode
           @text << Instruction.new(
-            ISA::Sw, tmp_register.value, into.reference_register!.value, immediate: assemble_immediate into.value, Kind::Imm, into.symbol_offset + index
+            ISA::Sw, tmp_register.value, into.reference_register!.value, immediate: assemble_immediate into.value + index, Kind::Imm
           ).encode
         end
         
@@ -425,7 +408,7 @@ class Stacklang::Function
       if constraint.is_a? Type::Struct
         field = constraint.fields.find &.name.== access.field.name
         field || error "No such field #{access.field.name} for struct #{constraint}", node: access
-        lvalue.symbol_offset += field.offset
+        lvalue.value += field.offset
         {lvalue, field.constraint}
       else
         error "Cannot access field #{access.field} on expression #{access.operand} of type #{constraint}", node: access
@@ -543,11 +526,11 @@ class Stacklang::Function
       lvalue, targeted_type = lvalue_result
       ptr_type = Type::Pointer.new targeted_type
       into.try do |destination|
-        if lvalue.value.is_a? String || lvalue.value || lvalue.symbol_offset
+        if lvalue.value.is_a? String || lvalue.value
           offset_register = grab_register excludes: lvalue.used_registers
           # We get the real address in a register, for this we need to movi address if symbol
-          @text << Instruction.new(ISA::Lui, offset_register.value, immediate: assemble_immediate lvalue.value, Kind::Lui, lvalue.symbol_offset).encode
-          @text << Instruction.new(ISA::Addi, offset_register.value, offset_register.value, immediate: assemble_immediate lvalue.value, Kind::Lli, lvalue.symbol_offset).encode
+          @text << Instruction.new(ISA::Lui, offset_register.value, immediate: assemble_immediate lvalue.value, Kind::Lui).encode
+          @text << Instruction.new(ISA::Addi, offset_register.value, offset_register.value, immediate: assemble_immediate lvalue.value, Kind::Lli).encode
           @text. << Instruction.new(ISA::Add, offset_register.value, offset_register.value, lvalue.reference_register!.value).encode
           address_register = offset_register
         else

@@ -5,7 +5,7 @@ section text + 0x0
 
 # Linker will provide the __stack symbol automatically. It does not need to be defined.
 # The same is true for __io_* symbols.
-movi r7 :__stack
+movi r7 :__stack+1
 
 # stacklang generate exported symbol __function_<function name in stacklang> for each symbol
 # linker will substiture reference with runtime address of the function.
