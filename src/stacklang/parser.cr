@@ -154,7 +154,7 @@ class Stacklang::Parser < Parser
   end
 
   def leaf_expression
-    or ->sizeof, ->cast, ->unary_operation, ->parenthesis, ->call, ->identifier, ->literal
+    or ->sizeof, ->cast, ->literal, ->unary_operation, ->parenthesis, ->call, ->identifier
   end
 
   rule def affectation_chain
@@ -240,14 +240,14 @@ class Stacklang::Parser < Parser
   end
 
   rule def number
-    base = str ["0x", "0b"]
-    base = case base
-    when "0x" then 16
-    when "0b" then 2
-    else 10
+    sign = str(["-", "+"]) || ""
+    case str ["0x", "0b"]
+    when "0x" then base = 16
+    when "0b" then base = 2
+    else base = 10
     end
     next unless digits = one_or_more ->{ char ['0'..'9', 'a'..'f', 'A'..'F'] }
-    Literal.new digits.join.to_i32(base: base)
+    Literal.new (sign + digits.join).to_i32 base: base
   end
   
   def literal
