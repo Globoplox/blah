@@ -8,13 +8,13 @@ var bean : Pet
 var space
 
 fun main:_ {
-   var toto : Person
-   var tata : Person
+   //var toto : Person
+   //var tata : Person
 
-   toto.age = 5
-   *(&toto + sizeof(Person)) = toto
+   //toto.age = 5
+   //*(&toto + sizeof(Person)) = toto
 
-   return 10 & 8
+   return ~0x1111
     
    //  //return 0x9
    //  //var ptr :* = &error_code_success

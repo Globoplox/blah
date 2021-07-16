@@ -121,7 +121,7 @@ class Stacklang::Parser < Parser
   end
 
   rule def unary_operation
-    next unless operator = str ["!", "*", "&", "-"]
+    next unless operator = str ["!", "*", "&", "-", "~"]
     next unless expr = leaf_expression
     # Has to be leaf else *foo.bar would be *(foo.bar) instead of (*foo).bar
     # and more importantly *foo = bar would be *(foo = bar)
@@ -177,7 +177,7 @@ class Stacklang::Parser < Parser
   end
   
   rule def low_chain
-    next unless name = str ["&", "|", "^", "+", "-"]
+    next unless name = str ["&", "|", "~&", "~|", "<<", ">>", "+", "-"]
     whitespace
     next unless right = medium_priority_operation
     whitespace
@@ -240,9 +240,14 @@ class Stacklang::Parser < Parser
   end
 
   rule def number
-    base = str "0x"
+    base = str ["0x", "0b"]
+    base = case base
+    when "0x" then 16
+    when "0b" then 2
+    else 10
+    end
     next unless digits = one_or_more ->{ char ['0'..'9', 'a'..'f', 'A'..'F'] }
-    Literal.new digits.join.to_i32(base: base ? 16 : 10)
+    Literal.new digits.join.to_i32(base: base)
   end
   
   def literal

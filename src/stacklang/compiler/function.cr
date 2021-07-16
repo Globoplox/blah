@@ -346,7 +346,10 @@ class Stacklang::Function
       @text << Instruction.new(ISA::Lui, into.value, immediate: assemble_immediate literal.number, Kind::Lui).encode
       @text << Instruction.new(ISA::Addi, into.value, into.value, immediate: assemble_immediate literal.number, Kind::Lli).encode
     when Memory
-      tmp_register = into.within_var.try(&.register) || grab_register excludes: [into.reference_register]
+      tmp_register = into.within_var.try(&.register) || grab_register excludes: [into.reference_register] # FIXME: use used_registers ? Might be useless.
+      # Only case where it is usefull is when ref_register hold address (either return where its R7 and ungrabable, or assignment and it's protected by tmp var)
+      # This is true for all grab within rightside valuen unless they don't rely on move: should they try to protect into ?
+      # This might be useless but might reduce register/caching/storage. IDK.
       @text << Instruction.new(ISA::Lui, tmp_register.value, immediate: assemble_immediate literal.number, Kind::Lui).encode
       @text << Instruction.new(ISA::Addi, tmp_register.value, tmp_register.value, immediate: assemble_immediate literal.number, Kind::Lli).encode
       # The move will compute to no-op automatically if this ends up copying a register to itself.
@@ -502,22 +505,41 @@ class Stacklang::Function
       when {Type::Word, Type::Pointer} then right_side_type
       else error "Cannot add values of types #{left_side_type} and #{right_side_type} together", node: node
     end        
-    result_register = grab_register excludes: [left_side_register, right_side_register]
+    result_register = grab_register excludes: [left_side_register, right_side_register]# TODO: maybe protect into for optimal code ?
+    # It is not critical, only case is is not R7 relative are from assignment lvalue and they are tmp val protected.
     @text << Instruction.new(ISA::Add, result_register.value, left_side_register.value, right_side_register.value).encode
     move result_register, ret_type, into: into
     ret_type
   end
 
-  def compile_bitwise_and(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any} , into : Registers | Memory, node : AST::Node): Type::Any
+  def compile_bitwise_and(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any} , into : Registers | Memory, node : AST::Node, inv = false): Type::Any
     left_side_register, left_side_type = left_side
     right_side_register, right_side_type = right_side
     ret_type = case {left_side_type, right_side_type}
       when {Type::Word, Type::Word} then Type::Word.new
-      else error "Cannot apply 'bitewise and' to values of types #{left_side_type} and #{right_side_type} together", node: node
+      else error "Cannot apply 'bitewise nand' to values of types #{left_side_type} and #{right_side_type} together", node: node
     end 
     result_register = grab_register excludes: [left_side_register, right_side_register]
     @text << Instruction.new(ISA::Nand, result_register.value, left_side_register.value, right_side_register.value).encode
-    @text << Instruction.new(ISA::Nand, result_register.value, result_register.value, result_register.value).encode
+    @text << Instruction.new(ISA::Nand, result_register.value, result_register.value, result_register.value).encode unless inv
+    move result_register, ret_type, into: into
+    ret_type
+  end
+
+  def compile_bitwise_or(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any} , into : Registers | Memory, node : AST::Node, inv = false): Type::Any
+    left_side_register, left_side_type = left_side
+    right_side_register, right_side_type = right_side
+    ret_type = case {left_side_type, right_side_type}
+      when {Type::Word, Type::Word} then Type::Word.new
+      else error "Cannot apply 'bitewise or' to values of types #{left_side_type} and #{right_side_type} together", node: node
+    end 
+    result_register_1 = grab_register excludes: [left_side_register, right_side_register]
+    @text << Instruction.new(ISA::Nand, result_register_1.value, left_side_register.value, left_side_register.value).encode
+    result_register_2 = grab_register excludes: [right_side_register, result_register_1]
+    @text << Instruction.new(ISA::Nand, result_register_2.value, right_side_register.value, right_side_register.value).encode
+    result_register = result_register_1 # Could have been 2, does not matter.
+    @text << Instruction.new(ISA::Nand, result_register.value, result_register_1.value, result_register_2.value).encode
+    @text << Instruction.new(ISA::Nand, result_register.value, result_register.value, result_register.value).encode if inv
     move result_register, ret_type, into: into
     ret_type
   end
@@ -540,6 +562,9 @@ class Stacklang::Function
         case binary.name
         when "+" then compile_addition left_side, right_side, into: into, node: binary
         when "&" then compile_bitwise_and left_side, right_side, into: into, node: binary
+        when "~&" then compile_bitwise_and left_side, right_side, into: into, node: binary, inv: true
+        when "|" then compile_bitwise_or left_side, right_side, into: into, node: binary
+        when "~|" then compile_bitwise_or left_side, right_side, into: into, node: binary, inv: true
         else error "Unusupported binary operation '#{binary.name}'", node: binary
         end
       end
@@ -555,6 +580,7 @@ class Stacklang::Function
   end
 
   # Compile a unary operator value, and move it's value if necessary.
+  # TODO: split simple cases out with common wrapper to reduce duplication (as for simple binary ops).
   def compile_unary(unary : AST::Unary, into : Registers | Memory | Nil): Type::Any
     case unary.name
     when "&"
@@ -582,7 +608,7 @@ class Stacklang::Function
         error "Cannot dereference non-pointer type #{expression_type}", node: unary unless expression_type.is_a? Type::Pointer
         expression_type.pointer_of
       else
-        address_register = grab_register excludes: into.try &.used_registers || [] of Registers
+        address_register = grab_register excludes: into.used_registers # TODO: maybe useless
         expression_type = compile_expression unary.operand, into: address_register
         error "Cannot dereference non-pointer type #{expression_type}", node: unary unless expression_type.is_a? Type::Pointer
         # We use a temporary var to reuse the dereferencement capability of move
@@ -590,6 +616,20 @@ class Stacklang::Function
           move Memory.absolute(temporary), expression_type.pointer_of, into
         end
         expression_type.pointer_of
+      end
+    when "~"
+      if into.nil? # We optimize to nothing unless operand might have side-effects 
+        expression_type = compile_expression unary.operand, into: nil
+        error "Cannot apply unary operator '~' to non-word type #{expression_type}", node: unary unless expression_type.is_a? Type::Word
+        expression_type
+      else
+        operand_register = grab_register excludes: into.used_registers # TODO: maybe useless
+        expression_type = compile_expression unary.operand, into: operand_register
+        error "Cannot apply unary operator '~' to non-word type #{expression_type}", node: unary unless expression_type.is_a? Type::Word
+        result_register = grab_register excludes: [operand_register] + into.used_registers # TODO: still likely useless
+        @text << Instruction.new(ISA::Nand, result_register.value, operand_register.value, operand_register.value).encode
+        move result_register, expression_type, into: into
+        expression_type
       end
     else error "Unsupported unary operation '#{unary.name}'", node: unary
     end
