@@ -493,39 +493,64 @@ class Stacklang::Function
     destination_type
   end
 
-  def compile_addition(left_side : AST::Expression, right_side : AST::Expression, into : Registers | Memory | Nil): Type::Any
+  def compile_addition(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any} , into : Registers | Memory, node : AST::Node): Type::Any
+    left_side_register, left_side_type = left_side
+    right_side_register, right_side_type = right_side
+    ret_type = case {left_side_type, right_side_type}
+      when {Type::Word, Type::Word} then Type::Word.new
+      when {Type::Pointer, Type::Word} then left_side_type
+      when {Type::Word, Type::Pointer} then right_side_type
+      else error "Cannot add values of types #{left_side_type} and #{right_side_type} together", node: node
+    end        
+    result_register = grab_register excludes: [left_side_register, right_side_register]
+    @text << Instruction.new(ISA::Add, result_register.value, left_side_register.value, right_side_register.value).encode
+    move result_register, ret_type, into: into
+    ret_type
+  end
+
+  def compile_bitwise_and(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any} , into : Registers | Memory, node : AST::Node): Type::Any
+    left_side_register, left_side_type = left_side
+    right_side_register, right_side_type = right_side
+    ret_type = case {left_side_type, right_side_type}
+      when {Type::Word, Type::Word} then Type::Word.new
+      else error "Cannot apply 'bitewise and' to values of types #{left_side_type} and #{right_side_type} together", node: node
+    end 
+    result_register = grab_register excludes: [left_side_register, right_side_register]
+    @text << Instruction.new(ISA::Nand, result_register.value, left_side_register.value, right_side_register.value).encode
+    @text << Instruction.new(ISA::Nand, result_register.value, result_register.value, result_register.value).encode
+    move result_register, ret_type, into: into
+    ret_type
+  end
+
+  def compile_binary(binary : AST::Binary, into : Registers | Memory | Nil): Type::Any
     if into.nil?
-      compile_expression left_side, into: nil
-      compile_expression right_side, into: nil
+      compile_expression binary.left, into: nil
+      compile_expression binary.right, into: nil
       Type::Word.new
     else
       left_side_register = grab_register excludes: into.used_registers
-      left_side_type = compile_expression left_side, into: left_side_register
-      error "Cannot add with nothing", node: left_side unless left_side_type
+      left_side_type = compile_expression binary.left, into: left_side_register
+      error "Cannot perform binary #{binary.name} operation with left-side expression of type nothing", node: binary unless left_side_type
       with_temporary(left_side_register, left_side_type) do |temporary|
         right_side_register = grab_register excludes: into.used_registers + [left_side_register]
-        right_side_type = compile_expression right_side, into: right_side_register
-        ret_type = case {left_side_type, right_side_type}
-        when {Type::Word, Type::Word} then Type::Word.new
-        when {Type::Pointer, Type::Word} then left_side_type
-        when {Type::Word, Type::Pointer} then right_side_type
-        else error "Cannot add value of types #{left_side_type} and #{right_side_type} together", node: left_side
-        end        
+        right_side_type = compile_expression binary.right, into: right_side_register
         left_side_register = cache temporary, excludes: [right_side_register]
-        result_register = grab_register excludes: [left_side_register, right_side_register]
-        @text << Instruction.new(ISA::Add, result_register.value, left_side_register.value, right_side_register.value).encode
-        move result_register, ret_type, into: into
-        ret_type
+        left_side = {left_side_register, left_side_type}
+        right_side = {right_side_register, right_side_type}
+        case binary.name
+        when "+" then compile_addition left_side, right_side, into: into, node: binary
+        when "&" then compile_bitwise_and left_side, right_side, into: into, node: binary
+        else error "Unusupported binary operation '#{binary.name}'", node: binary
+        end
       end
     end
   end
   
   # Compile a binary operator value, and move it's value if necessary.
-  def compile_binary(binary : AST::Binary, into : Registers | Memory | Nil): Type::Any
+  def compile_assignment_or_binary(binary : AST::Binary, into : Registers | Memory | Nil): Type::Any
     case binary.name
     when "=" then compile_assignement binary.left, binary.right, into: into
-    when "+" then compile_addition binary.left, binary.right, into: into      
-    else error "Unusupported binary operation '#{binary.name}'", node: binary
+    else compile_binary binary, into: into
     end
   end
 
@@ -581,7 +606,7 @@ class Stacklang::Function
   def compile_operator(operator : AST::Operator, into : Registers | Memory | Nil): Type::Any
     case operator
     when AST::Unary then compile_unary operator, into: into
-    when AST::Binary then compile_binary operator, into: into
+    when AST::Binary then compile_assignment_or_binary operator, into: into
     when AST::Access then compile_access operator, into: into
     else error "Unsuported operator", node: operator
     end

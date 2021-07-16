@@ -13,7 +13,8 @@ fun main:_ {
 
    toto.age = 5
    *(&toto + sizeof(Person)) = toto
-   return tata.age
+
+   return 10 & 8
     
    //  //return 0x9
    //  //var ptr :* = &error_code_success

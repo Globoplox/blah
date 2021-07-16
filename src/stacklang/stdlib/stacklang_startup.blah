@@ -8,7 +8,7 @@ section text + 0x0
 movi r7 :__stack+1
 
 # stacklang generate exported symbol __function_<function name in stacklang> for each symbol
-# linker will substiture reference with runtime address of the function.
+# linker will substitute reference with runtime address of the function.
 movi r6 :__function_main 
 
 # Per abi, we always call function storing the return address in r6. 
