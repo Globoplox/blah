@@ -24,13 +24,40 @@ module RiSC16
     @spec : Spec
     @breakpoints = Set(Int32).new
     @object : RiSC16::Object? = nil
+    @definitions : Hash(UInt16, {String, Char})
+    @references : Hash(UInt16, String)
 
     def initialize(io, @spec, @object = nil)
       @vm = VM.from_spec(@spec, io_override: {"tty" => VM::MMIO.new(@input, @output)}).tap &.load io
+      @references = {} of UInt16 => String
+      @object.try do |object|
+        object.sections.each &.references.each do |(name, locations)|
+          locations.each do |location|
+            @references[location.address] = name
+          end
+        end
+      end  
+      @definitions = @object.try do |object|
+        object.sections.flat_map(&.definitions.to_a).to_h do |(name, symbol)|
+          char = 's'
+          if name.starts_with? "__function_"
+            char = 'f'
+            name = name.gsub("__function_", "")
+          elsif name.starts_with? "__global_"
+            char = 'g'
+            name = name.gsub("__global_", "")
+          end
+          if symbol.exported
+            char = char.upcase
+          end
+          {symbol.address.to_u16, {name, char} }
+        end
+      end || {} of UInt16 => {String, Char}
     end
 
-    def disassemble(word)
+    def disassemble(word, address)
       i = Instruction.decode word
+      imm_repr = @references[address]? || "0x#{i.immediate.to_w}"
       case i.opcode
       in ISA::Add, ISA::Nand
         if i.opcode.add? && i.reg_a == 0 && i.reg_b == 0 && i.reg_c == 0
@@ -40,11 +67,11 @@ module RiSC16
         end
       in ISA::Addi, ISA::Sw, ISA::Lw, ISA::Beq, ISA::Jalr
         if i.opcode.jalr? && i.immediate != 0
-          "halt 0x#{i.immediate.to_w}"
+          "halt 0x#{imm_repr}"
         else
-          "#{i.opcode} r#{i.reg_a} r#{i.reg_b} 0x#{i.immediate.to_w}"
+          "#{i.opcode} r#{i.reg_a} r#{i.reg_b} #{imm_repr}"
         end
-      in ISA::Lui then "#{i.opcode} r#{i.reg_a} 0x#{i.immediate.to_w}"
+      in ISA::Lui then "#{i.opcode} r#{i.reg_a} #{imm_repr}"
       end
     end
 
@@ -56,21 +83,28 @@ module RiSC16
         NCurses.notimeout true
         window_cursor = 0
         windows = [] of Window
-        
+
+        rem = (NCurses.maxx // 2) - (8 + 3 + 20 + 3 + 2)
         code = Table.new(
           x: 0, y: 0,
           height: NCurses.maxy, width: NCurses.maxx // 2,
-          columns: [3, 8, 20, 30], title: "CODE",
+          columns: [8, 3, 20, rem], title: "CODE",
           range: (0..((@spec.ram_start + @spec.ram_size).to_i))
         ) do |address|
           labels = "" # (@locs[address]?.try(&.map &.label).try &.compact.join ", ") || " "
-          dis = disassemble @vm.ram[address]
+          dis = disassemble @vm.ram[address], address
+          dis = dis.ljust rem - 2
+          symbol = @definitions[address]?
+          kind = symbol.try &.[1] || ' '
+          symbol = symbol.try &.[0] || ""
+          symbol = symbol.ljust(18)
+          symbol = "#{symbol[0...15]}..." if symbol.size > 18
           cursor = case {@breakpoints.includes?(address), address}
           when {_, @vm.pc} then ">"
-          when {true, _}  then "B"
-          else " "
+          when {true, _}  then "@"
+          else "#{kind}"
           end
-          [cursor, "0x#{address.to_u16.to_w}", dis, labels]
+          ["0x#{address.to_u16.to_w}", cursor, symbol,  dis]
         end
         windows << code
 

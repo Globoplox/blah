@@ -134,8 +134,9 @@ module RiSC16
       end
 
       if !intermediary_only || also_run
+        merged_object = Linker.merge(spec, objects)
         binary = IO::Memory.new
-        Linker.link_to_binary spec, objects, binary
+        Linker.static_link spec, merged_object, binary
         
         unless intermediary_only
           File.open target_file, "w" do |sink|
@@ -147,7 +148,7 @@ module RiSC16
         if also_run
           binary.rewind
           if debug
-            Debugger.new(binary, spec).run
+            Debugger.new(binary, spec, merged_object).run
           else
             VM.from_spec(spec).tap(&.load binary).run
           end

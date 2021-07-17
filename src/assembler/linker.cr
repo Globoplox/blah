@@ -18,19 +18,9 @@ module RiSC16::Linker
     predefined_symbols
   end
 
-  # linking to a relocatable binary would create an object
-  # everything would be done as it is but the symbol replacement would not be done
-  # all offset should be set relative to whole binary start
-  # there would still be check for undefined ref
-  # all section get an distinct id and all non exported symbol is prefixed, all internal refs to these will follow
-  # then all the section are merged togeter (all symbols and references mergeds, the text is the binary).
-  # the start would be 0
-  # Predefined references and symbols would be solved and removed (as they have an absolute value, that will not change with binary position (infact they are macros))
-  # the loader would have to add the load address to all symbols values, then solve references as its done here.
-  # We could also have an helper func 'relocate' that perform just this (running it trhough link_to_binary would work but it does useless checks)
-
-  def link_to_binary(spec, objects, io, start : Int32? = nil)
-    start ||= spec.ram_start.to_i32
+  # Link several objects into a single object, with all blocks offset set.
+  def merge(spec : Spec, objects : Array(RiSC16::Object)) : RiSC16::Object
+    start = 0
     predefined_section_size = {} of String => UInt32
     predefined_section_address = {} of String => UInt32
     spec.sections.each do |section|
@@ -39,16 +29,16 @@ module RiSC16::Linker
       predefined_section_size[section.name] = max if max
       predefined_section_address[section.name] = base if base
     end
-    
+
     globals = symbols_from_spec(spec)
 
     # check for conflict between exported symbols
     objects.each &.sections.each &.definitions.each do |(name, symbol)|
       next unless symbol.exported
       raise "duplicate global symbol #{name}" if globals[name]?
-      globals[name] = symbol                                                   
+      globals[name] = symbol
     end
-    
+
     # Set all the texts, symbols and references address
     # by ordering all "sections", then each fragment of this section
     # and adding the size of each. Raise when constraint is not possible and jump directly to offset when their are gaps
@@ -58,7 +48,9 @@ module RiSC16::Linker
       base = predefined_section_address[name]?.try &.to_i32 || absolute
       raise "Section #{name} cannot overwrite at offset #{base}, there are already data up to #{absolute}" if base < absolute
       sections.sort_by { |section| section.offset || Int32::MAX }.reduce(base) do |absolute, section|
-        raise "Block offset conflict in section #{name}, cannot overwrite at offset #{section.offset}, there are already data up to #{absolute}" if (section.offset || Int32::MAX) < absolute
+        if (section.offset || Int32::MAX) < absolute
+          raise "Block offset conflict in section #{name}, cannot overwrite at offset #{section.offset}, there are already data up to #{absolute}"
+        end
         section.offset ||= absolute
         section.definitions.values.each do |symbol|
           symbol.address = symbol.address + section.offset.not_nil!
@@ -74,14 +66,46 @@ module RiSC16::Linker
       end
     end
 
+    RiSC16::Object.new.tap do |object|
+      objects.each &.sections.each do |section|
+        object.sections << section
+      end
+      object.merged = true
+    end
+  end
+
+  # Static link binary
+  def static_link(spec, object, io, start : Int32 = 0)
+    object = merge(spec, [object]) if object.merged == false
+      
+    globals = symbols_from_spec(spec)
+
+    if start != 0    
+      object.sections.each do |section|
+        section.definitions.values.each do |symbol|
+          symbol.address += start
+        end
+        section.references.values.each &.each do |ref|
+          ref.address = (ref.address.to_i32 + start).to_u16
+        end
+        section.offset = section.offset.not_nil! + start
+      end
+    end
+
+    object.sections.each &.definitions.each do |(name, symbol)|
+      next unless symbol.exported
+      globals[name] = symbol
+    end
+
+    max = object.sections.max_by &.offset.not_nil!
+    text_size = max.offset.not_nil! + max.text.size
+    
     raise "Binary does not fit in ram: #{text_size} words overlfow #{spec.ram_size}" if text_size > spec.ram_size
     binary = Slice(UInt16).new text_size
     
-    # write to file
     # perform references replacement
-    objects.each &.sections.each do |section|
-      # we accept only section defined symbols, not object defined symbols. We could do the opposite easily, but do we want to ? => yes, for static stuff
-      # todo: update this ? or else we could not. This would ease having static near in memory to where they should be. 
+    # write to file
+    object.sections.each do |section|
       symbols = globals.merge section.definitions.reject { |name, symbol| symbol.exported } 
       section.text.copy_to binary[(section.offset.not_nil!)...(section.offset.not_nil! + section.text.size)]
       section.references.each do |name, references|

@@ -3,9 +3,12 @@
 class RiSC16::Object
   property name : String? 
   @sections : Array(Section) = [] of Section
+  property merged : Bool
   getter sections
 
-  def initialize(@name = nil) end
+  def initialize(@name = nil)
+    @merged = false
+  end
 
   # A section is a continuous block of code with it's symbols definitions and references.
   #
@@ -64,6 +67,7 @@ class RiSC16::Object
 
   # Serialize this object to the given *io*.
   def to_io(io, endian = ENDIAN)
+    (@merged ? 1u8 : 0u8).to_io io, endian
     @sections.size.to_io io, endian
     @sections.each do |section|
       section.name.to_slice.size.to_io io, endian
@@ -96,6 +100,7 @@ class RiSC16::Object
   # Build an object from given *io*.
   def self.from_io(io, name = nil, endian = ENDIAN)
     object = self.new(name)
+    object.merged = UInt8.from_io(io, endian) != 0
     (Int32.from_io io, endian).times do
       section = Section.new io.read_string (Int32.from_io io, endian)
       object.sections << section
