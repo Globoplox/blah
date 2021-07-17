@@ -21,6 +21,8 @@ movi r6 :__function_putw
 jalr r6 r6 0x0 # call putw
 halt
 
+export __global_tty: .word :__io_tty_a
+
 # We can define accessible by stacklang by following the symbol naming pattern __global_<global name in stacklang>
 export __global_hex_prefix: .ascii "0x"
        			    nop

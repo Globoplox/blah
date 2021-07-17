@@ -12,13 +12,18 @@ fun inc(word:_):_ {
 }
 
 fun main:_ {
-   //var toto : Person
-   //var tata : Person
+   // var toto : Person
+   // var tata : Person
 
-   //toto.age = 5
-   //*(&toto + sizeof(Person)) = toto
+   // toto.age = 5
+   // *(&toto + sizeof(Person)) = toto
 
-   return inc(inc(0xf - 0xc))
+   // type a, it echoes b :D 
+   // return *tty = inc(*tty)
+   return 7 != inc(6)
+   // while ((*tty = *tty) != 0xff00) {}
+
+   // return inc(inc(0xf - 0xc))
    
    //  //return 0x9
    //  //var ptr :* = &error_code_success

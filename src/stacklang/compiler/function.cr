@@ -2,7 +2,6 @@ require "../../risc16"
 require "./types"
 require "./unit"
 
-# TODO: all operator, calls (carefull of tmp var, and that the return value is moved by the amount of tmp var).
 # TODO: handle copy with index in a temporary register with a beq loop ?
 # TODO: when doing a movi and the value is a flat 0, we could do a sw r0, ,0 instead of a movi
 # TODO: a dedicated function for generating movi
@@ -588,6 +587,27 @@ class Stacklang::Function
     ret_type
   end
 
+  def compile_equal(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any} , into : Registers | Memory, node : AST::Node, neq = false): Type::Any
+    left_side_register, left_side_type = left_side
+    right_side_register, right_side_type = right_side
+    ret_type = case {left_side_type, right_side_type}
+      when {Type::Word, Type::Word} then Type::Word.new
+      else error "Cannot compare two values of types #{left_side_type} and #{right_side_type}", node: node
+    end
+    result_register = grab_register excludes: [left_side_register, right_side_register]
+    unless neq
+      @text << Instruction.new(ISA::Addi, result_register.value, Registers::R0.value, immediate: 1u16).encode
+      @text << Instruction.new(ISA::Beq, left_side_register.value, right_side_register.value, immediate: 1u16).encode
+      @text << Instruction.new(ISA::Add, result_register.value).encode
+    else
+      @text << Instruction.new(ISA::Add, result_register.value).encode
+      @text << Instruction.new(ISA::Beq, left_side_register.value, right_side_register.value, immediate: 1u16).encode
+      @text << Instruction.new(ISA::Addi, result_register.value, immediate: 1u16).encode
+    end
+    move result_register, ret_type, into: into
+    ret_type
+  end
+
   def compile_binary(binary : AST::Binary, into : Registers | Memory | Nil): Type::Any
     if into.nil?
       compile_expression binary.left, into: nil
@@ -610,6 +630,8 @@ class Stacklang::Function
         when "~&" then compile_bitwise_and left_side, right_side, into: into, node: binary, inv: true
         when "|" then compile_bitwise_or left_side, right_side, into: into, node: binary
         when "~|" then compile_bitwise_or left_side, right_side, into: into, node: binary, inv: true
+        when "==" then compile_equal left_side, right_side, into: into, node: binary
+        when "!=" then compile_equal left_side, right_side, into: into, node: binary, neq: true
         else error "Unusupported binary operation '#{binary.name}'", node: binary
         end
       end
