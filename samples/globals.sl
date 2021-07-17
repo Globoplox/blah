@@ -14,7 +14,9 @@ fun main:_ {
    //toto.age = 5
    //*(&toto + sizeof(Person)) = toto
 
-   return 0xf+-0xc
+   var a = 0xf
+   var b = 0xc
+   return a + -b
     
    //  //return 0x9
    //  //var ptr :* = &error_code_success

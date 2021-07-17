@@ -348,7 +348,7 @@ class Stacklang::Function
     when Memory
       tmp_register = into.within_var.try(&.register) || grab_register excludes: [into.reference_register] # FIXME: use used_registers ? Might be useless.
       # Only case where it is usefull is when ref_register hold address (either return where its R7 and ungrabable, or assignment and it's protected by tmp var)
-      # This is true for all grab within rightside valuen unless they don't rely on move: should they try to protect into ?
+      # This is true for all grab within rightside valuen unless they don't rely on move: should they try to protect ino ?
       # This might be useless but might reduce register/caching/storage. IDK.
       @text << Instruction.new(ISA::Lui, tmp_register.value, immediate: assemble_immediate literal.number, Kind::Lui).encode
       @text << Instruction.new(ISA::Addi, tmp_register.value, tmp_register.value, immediate: assemble_immediate literal.number, Kind::Lli).encode
@@ -459,7 +459,7 @@ class Stacklang::Function
     when AST::Access then compile_access_lvalue expression
     when AST::Unary
       if expression.name == "*"
-        # TODO: use Any register destination instead of grabbing one 
+        # TODO: use Any register destination instead of grabbing one ? 
         destination_register = grab_register
         constraint = compile_expression expression.operand, into: destination_register
         if constraint.is_a? Type::Pointer
@@ -496,7 +496,7 @@ class Stacklang::Function
     destination_type
   end
 
-  def compile_addition(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any} , into : Registers | Memory, node : AST::Node): Type::Any
+  def compile_addition(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any} , into : Registers | Memory, node : AST::Node, soustract = false): Type::Any
     left_side_register, left_side_type = left_side
     right_side_register, right_side_type = right_side
     ret_type = case {left_side_type, right_side_type}
@@ -504,9 +504,14 @@ class Stacklang::Function
       when {Type::Pointer, Type::Word} then left_side_type
       when {Type::Word, Type::Pointer} then right_side_type
       else error "Cannot add values of types #{left_side_type} and #{right_side_type} together", node: node
-    end        
+    end
     result_register = grab_register excludes: [left_side_register, right_side_register]# TODO: maybe protect into for optimal code ?
     # It is not critical, only case is is not R7 relative are from assignment lvalue and they are tmp val protected.
+    if soustract
+      @text << Instruction.new(ISA::Nand, result_register.value, right_side_register.value, right_side_register.value).encode
+      @text << Instruction.new(ISA::Addi, result_register.value, result_register.value, immediate: 1u16).encode
+      right_side_register = result_register
+    end
     @text << Instruction.new(ISA::Add, result_register.value, left_side_register.value, right_side_register.value).encode
     move result_register, ret_type, into: into
     ret_type
@@ -561,6 +566,7 @@ class Stacklang::Function
         right_side = {right_side_register, right_side_type}
         case binary.name
         when "+" then compile_addition left_side, right_side, into: into, node: binary
+        when "-" then compile_addition left_side, right_side, into: into, node: binary, soustract: true
         when "&" then compile_bitwise_and left_side, right_side, into: into, node: binary
         when "~&" then compile_bitwise_and left_side, right_side, into: into, node: binary, inv: true
         when "|" then compile_bitwise_or left_side, right_side, into: into, node: binary
@@ -579,59 +585,80 @@ class Stacklang::Function
     end
   end
 
-  # Compile a unary operator value, and move it's value if necessary.
-  # TODO: split simple cases out with common wrapper to reduce duplication (as for simple binary ops).
-  def compile_unary(unary : AST::Unary, into : Registers | Memory | Nil): Type::Any
-    case unary.name
-    when "&"
-      lvalue_result = compile_lvalue unary.operand
-      lvalue_result || error "Expression #{unary.operand.to_s} is not a valid operand for operator '&'", node: unary
-      lvalue, targeted_type = lvalue_result
-      ptr_type = Type::Pointer.new targeted_type
-      into.try do |destination|
-        if lvalue.value.is_a? String || lvalue.value
-          offset_register = grab_register excludes: lvalue.used_registers
-          # We get the real address in a register, for this we need to movi address if symbol
-          @text << Instruction.new(ISA::Lui, offset_register.value, immediate: assemble_immediate lvalue.value, Kind::Lui).encode
-          @text << Instruction.new(ISA::Addi, offset_register.value, offset_register.value, immediate: assemble_immediate lvalue.value, Kind::Lli).encode
-          @text. << Instruction.new(ISA::Add, offset_register.value, offset_register.value, lvalue.reference_register!.value).encode
-          address_register = offset_register
-        else
-          address_register = lvalue.reference_register!
-        end
-        move address_register, ptr_type, into: destination
-      end
-      ptr_type
-    when "*"
-      if into.nil? # We optimize to nothing unless operand might have side-effects 
-        expression_type = compile_expression unary.operand, into: nil
-        error "Cannot dereference non-pointer type #{expression_type}", node: unary unless expression_type.is_a? Type::Pointer
-        expression_type.pointer_of
-      else
-        address_register = grab_register excludes: into.used_registers # TODO: maybe useless
-        expression_type = compile_expression unary.operand, into: address_register
-        error "Cannot dereference non-pointer type #{expression_type}", node: unary unless expression_type.is_a? Type::Pointer
-        # We use a temporary var to reuse the dereferencement capability of move
-        with_temporary(address_register, expression_type) do |temporary|
-          move Memory.absolute(temporary), expression_type.pointer_of, into
-        end
-        expression_type.pointer_of
-      end
-    when "~"
-      if into.nil? # We optimize to nothing unless operand might have side-effects 
-        expression_type = compile_expression unary.operand, into: nil
-        error "Cannot apply unary operator '~' to non-word type #{expression_type}", node: unary unless expression_type.is_a? Type::Word
-        expression_type
-      else
-        operand_register = grab_register excludes: into.used_registers # TODO: maybe useless
-        expression_type = compile_expression unary.operand, into: operand_register
-        error "Cannot apply unary operator '~' to non-word type #{expression_type}", node: unary unless expression_type.is_a? Type::Word
+  # Compile unary operator operating on word values.
+  def compile_value_unary(unary : AST::Unary, into : Registers | Memory | Nil): Type::Any
+    if into.nil? # We optimize to nothing unless operand might have side-effects 
+      expression_type = compile_expression unary.operand, into: nil
+      error "Cannot apply unary operator '#{unary.name}' to non-word type #{expression_type}", node: unary unless expression_type.is_a? Type::Word
+      expression_type
+    else
+      operand_register = grab_register excludes: into.used_registers # TODO: maybe useless
+      expression_type = compile_expression unary.operand, into: operand_register
+      error "Cannot apply unary operator '#{unary.name}' to non-word type #{expression_type}", node: unary unless expression_type.is_a? Type::Word
+      case unary.name
+      when "-"
+        result_register = grab_register excludes: [operand_register] + into.used_registers # TODO: still likely useless
+        @text << Instruction.new(ISA::Nand, result_register.value, operand_register.value, operand_register.value).encode
+        @text << Instruction.new(ISA::Addi, result_register.value, result_register.value, immediate: 1u16).encode
+        move result_register, expression_type, into: into
+      when "~"
         result_register = grab_register excludes: [operand_register] + into.used_registers # TODO: still likely useless
         @text << Instruction.new(ISA::Nand, result_register.value, operand_register.value, operand_register.value).encode
         move result_register, expression_type, into: into
-        expression_type
+      else error "Unsupported unary operation '#{unary.name}'", node: unary
       end
-    else error "Unsupported unary operation '#{unary.name}'", node: unary
+      expression_type
+    end
+  end
+
+  # Compile dereferencement expression.
+  # It has it's own case instead of being in `#compile_value_unary` to simplify error display. 
+  def compile_ptr_unary(operand : AST::Expression, into : Registers | Memory | Nil, node : AST::Node): Type::Any
+    if into.nil? # We optimize to nothing unless operand might have side-effects                                                                                            
+      expression_type = compile_expression operand, into: nil
+      error "Cannot dereference non-pointer type #{expression_type}", node: node unless expression_type.is_a? Type::Pointer
+      expression_type.pointer_of
+    else
+      address_register = grab_register excludes: into.used_registers # TODO: maybe useless                                                                                  
+      expression_type = compile_expression operand, into: address_register
+      error "Cannot dereference non-pointer type #{expression_type}", node: node unless expression_type.is_a? Type::Pointer
+      # We use a temporary var to reuse the dereferencement capability of move                                                                                              
+      with_temporary(address_register, expression_type) do |temporary|
+        move Memory.absolute(temporary), expression_type.pointer_of, into
+      end
+      expression_type.pointer_of
+    end
+  end
+
+  # Compile &() expression.
+  def compile_addressable_unary(operand : AST::Expression, into : Registers | Memory | Nil, node : AST::Node): Type::Any
+    lvalue_result = compile_lvalue operand
+    lvalue_result || error "Expression #{operand.to_s} is not a valid operand for operator '&'", node: node
+    lvalue, targeted_type = lvalue_result
+    ptr_type = Type::Pointer.new targeted_type
+    into.try do |destination|
+      if lvalue.value.is_a? String || lvalue.value
+        offset_register = grab_register excludes: lvalue.used_registers
+        # We get the real address in a register, for this we need to movi offset if symbol                                                                                 
+        @text << Instruction.new(ISA::Lui, offset_register.value, immediate: assemble_immediate lvalue.value, Kind::Lui).encode
+        @text << Instruction.new(ISA::Addi, offset_register.value, offset_register.value, immediate: assemble_immediate lvalue.value, Kind::Lli).encode
+        @text. << Instruction.new(ISA::Add, offset_register.value, offset_register.value, lvalue.reference_register!.value).encode
+        address_register = offset_register
+      else
+        address_register = lvalue.reference_register!
+      end
+      move address_register, ptr_type, into: destination
+    end
+    ptr_type
+  end
+
+
+  # Compile a unary operator value, and move it's value if necessary.
+  def compile_any_unary(unary : AST::Unary, into : Registers | Memory | Nil): Type::Any
+    case unary.name
+    when "&" then compile_addressable_unary unary.operand, into: into, node: unary
+    when "*"then compile_ptr_unary unary.operand, into: into, node: unary
+    else compile_value_unary unary, into: into
     end
   end
 
@@ -645,7 +672,7 @@ class Stacklang::Function
   # Compile the value of any operation and move it's value if necessary.
   def compile_operator(operator : AST::Operator, into : Registers | Memory | Nil): Type::Any
     case operator
-    when AST::Unary then compile_unary operator, into: into
+    when AST::Unary then compile_any_unary operator, into: into
     when AST::Binary then compile_assignment_or_binary operator, into: into
     when AST::Access then compile_access operator, into: into
     else error "Unsuported operator", node: operator

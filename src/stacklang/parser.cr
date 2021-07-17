@@ -247,7 +247,11 @@ class Stacklang::Parser < Parser
     else base = 10
     end
     next unless digits = one_or_more ->{ char ['0'..'9', 'a'..'f', 'A'..'F'] }
-    Literal.new (sign + digits.join).to_i32 base: base
+    begin
+      Literal.new (sign + digits.join).to_i32 base: base
+    rescue
+      nil
+    end
   end
   
   def literal
