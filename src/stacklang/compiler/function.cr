@@ -67,17 +67,21 @@ class Stacklang::Function
       getter constraint
       def initialize(@name, @constraint, @offset) end
     end
-    @parameters = {} of String => Parameter
+    @parameters = [] of Parameter
     @return_type : Type::Any?
-    @return_value_offset : Int32?    
+    @return_value_offset : Int32?
+    @symbol : String
     getter parameters
     getter return_type
     getter return_value_offset
-    def initialize(@parameters, @return_type, @return_value_offset) end
+    getter symbol
+    def initialize(@symbol, @parameters, @return_type, @return_value_offset) end
   end
 
   # The ast of the function.
   @ast : AST::Function
+  # The exported symbol holding the address of the function 
+  @symbol : String
   # The unit containing the functions, for fetching prototypes and types.
   @unit : Unit
   # The prototype of the function, for use by other functions.
@@ -96,6 +100,10 @@ class Stacklang::Function
   @text = [] of UInt16
   # A stack of temporary variables, to cache temporary values stored in register while doing other computation. 
   @temporaries = [] of Variable
+
+  def name
+    @ast.name.name
+  end
 
   # Allow to share the prototype of the function to external symbols.
   getter prototype
@@ -117,7 +125,8 @@ class Stacklang::Function
   #
   def initialize(@ast, @unit)
     @return_type = ast.return_type.try { |r| @unit.typeinfo r }
-    
+    @symbol = "__function_#{@ast.name.name}"
+
     local_variables = @ast.variables.map do |variable|
       typeinfo = @unit.typeinfo variable.constraint
       Variable.new(variable.name.name, @frame_size.to_i32, typeinfo, variable.initialization).tap do
@@ -147,12 +156,12 @@ class Stacklang::Function
       @frame_size += @return_type.not_nil!.size
     end
     
-    @prototype = Prototype.new (parameters.to_h do |parameter|
-      {parameter.name, Prototype::Parameter.new parameter.name, parameter.constraint, parameter.offset - @frame_size}
+    @prototype = Prototype.new @symbol, (parameters.map do |parameter|
+      Prototype::Parameter.new parameter.name, parameter.constraint, parameter.offset - @frame_size
     end), @return_type, @return_value_offset.try &.to_i32.-(@frame_size)
     
-    @section = RiSC16::Object::Section.new "__function_#{@ast.name.name}"
-    @section.definitions["__function_#{@ast.name.name}"] = Object::Section::Symbol.new 0, true
+    @section = RiSC16::Object::Section.new @symbol
+    @section.definitions[@symbol] = Object::Section::Symbol.new 0, true
   end
 
   def error(error, node = nil)
@@ -201,8 +210,16 @@ class Stacklang::Function
     end
   end
 
+  # Ensure all variables avlues are written to the ram, including temporaries.
+  def store_all
+    (@temporaries + @variables.values).each do |variable|
+      store variable
+      variable.register = nil
+    end
+  end
+  
   # Cache a variable in a register.
-  # Used to fetch temporary varaibles.
+  # Used to fetch temporary variables.
   def cache(variable, excludes): Registers
     variable.register || begin
       register = grab_register excludes: excludes
@@ -398,14 +415,36 @@ class Stacklang::Function
     end
   end
 
-  # def compile_call(call : AST::Call, into : Registers | Offset | Nil): Type::Any?
-  #   # find the func prototype
-  #   function = @unit.functions[identifier.name.name]? || "Unknown functions #{identifier.name} in #{@unit.path} at line #{call.line}"
-  #   # check that we are not trying to put a multiple word return value into a register
-  #   # for each paramter: copy into futur stack
-  #   # call
-  #   # depending on the into, copy the return value
-  # end
+  # Compile a call. This cause all variable cached in registers to be stacked.
+  def compile_call(call : AST::Call, into : Registers | Memory | Nil): Type::Any
+    function = @unit.functions[call.name.name]? || error "Unknown functions '#{call.name.name}'", node: call
+    if function.prototype.parameters.size != call.parameters.size                                                      
+      error "Call to #{function.name} require #{function.prototype.parameters.size} paremters but #{call.parameters.size} given", node: call
+    end  
+    tmp_offset = @temporaries.size
+    function.prototype.parameters.each_with_index do |parameter, index|
+      actual_type = compile_expression call.parameters[index], into: Memory.offset parameter.offset - tmp_offset
+      if parameter.constraint != actual_type
+        error "Parameter #{parameter.name} of #{function.name} should be #{parameter.constraint} but is #{actual_type}", node: call
+      end
+    end
+    store_all
+    @text << Instruction.new(ISA::Addi, STACK_REGISTER.value, STACK_REGISTER.value, immediate: assemble_immediate -tmp_offset, Kind::Imm).encode if tmp_offset != 0
+    @text << Instruction.new(ISA::Lui, RETURN_ADRESS_REGISTER.value, immediate: assemble_immediate function.prototype.symbol, Kind::Lui).encode
+    @text << Instruction.new(
+      ISA::Addi, RETURN_ADRESS_REGISTER.value, RETURN_ADRESS_REGISTER.value, immediate: assemble_immediate function.prototype.symbol, Kind::Lli
+    ).encode
+    @text << Instruction.new(ISA::Jalr, RETURN_ADRESS_REGISTER.value, RETURN_ADRESS_REGISTER.value).encode
+    @text << Instruction.new(ISA::Addi, STACK_REGISTER.value, STACK_REGISTER.value, immediate: assemble_immediate tmp_offset, Kind::Imm).encode if tmp_offset != 0
+    into.try do |destination|
+      return_type = function.prototype.return_type
+      error "Cannot use return value of call to function '#{function.name}' with no return value" if return_type.nil?
+      move Memory.offset(function.prototype.return_value_offset.not_nil! - tmp_offset), return_type, into: destination 
+    end
+    function.prototype.return_type || Type::Word.new
+    # We cheat: if here is no into, there won't be type check. And if return_type is nil and there is an into we raise.
+    # So we can safely return bullshit if there are no function.prototype.return_type.
+  end
 
   # Get the memory location and type represented an access.
   # This work by obtaining a memory location for its subvalue and adding the accessed field offset.
@@ -652,7 +691,6 @@ class Stacklang::Function
     ptr_type
   end
 
-
   # Compile a unary operator value, and move it's value if necessary.
   def compile_any_unary(unary : AST::Unary, into : Registers | Memory | Nil): Type::Any
     case unary.name
@@ -684,7 +722,7 @@ class Stacklang::Function
     case expression
     when AST::Literal then compile_literal expression, into: into
     when AST::Sizeof then compile_sizeof expression, into: into
-    #when AST::Cast then compile_cast expression, into: into
+    when AST::Call then compile_call expression, into: into
     when AST::Identifier then compile_identifier expression, into: into
     when AST::Operator then compile_operator expression, into: into
     else error "Unsupported expression", node: expression

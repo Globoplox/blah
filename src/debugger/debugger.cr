@@ -23,14 +23,10 @@ module RiSC16
     @cursor = 0
     @spec : Spec
     @breakpoints = Set(Int32).new
-    
-    #def initialize(@units, io, @spec)
-    def initialize(io, @spec)
-      @vm = VM.from_spec(@spec, io_override: {"tty" => VM::MMIO.new(@input, @output)}).tap &.load io      
-      #@locs = {} of UInt16 => Array(Assembler::Loc)
-      #unit.each_with_address do |address, loc|
-      #  (@locs[address] = @locs[address]? || [] of Assembler::Loc).push loc
-      #end
+    @object : RiSC16::Object? = nil
+
+    def initialize(io, @spec, @object = nil)
+      @vm = VM.from_spec(@spec, io_override: {"tty" => VM::MMIO.new(@input, @output)}).tap &.load io
     end
 
     def disassemble(word)
@@ -63,7 +59,7 @@ module RiSC16
         
         code = Table.new(
           x: 0, y: 0,
-          height: NCurses.maxy / 2, width: NCurses.maxx // 2,
+          height: NCurses.maxy, width: NCurses.maxx // 2,
           columns: [3, 8, 20, 30], title: "CODE",
           range: (0..((@spec.ram_start + @spec.ram_size).to_i))
         ) do |address|
@@ -128,54 +124,6 @@ module RiSC16
           NCurses.clear
         end
       end
-    end
-
-    # def code(win)
-    #   w = NCurses.maxx // 2
-    #   h = NCurses.maxy - 2
-    #   cursor_loc = [] of Assembler::Loc
-    #   index = 0
-    #   real_index = 0
-    #   cursor_index = 0
-    #   @cursor = 0 if @cursor < 0
-    #   while index < h - 2
-    #     pc = (real_index - (h - 2) // 2) + @vm.pc
-        
-    #     if pc < 0 || pc >= @vm.ram.size
-    #       real_index += 1
-    #       index += 1
-    #       next
-    #     end
-        
-    #     locs = @locs[pc]?
-    #     size = locs.try &.size || 1
-        
-    #     win.attron(NCurses::Attribute::UNDERLINE) if pc == @vm.pc
-    #     win.attron(NCurses::Attribute::BOLD) if cursor_index == @cursor
-    #     win.mvaddstr("0x#{pc.to_s(base:16).rjust(4, '0')}: 0b#{@vm.ram[pc].to_s(base:2).rjust(16, '0')}", x: 1, y: 1 + index)
-    #     win.attroff(NCurses::Attribute::UNDERLINE) if pc == @vm.pc
-    #     win.attroff(NCurses::Attribute::BOLD) if cursor_index == @cursor
-        
-    #     locs.try &.each_with_index do |loc, source_index|
-    #       break if source_index + index >= h - 2
-    #       cursor_loc << loc if cursor_index == @cursor
-    #       win.attron(NCurses::Attribute::BOLD) if cursor_index == @cursor
-    #       win.mvaddstr(loc.source, x: 30, y: 1 + index + source_index)
-    #       win.attroff(NCurses::Attribute::BOLD) if cursor_index == @cursor
-    #     end
-        
-    #     cursor_index += 1
-    #     real_index += 1
-    #     index += size
-    #   end
-    #   win.attron(NCurses::Attribute::REVERSE)
-    #   win.mvaddstr("#{@vm.halted ? "Halted" : "Paused"} s:step c:continue q:quit b:break".ljust(w - 2, ' '), x: 1, y: 1 + h - 1)          
-      
-    #   file = cursor_loc.first?.try &.file || "???"
-    #   line = cursor_loc.first?.try &.line || "???"
-    #   win.mvaddstr("Unit #{file || "???"}:L#{line || "??"}".ljust(w - 2, ' '), x: 1, y: 1 + h - 2)
-    #   win.attroff(NCurses::Attribute::REVERSE)
-    # end
-    
+    end    
   end  
 end

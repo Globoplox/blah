@@ -7,6 +7,10 @@ var bean : Pet
 
 var space
 
+fun inc(word:_):_ {
+    return word + 1
+}
+
 fun main:_ {
    //var toto : Person
    //var tata : Person
@@ -14,10 +18,8 @@ fun main:_ {
    //toto.age = 5
    //*(&toto + sizeof(Person)) = toto
 
-   var a = 0xf
-   var b = 0xc
-   return a + -b
-    
+   return inc(inc(0xf - 0xc))
+   
    //  //return 0x9
    //  //var ptr :* = &error_code_success
    //  //*ptr = 0xb

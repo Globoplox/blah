@@ -272,7 +272,8 @@ end
   
   class Call < Expression
     def initialize(@name : Identifier, @parameters : Array(Expression)) end
-
+    getter name
+    getter parameters
     def dump(io, indent = 0)
       @name.dump io, indent
       io << "("
