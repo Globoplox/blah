@@ -125,7 +125,8 @@ end
 
   class While < Statement
     def initialize(@condition : Expression, @body : Array(Statement)) end
-
+    getter condition
+    getter body
     def dump(io, indent = 0)
       io << "while ("
       @condition.dump io, indent

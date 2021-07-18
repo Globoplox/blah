@@ -12,6 +12,10 @@ fun inc(word:_):_ {
 }
 
 fun main:_ {
+  var buffer
+  while ((buffer = *tty) != 0xff00)
+    *tty = buffer
+  return 0
    // var toto : Person
    // var tata : Person
 
@@ -21,10 +25,14 @@ fun main:_ {
    // type a, it echoes b :D 
    // return *tty = inc(*tty)
 
-   if (inc(2) == 4) {
-     return 5
-   }
-   return 6
+   // var a = 0
+   // var b = -2
+   // while (a != 6) {
+   //   a = a + 1
+   //   b = b + 1
+   // }
+   // return b
+
 
    // while ((*tty = *tty) != 0xff00) {}
 
