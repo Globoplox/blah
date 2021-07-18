@@ -99,6 +99,8 @@ class Stacklang::Function
   @text = [] of UInt16
   # A stack of temporary variables, to cache temporary values stored in register while doing other computation. 
   @temporaries = [] of Variable
+  # Used to generate local uniq symbols.
+  @local_uniq = 0
 
   def name
     @ast.name.name
@@ -772,12 +774,40 @@ class Stacklang::Function
     @text << Instruction.new(ISA::Jalr, reg_a: 0u16, reg_b: RETURN_ADRESS_REGISTER.value).encode
   end
 
+  def compile_if(if_node : AST::If)
+    # Symbol name (local uniq with debug info encoded)
+    symbol = "__if_#{@local_uniq += 1}_#{Base64.encode(if_node.condition.to_s[0..13])}"
+    # Store all
+    store_all
+    # Compute condition
+    result_register = grab_register
+    condition_type = compile_expression if_node.condition, into: result_register
+    error "Condition expression expect a word or a pointer, got #{condition_type}", node: if_node if condition_type.is_a?(Type::Struct)
+    # beq r0 result (if false) jump to +1
+    @text << Instruction.new(ISA::Beq, reg_a: result_register.value, immediate: 1u16).encode
+    # beq TRUE jump to after we setup and jump to the end
+    @text << Instruction.new(ISA::Beq, immediate: 3u16).encode
+    # movi result < __if_end__
+    @text << Instruction.new(ISA::Lui, result_register.value, immediate: assemble_immediate symbol, Kind::Lui).encode
+    @text << Instruction.new(ISA::Addi, result_register.value, result_register.value, immediate: assemble_immediate symbol, Kind::Lli).encode
+    # jalr r0 result
+    @text << Instruction.new(ISA::Jalr, reg_b: result_register.value).encode
+    # compile body
+    if_node.body.each do |statement|
+      compile_statement statement
+    end
+    # store_all
+    store_all
+    # define __if_end__ here
+    @section.definitions[symbol] = Object::Section::Symbol.new @text.size, false    
+  end
+  
   # Compile any statement.
   def compile_statement(statement)
     case statement
     when AST::Return then compile_return statement   
     when AST::While then nil
-    when AST::If then nil
+    when AST::If then compile_if statement
     when AST::Expression then compile_expression statement, nil
     end
   end

@@ -107,7 +107,8 @@ end
 
   class If < Statement
     def initialize(@condition : Expression, @body : Array(Statement)) end
-
+    getter condition
+    getter body
     def dump(io, indent = 0)
       io << "if ("
       @condition.dump io, indent

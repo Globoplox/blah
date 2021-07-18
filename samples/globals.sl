@@ -20,7 +20,12 @@ fun main:_ {
 
    // type a, it echoes b :D 
    // return *tty = inc(*tty)
-   return 7 != inc(6)
+
+   if (inc(2) == 4) {
+     return 5
+   }
+   return 6
+
    // while ((*tty = *tty) != 0xff00) {}
 
    // return inc(inc(0xf - 0xc))
