@@ -1,27 +1,7 @@
 # blah
 
-Pet project where I intend to write a complete usable computer from as scratch as possible.
-Based on the [RiSC16 ISA](https://user.eng.umd.edu/~blj/RiSC/RiSC-isa.pdf).
-Written in crystal because it rules.
-
-Quicktest:
-```sh
-crystal build src/cli.cr && ./cli examples/hello.blah examples/data.blah
-```
-
-Echo back example:  
-```
-movi r1 0xff00 # if we read this word from tty, it mean it's closed.
-loop:
-    lw r2 r0 :__io_tty_r # read w from tty in r2
-    nand r3 r1 r2
-    nand r3 r3 r3  # r3 = r1 & r2
-    beq r1 r3 :end # roughly, branch if r2 & r1 == r1
-    sw r2 r0 :__io_tty_r # write data r2 in tty
-    beq r0 r0 :loop
-end:
-    halt
-```
+Pet project intending to build a 'usable' computer software stack from scratch, starting from a architecture simple enough to run on a hand designed CPU.  
+Based on the [RiSC16 ISA](https://user.eng.umd.edu/~blj/RiSC/RiSC-isa.pdf).  
 
 ## Summary
 
@@ -52,16 +32,31 @@ which would almost always mean an additional two instructions (move immediate `_
 Instruction can be sorted in various continuous blocks within a section. 
 The linker will ensure everything fit, find the absolute address of each symbol and replace each reference to it with the real value.  
 
-#### CLI default
+## CLI
 
+The [CLI](./src/cli.cr) is the main entrypoint for most operation.
 If no command is given to the CLI, every non flag parameters will be considered as input and the compiler will try to assembler them, then link it and run it.  
 Exemples:  
 - Run a program that echo input: `cli examples/echo.blah` 
 - Debug a program that display hello world: `cli -g examples/hello.blah examples/data.blah` 
 
-## Assembly Syntax
+## Linking
+
+Assembler and compilers output object files. The linker can merge multiple object files together into a merged object file that can then be linked into an executable that can be loaded and run from a location defined a link time.
+
+## Assembly
+
+Assembly mostly follows RiSC16 specs, with some additional pseudo-instructions and possibility to specify the location of a block of instructions.
 
 ## Stacklang
+
+Stacklang is a basic langage based on a subset of C that compile to RiSC16 bytecode.  
+It is fat from full featured but powerful enough for basic stuff.
+
+### Warning
+
+Writing to the stack though use of indirect reference to variables might lead to undefined behavior due to variable caching.
+
 
 ### Syntax oddities:
 
@@ -112,7 +107,7 @@ by future calls.
 - [x] Write a dummy virtual machine that can execute this raw bitcode
   - [x] IO (but meh)
   - [x] Hello World
-- [ ] Design and write a compiler for a small stack language
+- [X] Design and write a compiler for a small stack language
   - [ ] Minimal standard library
 - [ ] Write an OS
   - [ ] Load another program

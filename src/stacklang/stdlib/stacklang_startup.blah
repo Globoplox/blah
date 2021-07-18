@@ -1,7 +1,7 @@
 # Minimal startup file for stacklang programs.
 # This setup the stack pointer, call the stackang main and print the return valueof the main.
 
-section text + 0x0
+section text+0x0
 
 # Linker will provide the __stack symbol automatically. It does not need to be defined.
 # The same is true for __io_* symbols.
@@ -9,58 +9,29 @@ movi r7 :__stack+1
 
 # stacklang generate exported symbol __function_<function name in stacklang> for each symbol
 # linker will substitute reference with runtime address of the function.
-movi r6 :__function_main 
+movi r6 :__function_main
 
 # Per abi, we always call function storing the return address in r6. 
 jalr r6 r6 0x0 # call main
 
-lw r6 r7 -1 # we take return word of main (assuming stacklang prototype is main():_ )
-
-sw r6 r7 -2 # put it as first param of putw (assuming stacklang prototype is putw(:w) )
-movi r6 :__function_putw
-jalr r6 r6 0x0 # call putw
 halt
 
 export __global_tty: .word :__io_tty_a
-
-# We can define accessible by stacklang by following the symbol naming pattern __global_<global name in stacklang>
-export __global_hex_prefix: .ascii "0x"
-       			    nop
-
-export __global_hex_digits: .ascii "0123456789ABCDEF"
-       			    nop
-
-export __global_error_code_success: .word 0xc
-
-export __global_error_code_success_ptr: .word :__global_error_code_success
-
-export __global_null_ptr: nop
-
-export __global_color_green: .word 0x0000
-			     .word 0x7777
-			     .word 0x0000
-
-export __global_color_green_ptr: .word :__global_color_green
-
-# notice putw do not need to move its stack because it does not call any other function. Stack frame looks like this:
-# r7 - 2 | parameter of type word
-# r7 - 1 | usually return address (here we don't store it because we never overwrite r6, which contain the return address per abi)
-# r7     | (stack ptr of caller)
-export __function_putw:
-        # Expect: r6 store return address, r7 is stack ptr
-        movi r1 :__global_hex_prefix
-        lw r2 r1 0
-	sw r2 r0 :__io_tty_r
-        lw r2 r1 1
-        sw r2 r0 :__io_tty_r
-        # load first paramter, which we expect to be a word
-        lw r1 r7 -0x2 # pos of first word-size parameter
-	movi r5 :__global_hex_digits
-        movi r2 0x000f
-        nand r3 r1 r2
-        nand r3 r3 r3
-	add r3 r3 r5
-	lw r3 r3 0
-        sw r3 r0 :__io_tty_r
-        # bitshift > 8 then do again
-        jalr r0 r6 0x0 # return
+export __global_null: nop
+export __global_hex_digits:
+                     .word 0x30
+                     .word 0x31
+                     .word 0x32
+                     .word 0x33
+                     .word 0x34
+                     .word 0x35
+                     .word 0x36
+                     .word 0x37
+                     .word 0x38
+                     .word 0x39
+                     .word 0x61
+                     .word 0x62
+                     .word 0x63
+                     .word 0x64
+                     .word 0x65
+                     .word 0x66
