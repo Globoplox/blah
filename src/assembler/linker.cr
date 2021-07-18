@@ -77,7 +77,6 @@ module RiSC16::Linker
   # Static link binary
   def static_link(spec, object, io, start : Int32 = 0)
     object = merge(spec, [object]) if object.merged == false
-      
     globals = symbols_from_spec(spec)
 
     if start != 0    
@@ -97,9 +96,11 @@ module RiSC16::Linker
       globals[name] = symbol
     end
 
-    max = object.sections.max_by &.offset.not_nil!
+    max = object.sections.max_by do |section|
+      section.offset.not_nil! + section.text.size
+    end
     text_size = max.offset.not_nil! + max.text.size
-    
+
     raise "Binary does not fit in ram: #{text_size} words overlfow #{spec.ram_size}" if text_size > spec.ram_size
     binary = Slice(UInt16).new text_size
     
