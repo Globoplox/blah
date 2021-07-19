@@ -11,7 +11,8 @@ require "./unit"
 # TODO: maybe we could even cache globals. Variable would need to have a 'reference_register', address & offset should be added instead of
 #       Relying on immediates ?
 # TODO: Accessing a global lvalue could maybe not cause immediate loading address. It could be delegated to move
-#       by allowing to define reference_register as a symbol. The load step could then handle a movi by itself if needed ? 
+#       by allowing to define reference_register as a symbol. The load step could then handle a movi by itself if needed ?
+# TODO: handling sugar operator: +=, -=, <<, >>
 class Stacklang::Function
   include RiSC16
   alias Kind = Object::Section::Reference::Kind
@@ -290,7 +291,6 @@ class Stacklang::Function
   # All variable cache optimisation where a variable memory destination is not really written to
   # thanks to caching within register can be disabled by setting *force_to_memory* to true.
   # That should be usefull only when storing a var because it's cache register is needed for something else.
-  # TODO: allow destination to be "ANY REGISTER" to avoid grabbing and copying when value might already be in a register
   def move(memory : Memory | Registers, constraint : Type::Any, into : Memory | Registers, force_to_memory = false)
     # If the source is a memory location holding a variable that is already cached into a register, then use this register directly.
     memory = memory.within_var.try(&.register) || memory if memory.is_a? Memory
@@ -516,7 +516,7 @@ class Stacklang::Function
   # Compile an assignement of any value to any other value.
   # The left side of the assignement must be solvable to a memory location (a lvalue).
   # The written value can also be written to another location (An assignement do have a type and an expression).
-  def compile_assignement(left_side : AST::Expression, right_side : AST::Expression, into : Registers | Memory | Nil): Type::Any
+  def compile_assignment(left_side : AST::Expression, right_side : AST::Expression, into : Registers | Memory | Nil): Type::Any
     lvalue_result = compile_lvalue left_side
     lvalue_result || raise "Expression #{left_side.to_s} is not a valid left value for an assignement in #{@unit.path} at line #{left_side.line}"
     lvalue, destination_type = lvalue_result
@@ -610,6 +610,23 @@ class Stacklang::Function
     ret_type
   end
 
+  def compile_binary_to_call(binary : AST::Binary, into : Registers | Memory | Nil): Type::Any
+    call_name = case binary.name
+    when "<<" then "left_bitshift"
+    when ">>" then "right_bitshift"
+    else error "Usupported binary operator '#{binary.name}'", node: binary
+    end
+    call = AST::Call.new(AST::Identifier.new(call_name), [binary.left, binary.right])
+    call.line = binary.line
+    call.character = binary.character
+    compile_call call, into: into
+  end
+
+  def compile_sugar_assignment(binary : AST::Binary, into : Registers | Memory | Nil): Type::Any
+    sugared = binary.name.rchop "="
+    compile_assignment binary.left,  AST::Binary.new(binary.left, sugared, binary.right), into: into
+  end
+
   def compile_binary(binary : AST::Binary, into : Registers | Memory | Nil): Type::Any
     if into.nil?
       compile_expression binary.left, into: nil
@@ -643,7 +660,9 @@ class Stacklang::Function
   # Compile a binary operator value, and move it's value if necessary.
   def compile_assignment_or_binary(binary : AST::Binary, into : Registers | Memory | Nil): Type::Any
     case binary.name
-    when "=" then compile_assignement binary.left, binary.right, into: into
+    when "=" then compile_assignment binary.left, binary.right, into: into
+    when "<<", ">>", "*", "/" then compile_binary_to_call binary, into: into
+    when "+=", "-=", "&=", "~=", "|=", "<<=", ">>=" then compile_sugar_assignment binary, into: into
     else compile_binary binary, into: into
     end
   end
@@ -831,7 +850,7 @@ class Stacklang::Function
     # Initialize variables
     @variables.values.each do |variable|
       if value = variable.initialization
-        compile_assignement AST::Identifier.new(variable.name), value, nil
+        compile_assignment AST::Identifier.new(variable.name), value, nil
       end # We do not zero-initialize variable implicitely.
       variable.initialized = true
     end

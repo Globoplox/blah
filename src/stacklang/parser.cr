@@ -158,7 +158,7 @@ class Stacklang::Parser < Parser
   end
 
   rule def affectation_chain
-    next unless name = str "="
+    next unless name = str ["=", "-=", "+=", "&=", "~=", "|=", "<<=", ">>="]
     whitespace
     next unless right = low_priority_operation
     whitespace
