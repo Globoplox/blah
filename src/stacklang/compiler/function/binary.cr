@@ -13,11 +13,11 @@ class Stacklang::Function
     result_register = grab_register excludes: [left_side_register, right_side_register]# TODO: maybe protect into for optimal code ?
     # It is not critical, only case is is not R7 relative are from assignment lvalue and they are tmp val protected.
     if soustract
-      @text << Instruction.new(ISA::Nand, result_register.value, right_side_register.value, right_side_register.value).encode
-      @text << Instruction.new(ISA::Addi, result_register.value, result_register.value, immediate: 1u16).encode
+      nand result_register, right_side_register, right_side_register
+      addi result_register,result_register, 1
       right_side_register = result_register
     end
-    @text << Instruction.new(ISA::Add, result_register.value, left_side_register.value, right_side_register.value).encode
+    add result_register, left_side_register, right_side_register
     move result_register, ret_type, into: into
     ret_type
   end
@@ -30,8 +30,8 @@ class Stacklang::Function
       else error "Cannot apply 'bitewise nand' to values of types #{left_side_type} and #{right_side_type} together", node: node
     end 
     result_register = grab_register excludes: [left_side_register, right_side_register]
-    @text << Instruction.new(ISA::Nand, result_register.value, left_side_register.value, right_side_register.value).encode
-    @text << Instruction.new(ISA::Nand, result_register.value, result_register.value, result_register.value).encode unless inv
+    nand result_register, left_side_register, right_side_register
+    nand result_register, result_register, result_register unless inv
     move result_register, ret_type, into: into
     ret_type
   end
@@ -44,12 +44,12 @@ class Stacklang::Function
       else error "Cannot apply 'bitewise or' to values of types #{left_side_type} and #{right_side_type} together", node: node
     end 
     result_register_1 = grab_register excludes: [left_side_register, right_side_register]
-    @text << Instruction.new(ISA::Nand, result_register_1.value, left_side_register.value, left_side_register.value).encode
+    nand result_register_1, left_side_register, left_side_register
     result_register_2 = grab_register excludes: [right_side_register, result_register_1]
-    @text << Instruction.new(ISA::Nand, result_register_2.value, right_side_register.value, right_side_register.value).encode
+    nand result_register_2, right_side_register, right_side_register
     result_register = result_register_1 # Could have been 2, does not matter.
-    @text << Instruction.new(ISA::Nand, result_register.value, result_register_1.value, result_register_2.value).encode
-    @text << Instruction.new(ISA::Nand, result_register.value, result_register.value, result_register.value).encode if inv
+    nand result_register, result_register_1, result_register_2
+    nand result_register, result_register, result_register if inv
     move result_register, ret_type, into: into
     ret_type
   end
@@ -63,13 +63,13 @@ class Stacklang::Function
     end
     result_register = grab_register excludes: [left_side_register, right_side_register]
     unless neq
-      @text << Instruction.new(ISA::Addi, result_register.value, Registers::R0.value, immediate: 1u16).encode
-      @text << Instruction.new(ISA::Beq, left_side_register.value, right_side_register.value, immediate: 1u16).encode
-      @text << Instruction.new(ISA::Add, result_register.value).encode
+      addi result_register, Registers::R0, 1
+      beq left_side_register, right_side_register, 1u16
+      add result_register, Registers::R0, Registers::R0
     else
-      @text << Instruction.new(ISA::Add, result_register.value).encode
-      @text << Instruction.new(ISA::Beq, left_side_register.value, right_side_register.value, immediate: 1u16).encode
-      @text << Instruction.new(ISA::Addi, result_register.value, immediate: 1u16).encode
+      add result_register, Registers::R0, Registers::R0
+      beq left_side_register, right_side_register, 1u16
+      addi result_register, Registers::R0, 1
     end
     move result_register, ret_type, into: into
     ret_type

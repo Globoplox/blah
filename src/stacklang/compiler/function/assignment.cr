@@ -22,8 +22,7 @@ class Stacklang::Function
   # Get the memory location of a global.
   def compile_global_lvalue(global : Unit::Global) : Memory
     dest_register = grab_register
-    @text << Instruction.new(ISA::Lui, dest_register.value, immediate: assemble_immediate global.symbol, Kind::Lui).encode
-    @text << Instruction.new(ISA::Addi, dest_register.value, dest_register.value, immediate: assemble_immediate global.symbol, Kind::Lli).encode
+    movi dest_register, global.symbol
     Memory.absolute(dest_register)
   end
 

@@ -6,15 +6,13 @@ class Stacklang::Function
     return Type::Word.new if into.nil?
     case into
     when Registers
-      @text << Instruction.new(ISA::Lui, into.value, immediate: assemble_immediate literal.number, Kind::Lui).encode
-      @text << Instruction.new(ISA::Addi, into.value, into.value, immediate: assemble_immediate literal.number, Kind::Lli).encode
+      movi into, literal.number
     when Memory
       tmp_register = into.within_var.try(&.register) || grab_register excludes: [into.reference_register] # FIXME: use used_registers ? Might be useless.
       # Only case where it is usefull is when ref_register hold address (either return where its R7 and ungrabable, or assignment and it's protected by tmp var)
       # This is true for all grab within rightside valuen unless they don't rely on move: should they try to protect ino ?
       # This might be useless but might reduce register/caching/storage. IDK.
-      @text << Instruction.new(ISA::Lui, tmp_register.value, immediate: assemble_immediate literal.number, Kind::Lui).encode
-      @text << Instruction.new(ISA::Addi, tmp_register.value, tmp_register.value, immediate: assemble_immediate literal.number, Kind::Lli).encode
+      movi tmp_register, literal.number
       # The move will compute to no-op automatically if this ends up copying a register to itself.
       move tmp_register, Type::Word.new, into
     end
@@ -61,13 +59,11 @@ class Stacklang::Function
     end
   end
 
-
   # Compile the value of an access and move it's value if necessary.
   def compile_access(access : AST::Access,  into : Registers | Memory | Nil): Type::Any
     memory, constraint = compile_access_lvalue access || raise "Illegal expression #{access.to_s} in #{@unit.path} at #{access.line}"
     move memory, constraint, into: into if into
     constraint
   end
-
 
 end

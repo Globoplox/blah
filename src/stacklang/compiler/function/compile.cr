@@ -33,7 +33,7 @@ class Stacklang::Function
   def cache(variable, excludes): Registers
     variable.register || begin
       register = grab_register excludes: excludes
-      @text << Instruction.new(ISA::Lw, register.value, STACK_REGISTER.value, immediate: assemble_immediate variable.offset, Kind::Imm).encode
+      lw register, STACK_REGISTER, variable.offset
       variable.register = register
     end
   end
@@ -58,9 +58,9 @@ class Stacklang::Function
   # TODO: find a wat to ensure every path end with a return.
   def compile : RiSC16::Object::Section
     # move the stack UP by the size of the stack frame.
-    @text << Instruction.new(ISA::Addi, reg_a: STACK_REGISTER.value, reg_b: STACK_REGISTER.value, immediate: assemble_immediate -(@frame_size.to_i32), Kind::Imm).encode
+    addi STACK_REGISTER, STACK_REGISTER, -(@frame_size.to_i32)
     # copy the return address on the stack.
-    @text << Instruction.new(ISA::Sw, reg_a: RETURN_ADRESS_REGISTER.value, reg_b: STACK_REGISTER.value, immediate: @return_address_offset).encode
+    sw RETURN_ADRESS_REGISTER, STACK_REGISTER, @return_address_offset.to_i32
 
     # Initialize variables
     @variables.values.each do |variable|

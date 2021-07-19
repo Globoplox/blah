@@ -17,6 +17,8 @@ class Stacklang::Function
   end
 
   # TODO: optimize
+  # TODO: be careful when optimizing, some caller (if and while statement ?) might rely on predicted size of movi.
+  # TODO: Add a way to predict size of a movi ? 
   def movi(a : Registers, imm : Int32 | String | Memory)
     lui a, imm
     lli a, imm
@@ -34,8 +36,8 @@ class Stacklang::Function
     @text << Instruction.new(ISA::Lw, a.value, b.value, immediate: assemble_immediate imm, Kind::Imm).encode
   end
   
-  def jalr(a : Registers)
-    @text << Instruction.new(ISA::Jalr, a.value).encode
+  def jalr(a : Registers, b : Registers)
+    @text << Instruction.new(ISA::Jalr, a.value, b.value).encode
   end
 
   def beq(a : Registers, b : Registers, imm : Int32 | String | Memory)

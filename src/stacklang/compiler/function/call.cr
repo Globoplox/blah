@@ -14,13 +14,10 @@ class Stacklang::Function
       end
     end
     store_all
-    @text << Instruction.new(ISA::Addi, STACK_REGISTER.value, STACK_REGISTER.value, immediate: assemble_immediate -tmp_offset, Kind::Imm).encode if tmp_offset != 0
-    @text << Instruction.new(ISA::Lui, RETURN_ADRESS_REGISTER.value, immediate: assemble_immediate function.prototype.symbol, Kind::Lui).encode
-    @text << Instruction.new(
-      ISA::Addi, RETURN_ADRESS_REGISTER.value, RETURN_ADRESS_REGISTER.value, immediate: assemble_immediate function.prototype.symbol, Kind::Lli
-    ).encode
-    @text << Instruction.new(ISA::Jalr, RETURN_ADRESS_REGISTER.value, RETURN_ADRESS_REGISTER.value).encode
-    @text << Instruction.new(ISA::Addi, STACK_REGISTER.value, STACK_REGISTER.value, immediate: assemble_immediate tmp_offset, Kind::Imm).encode if tmp_offset != 0
+    addi STACK_REGISTER, STACK_REGISTER, -tmp_offset
+    movi RETURN_ADRESS_REGISTER, function.prototype.symbol
+    jalr RETURN_ADRESS_REGISTER, RETURN_ADRESS_REGISTER
+    addi STACK_REGISTER, STACK_REGISTER, tmp_offset
     into.try do |destination|
       return_type = function.prototype.return_type
       error "Cannot use return value of call to function '#{function.name}' with no return value" if return_type.nil?

@@ -42,37 +42,32 @@ class Stacklang::Function
     
     case {memory, into}
     when {Registers, Registers}
-      @text << Instruction.new(ISA::Add, into.value, memory.value).encode unless into == memory
+      add into, memory, Registers::R0 unless into == memory
 
     when {Registers, Memory}
       if force_to_memory == false && (var = into.within_var) && var.constraint.size == 1
         var.register = memory
       else
-        @text << Instruction.new(ISA::Sw, memory.value, into.reference_register!.value, immediate: assemble_immediate into.value, Kind::Imm).encode
+        sw memory, into.reference_register!, into.value
       end
 
     when {Memory, Registers}
       error "Illegal move of multiple word into register" if constraint.size > 1
-      @text << Instruction.new(ISA::Lw, into.value, memory.reference_register!.value, immediate: assemble_immediate memory.value, Kind::Imm).encode
+      lw into, memory.reference_register!, memory.value
 
     when {Memory, Memory}
       if force_to_memory == false &&  (var = into.within_var) && var.constraint.size == 1
         target_register = var.register || grab_register excludes: [memory.reference_register!]
-        @text << Instruction.new(
-          ISA::Lw, target_register.value, memory.reference_register!.value, immediate: assemble_immediate memory.value, Kind::Imm
-        ).encode
+        lw target_register,  memory.reference_register!,  memory.value
         var.register = target_register
 
       else
         # TODO: if force_to_memory is false and we find out both location are the same, no need to compile anything.
+        # TODO: check that we won't overflow max immediate
         tmp_register = grab_register excludes: [into.reference_register!, memory.reference_register!]
         (0...(constraint.size)).each do |index|
-          @text << Instruction.new(
-            ISA::Lw, tmp_register.value, memory.reference_register!.value, immediate: assemble_immediate memory.value + index, Kind::Imm
-          ).encode
-          @text << Instruction.new(
-            ISA::Sw, tmp_register.value, into.reference_register!.value, immediate: assemble_immediate into.value + index, Kind::Imm
-          ).encode
+          lw tmp_register, memory.reference_register!, memory.value + index
+          sw tmp_register, into.reference_register!, into.value + index
         end
         
       end

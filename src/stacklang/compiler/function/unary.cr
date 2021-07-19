@@ -14,12 +14,12 @@ class Stacklang::Function
       case unary.name
       when "-"
         result_register = grab_register excludes: [operand_register] + into.used_registers # TODO: still likely useless
-        @text << Instruction.new(ISA::Nand, result_register.value, operand_register.value, operand_register.value).encode
-        @text << Instruction.new(ISA::Addi, result_register.value, result_register.value, immediate: 1u16).encode
+        nand result_register, operand_register, operand_register
+        addi result_register, result_register, 1
         move result_register, expression_type, into: into
       when "~"
         result_register = grab_register excludes: [operand_register] + into.used_registers # TODO: still likely useless
-        @text << Instruction.new(ISA::Nand, result_register.value, operand_register.value, operand_register.value).encode
+        nand result_register, operand_register, operand_register
         move result_register, expression_type, into: into
       else error "Unsupported unary operation '#{unary.name}'", node: unary
       end
@@ -55,10 +55,9 @@ class Stacklang::Function
     into.try do |destination|
       if lvalue.value.is_a? String || lvalue.value
         offset_register = grab_register excludes: lvalue.used_registers
-        # We get the real address in a register, for this we need to movi offset if symbol                                                                                 
-        @text << Instruction.new(ISA::Lui, offset_register.value, immediate: assemble_immediate lvalue.value, Kind::Lui).encode
-        @text << Instruction.new(ISA::Addi, offset_register.value, offset_register.value, immediate: assemble_immediate lvalue.value, Kind::Lli).encode
-        @text. << Instruction.new(ISA::Add, offset_register.value, offset_register.value, lvalue.reference_register!.value).encode
+        # We get the real address in a register, for this we need to movi offset if symbol
+        movi offset_register, lvalue
+        add offset_register, offset_register, lvalue.reference_register!
         address_register = offset_register
       else
         address_register = lvalue.reference_register!

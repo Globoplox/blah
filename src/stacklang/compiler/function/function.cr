@@ -5,6 +5,7 @@ require "../unit"
 # TODO: subvar for struct var to allow for register caching. Carefull of single word struct (register cache is shared).
 # TODO: Language feature: function ptr, cast
 # TODO: type inference for initialized local variables
+# TODO: global initialisation
 class Stacklang::Function
   include RiSC16
   alias Kind = Object::Section::Reference::Kind
