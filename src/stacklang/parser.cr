@@ -2,9 +2,7 @@ require "../parsing/primitive"
 require "./ast"
 
 # FIXME: line and char counts
-# TODO: Cast
 # TODO: Function PTR
-# TODO: Minimalistic Operator Overloading ?
 class Stacklang::Parser < Parser
   include Stacklang::AST
 

@@ -1,0 +1,25 @@
+Mapping a bunch of address to rom ? (lets say 256 ?) as bios, from 0 to 256.
+Then rest as ram, and puts io at the end.
+BIOS responsability is to check for presence of a MBR in some predefined IOs (we need a kind of flat filesystem ? addresssable io ?)
+When he found one, he copy it in ram and jump to ram.
+
+SPEC should reworked to have more complex address space definition.
+Kind of section it should be able to hanlde:
+
+RAM, span over multiple continuous address
+ROM, span over multiple continuous addesss, write crash / do nothing ?
+
+CHARACTER DEVICE: need 2 (conitnuous?) address:
+  - Address: write to set the address, read to fetch info (value available or not)
+  - Value: read or write the value at 'address'
+GENRAL PURPOSE: Single register IO.
+       		We can decide thing such as 8 lsb for data, and msb: 6 bit for identity, 1 bit flipped for 'read ready' and one bit for 'write ready'
+		
+
+Then: spec can specify vm to map ram/rom/blocks to files, and map gpio to tty ?
+
+
+
+--- Interrupts:
+This ooo spec for risc16 do use a interrupt vector table at fixed address (0X0000), so this might be ok to do this. Spec do specify there might be a
+hardawre register for the return address, but it doe not specify what is the "return-from-exception" instruction. Likely some kind of jalr ?

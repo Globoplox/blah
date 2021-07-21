@@ -14,10 +14,10 @@ class Stacklang::Function
       end
     end
     store_all
-    addi STACK_REGISTER, STACK_REGISTER, -tmp_offset
+    addi STACK_REGISTER, STACK_REGISTER, -tmp_offset if tmp_offset != 0
     movi RETURN_ADRESS_REGISTER, function.prototype.symbol
     jalr RETURN_ADRESS_REGISTER, RETURN_ADRESS_REGISTER
-    addi STACK_REGISTER, STACK_REGISTER, tmp_offset
+    addi STACK_REGISTER, STACK_REGISTER, tmp_offset if tmp_offset != 0
     into.try do |destination|
       return_type = function.prototype.return_type
       error "Cannot use return value of call to function '#{function.name}' with no return value" if return_type.nil?

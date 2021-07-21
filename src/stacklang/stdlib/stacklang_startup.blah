@@ -1,5 +1,5 @@
 # Minimal startup file for stacklang programs.
-# This setup the stack pointer, call the stackang main and print the return valueof the main.
+# This setup the stack pointer, call the stackang main.
 
 section text+0x0
 

@@ -1,7 +1,6 @@
 class Stacklang::Function
 
   # Run a computation step while ensuring a register value is kept or cached in stack.
-  # (Unless an mistake in the compiler cause use of register it shouldn't).
   # To be used with #uncache or #move.
   def with_temporary(register : Registers, constraint : Type::Any)
     tmp = Variable.new "__temporary_var_#{@temporaries.size}", -(@temporaries.size + 1), constraint, nil
