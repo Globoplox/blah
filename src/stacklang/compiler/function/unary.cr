@@ -51,6 +51,7 @@ class Stacklang::Function
     lvalue_result = compile_lvalue operand
     lvalue_result || error "Expression #{operand.to_s} is not a valid operand for operator '&'", node: node
     lvalue, targeted_type = lvalue_result
+    targeted_type = targeted_type.table_of if targeted_type.is_a? Type::Table # TODO: remove this fix to make table usable because there is no cast not table access yet
     ptr_type = Type::Pointer.new targeted_type
     into.try do |destination|
       if lvalue.value.is_a? String || lvalue.value

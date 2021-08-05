@@ -290,9 +290,17 @@ class Stacklang::Parser < Parser
     end
 
     whitespace
-    if ptr = char '*'
+    if char '*'
       type_constraint(false).try do |constraint|
         Pointer.new constraint
+      end
+    elsif char '['
+      whitespace
+      next unless size = literal
+      whitespace
+      next unless char ']'
+      type_constraint(false).try do |constraint|
+        Table.new constraint, size
       end
     elsif name = type_name
       Custom.new name

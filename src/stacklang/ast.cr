@@ -74,6 +74,19 @@ module Stacklang::AST
       @target.dump io, indent
     end
   end
+  
+  class Table < Type
+    def initialize(@target : Type, @size : Literal) end
+    getter target
+    getter size
+    
+    def dump(io, indent = 0)
+      @target.dump io, indent
+      io <<  '['
+      io << @size
+      io <<  ']'
+    end
+  end
 
   class Custom < Type
     def initialize(@name : String) end

@@ -13,8 +13,13 @@ module Stacklang
         else
           Type::Pointer.new solve_constraint target, types
         end
-      when AST::Custom
-        
+      when AST::Table
+        if (target = ast.target).is_a? AST::Custom
+          Type::Table.new (types[target.name]? || raise "Pointer to unknow struct name: '#{target.name}'"), ast.size.number
+        else
+          Type::Table.new (solve_constraint target, types), ast.size.number
+        end
+      when AST::Custom        
         actual_type = types[ast.name]? || raise "Unknown struct name: '#{ast.name}'"
         raise "Type #{actual_type.name} is recursive. This is illegal. Use a pointer to #{actual_type.name} instead." if actual_type.in? stack
         actual_type.solve types, stack + [actual_type]
@@ -52,6 +57,28 @@ module Stacklang
 
     def ==(other : Type::Any)
       other.is_a?(Pointer) && other.pointer_of == @pointer_of
+    end
+  end
+  
+  class Type::Table < Type::Any
+    getter quantity
+    getter table_of
+
+    def size
+      @quantity * @table_of.size
+    end
+
+    def initialize(@table_of : Type::Any, @quantity : Int32) end
+
+    def to_s(io)
+      io << '['
+      io << @quantity
+      io << ']'
+      @table_of.to_s io
+    end
+
+    def ==(other : Type::Any)
+      other.is_a?(Pointer) && other.pointer_of == @table_of
     end
   end
   
