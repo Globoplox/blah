@@ -41,7 +41,7 @@ class Stacklang::Function
       {compile_global_lvalue(global), global.type_info}             
     end
   end
-  
+ 
   # Get the memory location represented by an expression.
   # This is limited to global, variable, dereferenced pointer and access to them.
   # TODO: Optimization when we do not need the Memory target and only care for side effect ?
@@ -49,8 +49,11 @@ class Stacklang::Function
     case expression
     when AST::Identifier then compile_identifier_lvalue expression
     when AST::Access then compile_access_lvalue expression
-    when AST::Unary
-      if expression.name == "*"
+    when AST::Unary, AST::Binary 
+      if expression.is_a?(AST::Binary) && expression.name == "["
+        expression = AST::Unary.new(AST::Binary.new(AST::Unary.new(expression.left, "&"), "+", expression.right), "*")
+      end
+      if expression.is_a?(AST::Unary) && expression.name == "*"
         # TODO: use Any register destination instead of grabbing one ? 
         destination_register = grab_register
         constraint = compile_expression expression.operand, into: destination_register

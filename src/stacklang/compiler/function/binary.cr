@@ -1,6 +1,5 @@
 class Stacklang::Function
 
-
   def compile_addition(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any} , into : Registers | Memory, node : AST::Node, soustract = false): Type::Any
     left_side_register, left_side_type = left_side
     right_side_register, right_side_type = right_side
@@ -127,6 +126,10 @@ class Stacklang::Function
     compile_assignment binary.left,  AST::Binary.new(binary.left, sugared, binary.right), into: into
   end
 
+  def compile_table_access(binary : AST::Binary, into : Registers | Memory | Nil): Type::Any
+    compile_expression AST::Unary.new(AST::Binary.new(AST::Unary.new(binary.left, "&"), "+", binary.right), "*"), into: into
+  end
+
   def compile_binary(binary : AST::Binary, into : Registers | Memory | Nil): Type::Any
     if into.nil?
       compile_expression binary.left, into: nil
@@ -166,6 +169,7 @@ class Stacklang::Function
     case binary.name
     when "=" then compile_assignment binary.left, binary.right, into: into
     when "<<", ">>", "*", "/" then compile_binary_to_call binary, into: into
+    when "[" then compile_table_access binary, into: into 
     when "+=", "-=", "&=", "~=", "|=", "<<=", ">>=" then compile_sugar_assignment binary, into: into
     else compile_binary binary, into: into
     end

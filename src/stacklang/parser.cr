@@ -205,9 +205,15 @@ class Stacklang::Parser < Parser
   end
 
   rule def high_chain
-    next unless name = str ["<=", ">=", "==", "!=", "||", "&&", "<", ">", "^"]
+    next unless name = str ["<=", ">=", "==", "!=", "||", "&&", "<", ">", "^" , "["]
     whitespace
-    next unless right = access
+    if  name == "["
+      next unless right = expression
+      whitespace
+      next unless char ']' if name == "["
+    else
+      next unless right = access
+    end
     whitespace
     {name, right}
   end

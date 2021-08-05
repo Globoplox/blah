@@ -11,7 +11,7 @@ class Stacklang::Compiler
     @units = paths.to_h do |path|
       absolute =  Path[path].expand home: true
       File.open absolute do |file|
-        ast = Stacklang::Parser.new(file).unit || raise "Could not compile unit '#{path}'"
+        ast = Stacklang::Parser.new(file).unit || raise "Could not parse unit '#{path}'"
         unit = Unit.new ast, absolute, self
         { absolute, unit }
       end
@@ -28,7 +28,7 @@ class Stacklang::Compiler
     absolute = Path[path].expand home: true, base: from.path.dirname
     @units[absolute]? || begin
        File.open absolute do |file|
-       ast = Stacklang::Parser.new(file).unit || raise "Could not compile unit '#{path}'"
+       ast = Stacklang::Parser.new(file).unit || raise "Could not parse unit '#{path}'"
        unit = Unit.new ast, absolute, self
        @units[absolute] = unit
      end    
