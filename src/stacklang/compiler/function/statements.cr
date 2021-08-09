@@ -23,8 +23,8 @@ class Stacklang::Function
 
   # Compile a if or while statement.
   def compile_if(if_node : AST::If | AST::While, loop = false)
-    symbol_start = "__while_start_#{@local_uniq += 1}_#{Base64.encode(if_node.condition.to_s[0..13])}"
-    symbol_end = "__while_end_#{@local_uniq += 1}_#{Base64.encode(if_node.condition.to_s[0..13])}"
+    symbol_start = "__block_start_#{@local_uniq += 1}_#{Base64.encode(if_node.condition.to_s[0..13])}"
+    symbol_end = "__block_end_#{@local_uniq += 1}_#{Base64.encode(if_node.condition.to_s[0..13])}"
     store_all
     result_register = grab_register
     @section.definitions[symbol_start] = Object::Section::Symbol.new @text.size, false if loop

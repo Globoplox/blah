@@ -10,6 +10,7 @@ require "./debugger"
 module RiSC16
 
   module CLI
+  begin
     target_file = "./a.out"
     sources_files = [] of String
     spec_file = nil
@@ -104,7 +105,7 @@ module RiSC16
       end
       objects = sources_files.map do |source|
         if source.ends_with?(".sl")
-          object = Stacklang::Compiler.new([source]).compile.first
+          object = Stacklang::Compiler.new([source], debug).compile.first
           name = source.gsub(".blah", ".ro")
           if create_intermediary
             File.open Path[(intermediary_dir || Dir.current).not_nil!, Path[name].basename], "w" do |output|
@@ -158,6 +159,8 @@ module RiSC16
       when nil then raise "No command given"
     else raise "Invalid command: #{command}"
     end
+  rescue error
+    puts error.message
   end
-  
+  end
 end

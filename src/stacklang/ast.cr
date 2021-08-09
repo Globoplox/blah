@@ -2,8 +2,13 @@ module Stacklang::AST
   alias Node = Parser::Node
 
   class Node
+    def dump(io)
+    end
+    
     def to_s
-      String.build { |io| dump io }
+      String.build do |io|
+        dump io
+      end
     end
   end
   
@@ -193,8 +198,9 @@ end
         param.dump io, indent
         io << ", " if index < @parameters.size - 1
       end
-      io << ") : "
-      @return_type.dump io, indent
+      io << ") "
+      io << ": " if @return_type
+      @return_type.try &.dump io, indent
       io << " {\n"
       @variables.each do |var|
         (indent + 1).times { io << "  " }

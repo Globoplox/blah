@@ -163,7 +163,7 @@ class Stacklang::Function
     location = node.try do |node|
       " at line #{node.line}"
     end
-    raise "#{error}. #{@unit.path}/#{@ast.name.name}#{location}."
+    raise "#{error}. #{@unit.path} in function #{@ast.name.name}#{location}."
   end
 
   # Represent a memory location as an offset to an address stored in a register or a variable.

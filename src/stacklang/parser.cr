@@ -271,12 +271,14 @@ class Stacklang::Parser < Parser
     expr
   end
 
-  def expression
+  rule def expression
     operation
   end
 
   def any_statement : Statement?
-    or ->statement_if, ->statement_while, ->statement_return, ->expression
+    #checkpoint "any statement" do 
+      or(->statement_if, ->statement_while, ->statement_return, ->expression).as(Statement?)
+    #end
   end
 
   rule def type_name
@@ -371,7 +373,7 @@ class Stacklang::Parser < Parser
     next unless whitespace
     next unless name = identifier
     
-    parameters = checkpoint do
+    parameters = checkpoint "parameters" do
       next unless char '('
       next unless params = one_or_more ->function_parameter, separated_by: ->separator
       next unless char ')'

@@ -52,7 +52,33 @@ class Stacklang::Function
     move result_register, ret_type, into: into
     ret_type
   end
+  
+  # TODO: Allow ptr comparison ?
+  # FIXME: should not compute right side if left side is falsy
+  def compile_logic_and(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any} , into : Registers | Memory, node : AST::Node): Type::Any
+    left_side_register, left_side_type = left_side
+    right_side_register, right_side_type = right_side
+    ret_type = case {left_side_type, right_side_type}
+      when {Type::Word, Type::Word} then Type::Word.new
+      else error "Cannot compare two values of types #{left_side_type} and #{right_side_type}", node: node
+    end
+    result_register = grab_register excludes: [left_side_register, right_side_register]
+    add result_register, result_register, Registers::R0
+    beq left_side_register, Registers::R0, 0x2
+    beq right_side_register, Registers::R0, 0x1
+    add result_register, right_side_register, Registers::R0
+    move result_register, Type::Word.new, into: into
+    Type::Word.new
+  end
 
+  # TODO: Allow ptr comparison ?
+  # FIXME: should not compute right side if left side is truthy
+  def compile_logic_or(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any} , into : Registers | Memory, node : AST::Node): Type::Any
+   compile_bitwise_or left_side, right_side, into, node 
+  end
+  
+  # TODO: Add long type equal ?
+  # TODO: Allow ptr comparison ?
   def compile_equal(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any} , into : Registers | Memory, node : AST::Node, neq = false): Type::Any
     left_side_register, left_side_type = left_side
     right_side_register, right_side_type = right_side
@@ -93,6 +119,7 @@ class Stacklang::Function
     movi tmp_register, 0x8000
     nand tmp_register, result_register, tmp_register
     nand tmp_register, tmp_register, tmp_register
+    raise "Comparion with OR_EQUAL do not works yet" if or_equal
     # if tmp register hold 0x8000 it is true
     # else it holds zero, it is false. Tmp register hold the result.
     # if or_equal
@@ -149,6 +176,8 @@ class Stacklang::Function
         when "+" then compile_addition left_side, right_side, into: into, node: binary
         when "-" then compile_addition left_side, right_side, into: into, node: binary, soustract: true
         when "&" then compile_bitwise_and left_side, right_side, into: into, node: binary
+        when "&&" then compile_logic_and left_side, right_side, into: into, node: binary
+        when "||" then compile_logic_or left_side, right_side, into: into, node: binary
         when "~&" then compile_bitwise_and left_side, right_side, into: into, node: binary, inv: true
         when "|" then compile_bitwise_or left_side, right_side, into: into, node: binary
         when "~|" then compile_bitwise_or left_side, right_side, into: into, node: binary, inv: true

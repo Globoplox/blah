@@ -42,6 +42,7 @@ module RiSC16::Linker
     # Set all the texts, symbols and references address
     # by ordering all "sections", then each fragment of this section
     # and adding the size of each. Raise when constraint is not possible and jump directly to offset when their are gaps
+    # TODO: dump layout in case of overflow
     text_size = objects.flat_map(&.sections).group_by(&.name).to_a.sort_by do |(name, sections)|
       predefined_section_address[name]? || Int32::MAX
     end.reduce(start) do |absolute, (name, sections)|
@@ -110,7 +111,7 @@ module RiSC16::Linker
       symbols = globals.merge section.definitions.reject { |name, symbol| symbol.exported } 
       section.text.copy_to binary[(section.offset.not_nil!)...(section.offset.not_nil! + section.text.size)]
       section.references.each do |name, references|
-        symbol = symbols[name]? || raise "Undefined reference to symbol '#{name}'"
+        symbol = symbols[name]? || raise "Undefined reference to symbol '#{name}' in section '#{section.name}'"
         references.each do |reference|
           value = symbol.address + reference.offset
           case reference.kind

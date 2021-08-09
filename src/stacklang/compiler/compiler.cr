@@ -5,13 +5,18 @@ require "../../assembler/object"
 # TODO: getting more than one path is useless.
 class Stacklang::Compiler
   @units : Hash(Path, Unit)
-
-  def initialize(paths : Array(String))
+  
+  def initialize(paths : Array(String), @debug = true)
     @units = {} of Path => Unit
     @units = paths.to_h do |path|
       absolute =  Path[path].expand home: true
       File.open absolute do |file|
-        ast = Stacklang::Parser.new(file).unit || raise "Could not parse unit '#{path}'"
+        parser = Stacklang::Parser.new(file, @debug)
+        ast = parser.unit
+        unless ast
+          parser.trace_root.try &.dump
+          raise "Could not parse unit '#{path}'"
+        end
         unit = Unit.new ast, absolute, self
         { absolute, unit }
       end
@@ -27,12 +32,17 @@ class Stacklang::Compiler
   def require(path : String, from : Unit) : Unit
     absolute = Path[path].expand home: true, base: from.path.dirname
     @units[absolute]? || begin
-       File.open absolute do |file|
-       ast = Stacklang::Parser.new(file).unit || raise "Could not parse unit '#{path}'"
-       unit = Unit.new ast, absolute, self
-       @units[absolute] = unit
-     end    
-   end
+      File.open absolute do |file|
+        parser = Stacklang::Parser.new(file, @debug)
+        ast = parser.unit
+        unless ast
+          parser.trace_root.try &.dump
+          raise "Could not parse unit '#{path}'"
+        end
+        unit = Unit.new ast, absolute, self
+        @units[absolute] = unit
+      end    
+    end
   end
     
 end
