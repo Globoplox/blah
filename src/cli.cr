@@ -105,7 +105,7 @@ module RiSC16
       end
       objects = sources_files.map do |source|
         if source.ends_with?(".sl")
-          object = Stacklang::Compiler.new([source], debug).compile.first
+          object = Stacklang::Compiler.new([source], spec, debug).compile.first
           name = source.gsub(".sl", ".ro")
           if create_intermediary
             File.open Path[(intermediary_dir || Dir.current).not_nil!, Path[name].basename], "w" do |output|

@@ -80,7 +80,7 @@ module RiSC16::Linker
     object = merge(spec, [object]) if object.merged == false
     globals = symbols_from_spec(spec)
 
-    if start != 0    
+    if start != 0 
       object.sections.each do |section|
         section.definitions.values.each do |symbol|
           symbol.address += start

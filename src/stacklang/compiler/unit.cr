@@ -2,6 +2,7 @@ require "./compiler"
 require "./types"
 require "./function"
 require "../../assembler/object"
+require "../../assembler/linker"
 
 # We compile ONLY the thing in the current unit, the requirements are for info only (globals and functions are not compiled).
 # If we need them, compile both file and link.
@@ -17,6 +18,12 @@ class Stacklang::Unit
     # for now globals are zero initialized
     def initialize(@name : String, @type_info : Type::Any, @initialization : Int32 = 0) #initialisation Int32 is a placeholder
       @symbol = "__global_#{name}"
+    end
+
+    def initialize(@symbol : String)
+      @name = @symbol
+      @type_info = Type::Word.new
+      @initialization = 0
     end
   end
   
@@ -116,6 +123,10 @@ class Stacklang::Unit
       end.transform_values do |globals|
 	raise "Name clash for global '#{globals.first.name}'" if globals.size >	1
         globals.first
+      end
+    end.tap do |globals|
+      RiSC16::Linker.symbols_from_spec(@compiler.spec).each do |(name, _)|
+        globals.not_nil![name] = Global.new symbol: name
       end
     end
   end

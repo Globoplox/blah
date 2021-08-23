@@ -101,6 +101,7 @@ module RiSC16
       when ISA::Sw
         address = add reg_b, @instruction.immediate
         if address.in? @ram_range
+          
           ram[address - @ram_range.begin] = reg_a
         elsif address.in? @io_range
           @io[address - @io_range.begin].write reg_a

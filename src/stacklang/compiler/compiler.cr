@@ -1,12 +1,14 @@
 require "./unit"
 require "../parser"
 require "../../assembler/object"
+require "../../spec"
 
 # TODO: getting more than one path is useless.
 class Stacklang::Compiler
   @units : Hash(Path, Unit)
+  getter spec
   
-  def initialize(paths : Array(String), @debug = true)
+  def initialize(paths : Array(String), @spec : RiSC16::Spec, @debug = true)
     @units = {} of Path => Unit
     @units = paths.to_h do |path|
       absolute =  Path[path].expand home: true

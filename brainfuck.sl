@@ -18,7 +18,7 @@ var ram: [0x9000]
 fun main:_ {
   var pc = 0
   var ptr = 0
-  var program_size = load_io(tty, &program, 0x1000) // TODO: make sizeof work with vars ?
+  var program_size = load_io(&__io_brainfuck_a, &program, 0x1000) // TODO: make sizeof work with vars ?
   var loop_count = 0
 
   while (1) {
@@ -38,10 +38,10 @@ fun main:_ {
       ram[ptr] -= 1
       
     if (program[pc] == 0x2E)
-      *tty = ram[ptr]
+      __io_tty_a = ram[ptr]
       
     if (program[pc] == 0x2C)
-      ram[ptr] = *tty
+      ram[ptr] = __io_tty_a
 
     if (program[pc] == 0x5B) {
       if (ram[ptr] == 0) {

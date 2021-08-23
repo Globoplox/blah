@@ -16,7 +16,6 @@ jalr r6 r6 0x0 # call main
 
 halt
 
-export __global_tty: .word :__io_tty_a
 export __global_null: nop
 export __global_hex_digits:
                      .word 0x30
