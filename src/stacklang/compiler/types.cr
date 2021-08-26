@@ -78,7 +78,7 @@ module Stacklang
     end
 
     def ==(other : Type::Any)
-      other.is_a?(Pointer) && other.pointer_of == @table_of
+      other.is_a?(Table) && other.table_of == @table_of && other.quantity == @quantity
     end
   end
   
