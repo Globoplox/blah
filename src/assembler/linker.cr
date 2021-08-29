@@ -12,8 +12,13 @@ module RiSC16::Linker
     spec.io.each do |io|
       absolute = (spec.io_start + io.index).to_i32
       relative = - (UInt16::MAX.to_i32 - absolute + 1)
-      predefined_symbols["__io_#{io.name}_a"] = Object::Section::Symbol.new absolute, false
+      predefined_symbols["__io_#{io.name}"] = Object::Section::Symbol.new absolute, false
       predefined_symbols["__io_#{io.name}_r"] = Object::Section::Symbol.new relative, false
+    end
+    spec.sections.each do |section|
+      symbol = Object::Section::Symbol.new 0, false
+      section.definitions.push symbol
+      predefined_symbols["__section_#{section.name}"] = symbol
     end
     predefined_symbols
   end

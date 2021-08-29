@@ -104,13 +104,26 @@ by future calls.
   - [x] Basic math in offset
   - [x] Predefined symbols (stack, io)
   - [x] Relocatable object file and static linking
+  - [ ] Better error output for linker
+  - [ ] Generate symbol for sections
+  - [ ] Allow to partition the address space between rom, ram and IOs 
 - [x] Write a dummy virtual machine that can execute this raw bitcode
-  - [x] IO (but meh)
+  - [x] IO
   - [x] Hello World
-- [X] Design and write a compiler for a small stack language
+- [x] Design and write a compiler for a small stack language
+  - [x] Write a program that do something (Brainfuck interpreter)
+  - [ ] Fix line/char hints
+  - [ ] Fix big move immediate overflow
+  - [ ] Fix or don't fix undefined behavior due to cached var
+  - [ ] Cache field of struct var
+  - [ ] Optimize for size
   - [ ] Minimal standard library
+  - [ ] Fix or_equal comparison
+  - [ ] Cast
+  - [ ] In file prototypes
+  - [ ] Flag for trimming unused functions (need a call graph beforehand)
 - [ ] Write an OS
-  - [ ] Load another program
   - [ ] Relocate and load another program
+  - [ ] Run multiple programs
   - [ ] Handle syscalls and barebone scheduler 
   - [ ] Memory management

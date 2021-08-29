@@ -1,0 +1,20 @@
+STACKLANG FEATURE:
+- cast
+- prototypes blocks (extern var ?)
+
+OPTIMIZATION:
+Why into is almost always within the used registers ?
+- The root into is generally a var or a register grabbed as operand
+-- select better left/right registers
+-- grab priorize should works also if setting value of a cached var (memory with a within var)
+if/while block cause flush, could be easely optimized
+
+
+
+Fix logic and/or to avoid executing useless code
+Make operators handle more types
+Fix comparator OR_EQUALS
+
+Error handling in linker that dump info in case of conflict / overflow
+
+Wrap error instead of raisinf str everywhere
