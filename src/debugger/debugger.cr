@@ -28,7 +28,7 @@ module RiSC16
     @references : Hash(UInt16, String)
 
     def initialize(io, @spec, @object = nil)
-      @vm = VM.from_spec(@spec, io_override: {"tty" => VM::MMIO.new(@input, @output)}).tap &.load io
+      @vm = VM.from_spec(@spec, io_override: {"tty" => {@input, @output} }).tap &.load io
       @references = {} of UInt16 => String
       @object.try do |object|
         object.sections.each &.references.each do |(name, locations)|
@@ -89,10 +89,10 @@ module RiSC16
           x: 0, y: 0,
           height: NCurses.maxy, width: NCurses.maxx // 2,
           columns: [8, 3, 20, rem], title: "CODE",
-          range: (0..((@spec.ram_start + @spec.ram_size).to_i))
+          range: (0..((UInt16::MAX).to_i))
         ) do |address|
           labels = "" # (@locs[address]?.try(&.map &.label).try &.compact.join ", ") || " "
-          dis = disassemble @vm.ram[address], address
+          dis = disassemble @vm.read(address.to_u16), address
           dis = dis.ljust rem - 2
           symbol = @definitions[address]?
           kind = symbol.try &.[1] || ' '
@@ -120,8 +120,8 @@ module RiSC16
         
         windows << Table.new(
           x: (NCurses.maxx / 6 * 4).ceil, y: 0, height: (NCurses.maxy / 2).floor, width: NCurses.maxx // 3,
-          columns: [3, 30], range: ((@spec.ram_start.to_i)..(@spec.stack_start.to_i)), title: "STACK") do |address|
-          [(address == @vm.registers[7] ? ">" : " "),"0x#{address.to_u16.to_w}: 0x#{@vm.ram[address].to_w}"]
+          columns: [3, 30], range: ((0)..(Int32::MAX)), title: "STACK") do |address|
+          [(address == @vm.registers[7] ? ">" : " "),"0x#{address.to_u16.to_w}: 0x#{@vm.read(address.to_u16).to_w}"]
         end.tap(&.scroll_end)
         
         windows << CustomWindow.new x: (NCurses.maxx / 2).ceil, y: (NCurses.maxy / 2).floor, height: (NCurses.maxy / 2).ceil, width: NCurses.maxx // 2, title: "TTY" do |window|

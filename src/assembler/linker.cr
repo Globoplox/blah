@@ -8,16 +8,16 @@ module RiSC16::Linker
   
   def symbols_from_spec(spec)
     predefined_symbols = {} of String => Object::Section::Symbol
-    predefined_symbols["__stack"] = Object::Section::Symbol.new spec.stack_start.to_i32, false
-    spec.io.each do |io|
-      absolute = (spec.io_start + io.index).to_i32
-      relative = - (UInt16::MAX.to_i32 - absolute + 1)
-      predefined_symbols["__io_#{io.name}"] = Object::Section::Symbol.new absolute, false
-      predefined_symbols["__io_#{io.name}_r"] = Object::Section::Symbol.new relative, false
+    spec.segments.each do |segment|
+      absolute = segment.start.to_i32
+      if segment.is_a? RiSC16::Spec::Segment::IO
+        predefined_symbols["__io_#{segment.name}"] = Object::Section::Symbol.new absolute, false
+      else
+        predefined_symbols["__segment_#{segment.name}"] = Object::Section::Symbol.new absolute, false
+      end
     end
     spec.sections.each do |section|
       symbol = Object::Section::Symbol.new 0, false
-      section.definitions.push symbol
       predefined_symbols["__section_#{section.name}"] = symbol
     end
     predefined_symbols
@@ -107,7 +107,6 @@ module RiSC16::Linker
     end
     text_size = max.offset.not_nil! + max.text.size
 
-    raise "Binary does not fit in ram: #{text_size} words overlfow #{spec.ram_size}" if text_size > spec.ram_size
     binary = Slice(UInt16).new text_size
     
     # perform references replacement

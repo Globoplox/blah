@@ -161,6 +161,7 @@ module RiSC16
     end
   rescue error
     puts error.message
+    raise error
   end
   end
 end

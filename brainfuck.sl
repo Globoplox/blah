@@ -13,7 +13,7 @@ fun load_io(io:*, destination:*, size):_ {
 }
 
 var program: [0x1000]
-var ram: [0x9000]
+var ram: [0x1000]
 
 fun main:_ {
   var pc = 0
