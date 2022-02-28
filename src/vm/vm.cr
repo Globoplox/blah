@@ -121,7 +121,7 @@ class RiSC16::VM
   @instruction : Instruction
 
   # Build a VM from a specfile. Allow override of IO for easier debugging.
-  # TODO rework bcs it's ugly    
+  # TODO rework bcs it's ugly
   def self.from_spec(spec, io_override = {} of String => {IO, IO})
     segments = [] of Addressable
     default = Addressable::Default.new 

@@ -55,7 +55,7 @@ module RiSC16
         instruction |= ((@reg_a & 0b111) << 10) | ((@reg_b & 0b111) << 7) | (@immediate & 0b1111111)
       when ISA::Lui
         raise "Immediate overflow #{@immediate.to_s base: 16} for #{@opcode}" if @immediate > ~(~0 << 10)
-        instruction |= ((@reg_a & 0b111) << 10) | (@immediate & 0b_11_1111_1111)
+        instruction |= ((@reg_a & 0b111) << 10) | (@immediate & 0b11_1111_1111)
       end
       instruction
     end

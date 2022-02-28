@@ -136,6 +136,7 @@ module RiSC16
 
       if !intermediary_only || also_run
         merged_object = Linker.merge(spec, objects)
+        Log.warn &.emit "Linking into a binary without 'start' symbol" unless merged_object.has_start?
         binary = IO::Memory.new
         Linker.static_link spec, merged_object, binary
         

@@ -120,7 +120,7 @@ module RiSC16
         
         windows << Table.new(
           x: (NCurses.maxx / 6 * 4).ceil, y: 0, height: (NCurses.maxy / 2).floor, width: NCurses.maxx // 3,
-          columns: [3, 30], range: ((0)..(Int32::MAX)), title: "STACK") do |address|
+          columns: [3, 30], range: ((0)..(UInt16::MAX.to_i)), title: "STACK") do |address|
           [(address == @vm.registers[7] ? ">" : " "),"0x#{address.to_u16.to_w}: 0x#{@vm.read(address.to_u16).to_w}"]
         end.tap(&.scroll_end)
         

@@ -10,6 +10,14 @@ class RiSC16::Object
     @merged = false
   end
 
+  # return true is this object define a start symbol in a text section.
+  # This is useful to check if this is supposed to be executable.
+  def has_start?
+    sections.any? do |section|
+      section.name == "text" && section.definitions["start"]?.try &.exported
+    end
+  end
+
   # A section is a continuous block of code with it's symbols definitions and references.
   #
   # The block of code is not usable as is, it require to be linked to solve the references.

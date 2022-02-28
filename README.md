@@ -110,6 +110,8 @@ by future calls.
 - [x] Write a dummy virtual machine that can execute this raw bitcode
   - [x] IO
   - [x] Hello World
+  - [ ] Core dump
+  - [ ] Stack trace
 - [x] Design and write a compiler for a small stack language
   - [x] Write a program that do something (Brainfuck interpreter)
   - [ ] Fix line/char hints
