@@ -2,3 +2,4 @@
 // File should not be compiled ! It is meant to be required only.
 var null:*
 var hex_digits
+fun multiply(a,b):_ {}

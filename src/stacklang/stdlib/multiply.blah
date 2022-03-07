@@ -1,0 +1,20 @@
+# Stacklang ABI abiding multiplication between two UNSIGNED words.
+# Overflow is undefied behavior.
+export __function_multiply:
+add r1 r0 r0       # result = 0
+addi r2 r0 1       # shift_counter = 1
+lw r3 r7 -4        # first_param
+lw r4 r7 -3        # second_param
+loop:              # do
+nand r5 r2 r4      # # We compute bitwise AND(A, B) as NAND(NAND(A,B), NAND(A,B))
+nand r5 r5 r5      #
+beq r5 r0 :skip    # if (shift_counter & second_param) {  
+add r1 r1 r3       #   result += first_param
+skip:              # }
+add r2 r2 r2       # shift = shift * 2
+add r3 r3 r3       # first_param = first_param
+beq r2 r0 :return  # while (shift != 0) # AKA until overflow
+beq r0 r0 :loop    #
+return:            # return result
+sw r1 r7 -1
+jalr r6 r6 0

@@ -140,6 +140,7 @@ class Stacklang::Function
     call_name = case binary.name
     when "<<" then "left_bitshift"
     when ">>" then "right_bitshift"
+    when "*" then "multiply"
     else error "Usupported binary operator '#{binary.name}'", node: binary
     end
     call = AST::Call.new(AST::Identifier.new(call_name), [binary.left, binary.right])

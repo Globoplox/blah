@@ -112,7 +112,7 @@ class Stacklang::Function
   #  | param1               |
   #  +----------------------+
   #  | param2               |
-  #  +----------------------+ <- Used internaly to store return value
+  #  +----------------------+ <- Used internaly to store return address
   #  | reserved (always)    |
   #  +----------------------+ 
   #  | return value         |
