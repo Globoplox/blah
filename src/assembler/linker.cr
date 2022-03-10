@@ -23,8 +23,9 @@ module RiSC16::Linker
     end
     predefined_symbols
   end
-
+  
   # Link several objects into a single object, with all blocks offset set.
+  # Suitable to build librairies (static or dynamic).
   def merge(spec : Spec, objects : Array(RiSC16::Object)) : RiSC16::Object
     start = 0
     predefined_section_size = {} of String => UInt32
@@ -52,7 +53,8 @@ module RiSC16::Linker
     text_size = objects.flat_map(&.sections).group_by(&.name).to_a.sort_by do |(name, sections)|
       predefined_section_address[name]? || Int32::MAX
     end.reduce(start) do |absolute, (name, sections)|
-      base = predefined_section_address[name]?.try &.to_i32 || absolute
+      fixed = predefined_section_address[name]?.try &.to_i32
+      base = fixed || absolute
       raise "Section #{name} cannot overwrite at offset #{base}, there are already data up to #{absolute}" if base < absolute
       sections.sort_by { |section| section.offset || Int32::MAX }.reduce(base) do |absolute, section|
         if (section.offset || Int32::MAX) < absolute
@@ -77,11 +79,11 @@ module RiSC16::Linker
       objects.each &.sections.each do |section|
         object.sections << section
       end
-      object.merged = true
+      object.merged = true # indicate that the object is valid and has offset. that's all.
     end
   end
 
-  # Static link binary
+  # Static link binary.
   def static_link(spec, object, io, start : Int32 = 0)
     object = merge(spec, [object]) if object.merged == false
     globals = symbols_from_spec(spec)

@@ -119,7 +119,8 @@ class RiSC16::Spec
       {
         "hardware.segment.ram" => {"kind" => "ram", "start" => 0x0.to_s, "size" => 0xfffe.to_s},
         "hardware.segment.tty" => {"kind" => "io", "tty" => "true", "start" => 0xffff.to_s},
-        "linker.section.text" => { "start" => "0" }
+        "linker.section.text" => { "start" => "0" },
+        "linker.section.stack" => { "start" => "0xff00", "size" => "0x00ff" },
       }, {} of String => String)
   end
 

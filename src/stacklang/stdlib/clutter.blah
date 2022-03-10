@@ -1,0 +1,2 @@
+section __clutter
+.ascii "Hey this some useless clutter I put in the stdlib to test DCE"
