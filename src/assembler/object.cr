@@ -29,8 +29,15 @@ class RiSC16::Object
     property text : Slice(UInt16) = Slice(UInt16).empty
     property definitions : Hash(String, Symbol) = {} of String => Symbol
     property references : Hash(String, Array(Reference)) = {} of String => Array(Reference)
+    property options : Options
+    
+    @[Flags]
+    enum Options
+      Weak # The section fragments might be ignored in static binary if there are no references to any of its exported symbols.
+           # This option can differ from section fragment to section fragment. It is usefull only when building a static binary.
+    end
 
-    def initialize(@name, @offset = nil) end
+    def initialize(@name, @offset = nil, @options = Options::None) end
 
     # Represent a symbol defined by a section.
     # It can be static to the section or global depending on `#exported`.
@@ -80,6 +87,7 @@ class RiSC16::Object
     @sections.each do |section|
       section.name.to_slice.size.to_io io, endian
       io.write section.name.to_slice
+      section.options.value.to_io io, endian
       (section.offset.nil? ? 0u8 : 1u8).to_io io, endian
       (section.offset || 0).to_io io, endian
       section.definitions.size.to_io io, endian
@@ -112,6 +120,7 @@ class RiSC16::Object
     (Int32.from_io io, endian).times do
       section = Section.new io.read_string (Int32.from_io io, endian)
       object.sections << section
+      section.options = Section::Options.from_value Int32.from_io io, endian
       has_offset = io.read_byte
       section.offset = Int32.from_io io, endian
       section.offset = nil if has_offset == 0

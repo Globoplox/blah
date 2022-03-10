@@ -41,7 +41,8 @@ module RiSC16::Assembler::AST
   class Section < Node
     property name : String
     property offset : Int32?
-    def initialize(@name, @offset = nil) end
+    property weak : Bool
+    def initialize(@name, @offset = nil, @weak = false) end
   end
   
   class Unit < Node

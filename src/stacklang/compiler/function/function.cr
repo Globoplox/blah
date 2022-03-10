@@ -155,7 +155,8 @@ class Stacklang::Function
       Prototype::Parameter.new parameter.name, parameter.constraint, parameter.offset - @frame_size
     end), @return_type, @return_value_offset.try &.to_i32.-(@frame_size)
     
-    @section = RiSC16::Object::Section.new @symbol
+    @section = RiSC16::Object::Section.new @symbol, options: RiSC16::Object::Section::Options::Weak # all functions sections are weak,
+    # so dce can remove unused functions when building an executable binary.
     @section.definitions[@symbol] = Object::Section::Symbol.new 0, true
   end
 

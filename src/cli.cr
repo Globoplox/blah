@@ -4,6 +4,7 @@ require "./assembler/parser"
 require "./assembler/assembler"
 require "./assembler/linker"
 require "./assembler/lib"
+require "./assembler/dce"
 require "./vm"
 require "./stacklang/compiler"
 require "./debugger"
@@ -25,6 +26,7 @@ module RiSC16
     make_lib = false
     target_file = "a.out"
     target_specified = false
+    no_dce = false
     
     OptionParser.parse do |parser|
       parser.banner = "Usage: blah [command] [options] input_file"
@@ -71,6 +73,7 @@ module RiSC16
       parser.on("-i", "--intermediary-only", "Do not build exectuable.") { intermediary_only = true }
       parser.on("-r", "--also-run", "Run the created executable.") { also_run = true }
       parser.on("-l", "--make-lib", "Make a library instead of running.") { make_lib = true }
+      parser.on("--no-dce", "Disable dead code elimination when compiling an executable binary.") { no_dce = true }
 
       parser.unknown_args do |filenames, parameters|
         sources_files = filenames
@@ -153,6 +156,7 @@ module RiSC16
           Lib.new(objects).to_io sink
         end
       elsif !intermediary_only || also_run
+        Dce.optimize objects unless no_dce
         merged_object = Linker.merge(spec, objects)
         
         Log.warn &.emit "Linking into a binary without 'start' symbol" unless merged_object.has_start?

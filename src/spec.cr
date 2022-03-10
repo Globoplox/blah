@@ -4,15 +4,17 @@ require "log"
 
 class RiSC16::Spec
   @properties : Hash(String, Hash(String, String))
-  @sections : Array(Section)? = nil
-  @segments : Array(Segment)? = nil
+  @sections : Array(Section)?
+  @segments : Array(Segment)?
   @macros : Hash(String, String)
 
   class Section
     property name : String
-    property base_address : UInt32? = nil
-    property max_size : UInt32? = nil
-    def initialize(@name, @base_address, @max_size) end
+    property base_address : UInt32?
+    property max_size : UInt32?
+    property options : Object::Section::Options
+    
+    def initialize(@name, @base_address, @max_size, @options = Object::Section::Options::None) end
   end
 
   abstract class Segment

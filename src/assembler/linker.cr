@@ -25,7 +25,6 @@ module RiSC16::Linker
   end
   
   # Link several objects into a single object, with all blocks offset set.
-  # Suitable to build librairies (static or dynamic).
   def merge(spec : Spec, objects : Array(RiSC16::Object)) : RiSC16::Object
     start = 0
     predefined_section_size = {} of String => UInt32
@@ -83,7 +82,10 @@ module RiSC16::Linker
     end
   end
 
-  # Static link binary.
+  # Static link an object into a binary blob, expected to be loaded at a given lovation (default to 0).
+  # It performs the final sybomls/value substitution.
+  # This is the piece of code that would be necessary to bootstrap to be able to
+  # dynamically load programs from another program (this would also work for loading dynamic libraries).
   def static_link(spec, object, io, start : Int32 = 0)
     object = merge(spec, [object]) if object.merged == false
     globals = symbols_from_spec(spec)
@@ -110,7 +112,7 @@ module RiSC16::Linker
     end
     text_size = max.offset.not_nil! + max.text.size
 
-    binary = Slice(UInt16).new text_size
+    binary = Slice(UInt16).new text_size # should we actually start at *start* ?
     
     # perform references replacement
     # write to file

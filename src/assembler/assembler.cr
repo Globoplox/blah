@@ -35,7 +35,9 @@ module RiSC16::Assembler
       statement.section.try do |section|
         current_section.text = Slice.new text.size do |i| text[i] end
         text.clear
-        current_section = Object::Section.new section.name, section.offset
+        options = Object::Section::Options::None
+        options |= Object::Section::Options::Weak if section.weak
+        current_section = Object::Section.new section.name, section.offset, options
         object.sections << current_section
       end
 

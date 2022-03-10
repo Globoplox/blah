@@ -90,6 +90,8 @@ class RiSC16::Assembler::Parser < Parser
   rule def section_specifier
     next unless str "section"
     next unless whitespace
+    weak = str "weak"
+    next unless whitespace if weak
     next unless name = one_or_more ->{ char ['0'..'9', '_'..'_', 'a'..'z', 'A'..'Z'] }
     whitespace
     offset = checkpoint do
@@ -97,7 +99,12 @@ class RiSC16::Assembler::Parser < Parser
       whitespace
       number
     end
-    Section.new name.join, offset 
+    if weak
+      weak = true
+    else
+      weak = false
+    end
+    Section.new name.join, offset, weak: weak  
   end
   
   rule def unit(name = nil)
