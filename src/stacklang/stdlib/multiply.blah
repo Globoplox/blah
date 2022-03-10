@@ -1,5 +1,4 @@
-section __function_multiply
-export __function_multiply:
+section weak __function_multiply export __function_multiply:
 sw r6 r7 -2
 add r1 r0 r0      
 addi r2 r0 1      

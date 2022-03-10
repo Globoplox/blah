@@ -17,21 +17,5 @@ jalr r6 r6 0x0 # call main
 
 halt
 
-export __global_null: nop
-export __global_hex_digits:
-                     .word 0x30
-                     .word 0x31
-                     .word 0x32
-                     .word 0x33
-                     .word 0x34
-                     .word 0x35
-                     .word 0x36
-                     .word 0x37
-                     .word 0x38
-                     .word 0x39
-                     .word 0x61
-                     .word 0x62
-                     .word 0x63
-                     .word 0x64
-                     .word 0x65
-                     .word 0x66
+export __global_null: nop # that is ugly. Could use symbol with an absolute value. a kind of compiler level macro.
+export __global_hex_digits: .ascii "0123456789abcdef"
