@@ -31,27 +31,31 @@ module RiSC16
       @vm = VM.from_spec(@spec, io_override: {"tty" => {@input, @output} }).tap &.load io
       @references = {} of UInt16 => String
       @object.try do |object|
-        object.sections.each &.references.each do |(name, locations)|
-          locations.each do |location|
-            @references[location.address] = name
+        object.sections.each do |section|
+          section.references.each do |(name, locations)|
+            locations.each do |location|
+              @references[location.address + section.absolute.not_nil!] = name # assuming we are debugging a binary loaded at 0
+            end
           end
         end
       end  
       @definitions = @object.try do |object|
-        object.sections.flat_map(&.definitions.to_a).to_h do |(name, symbol)|
-          char = 's'
-          if name.starts_with? "__function_"
-            char = 'f'
-            name = name.gsub("__function_", "")
-          elsif name.starts_with? "__global_"
-            char = 'g'
-            name = name.gsub("__global_", "")
+        object.sections.flat_map do |section|
+          section.definitions.to_a.map do |(name, symbol)|
+            char = 's'
+            if name.starts_with? "__function_"
+              char = 'f'
+              name = name.gsub("__function_", "")
+            elsif name.starts_with? "__global_"
+              char = 'g'
+              name = name.gsub("__global_", "")
+            end
+            if symbol.exported
+              char = char.upcase
+            end
+            {(symbol.address + section.absolute.not_nil!).to_u16, {name, char} }
           end
-          if symbol.exported
-            char = char.upcase
-          end
-          {symbol.address.to_u16, {name, char} }
-        end
+        end.to_h
       end || {} of UInt16 => {String, Char}
     end
 
@@ -60,7 +64,7 @@ module RiSC16
       imm_repr = @references[address]? || "0x#{i.immediate.to_w}"
       case i.opcode
       in ISA::Add, ISA::Nand
-        if i.opcode.add? && i.reg_a == 0 && i.reg_b == 0 && i.reg_c == 0
+        if i == 0u16
           "nop"
         else
           "#{i.opcode} r#{i.reg_a} r#{i.reg_b} r#{i.reg_c}"
@@ -84,15 +88,16 @@ module RiSC16
         window_cursor = 0
         windows = [] of Window
 
-        rem = (NCurses.maxx // 2) - (8 + 3 + 20 + 3 + 2)
+        rem = (NCurses.maxx // 2) - (8 + 3 + 20 + 3 + 2 + 8)
         code = Table.new(
           x: 0, y: 0,
           height: NCurses.maxy, width: NCurses.maxx // 2,
-          columns: [8, 3, 20, rem], title: "CODE",
+          columns: [8, 3, 20, 8, rem], title: "CODE",
           range: (0..((UInt16::MAX).to_i))
         ) do |address|
           labels = "" # (@locs[address]?.try(&.map &.label).try &.compact.join ", ") || " "
-          dis = disassemble @vm.read(address.to_u16), address
+          word = @vm.read address.to_u16
+          dis = disassemble word, address
           dis = dis.ljust rem - 2
           symbol = @definitions[address]?
           kind = symbol.try &.[1] || ' '
@@ -104,7 +109,7 @@ module RiSC16
           when {true, _}  then "@"
           else "#{kind}"
           end
-          ["0x#{address.to_u16.to_w}", cursor, symbol,  dis]
+          ["0x#{address.to_u16.to_w}", cursor, symbol,  "0x#{word.to_s(base: 16)}", dis]
         end
         windows << code
 

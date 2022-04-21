@@ -9,5 +9,7 @@ section mbr+0x0 export start:
 		addi r2 r2 1
 		beq r0 r0 :load
 	loaded:
-		sw r2 r0 :__section_text_metadata+0x0
+		movi r1 :__section_text_metadata
+		sw r2 r1 0x0
+		lw r6 r1 0x0
 		beq r0 r0 :__section_text

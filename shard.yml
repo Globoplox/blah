@@ -2,7 +2,7 @@ name: blah
 version: 0.1.0
 
 authors:
-  - your-name-here <your-email-here>
+  - Globoplox <globoplox@gmail.com>
 
 dependencies:
   ncurses:
@@ -12,6 +12,6 @@ targets:
   blah:
     main: src/blah.cr
 
-crystal: 0.35.1
+crystal: 1.3.2
 
 license: MIT

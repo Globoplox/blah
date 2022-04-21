@@ -16,11 +16,11 @@ class RiSC16::Object
     @merged = false
   end
 
-  # return true is this object define a start symbol in a text section.
+  # return true is this object define a start symbol in a section.
   # This is useful to check if this is supposed to be executable.
   def has_start?
     sections.any? do |section|
-      section.name == "text" && section.definitions["start"]?.try &.exported
+      section.definitions["start"]?.try &.exported
     end
   end
 
@@ -28,8 +28,9 @@ class RiSC16::Object
   #
   # The block of code is not usable as is, it require to be linked to solve the references.
   # All the address are relative to the start of the block of code
-  # It has an optional offset within a namespace where it expect to be loaded
-  # When ready for merging, a section should have an absolute expected loading address.
+  # It has an optional offset within a namespace where it expect to be loaded.
+  # When ready for merging, a section should have an absolute, expected loading address (relative to address 0).
+  # This allows the linker to quickly adjust the symbols addresses given the real loading address.
   class	Section
     property name : String
     property offset : Int32? = nil

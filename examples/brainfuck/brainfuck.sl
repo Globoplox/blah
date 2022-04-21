@@ -1,4 +1,4 @@
-require "stdlib/prototypes.sl"
+require "../../stdlib/prototypes.sl"
 
 fun load_io(io:*, destination:*, size):_ {
   var i = 0
@@ -20,6 +20,9 @@ fun main:_ {
   var ptr = 0
   var program_size = load_io(&__io_brainfuck, &program, 0x1000) // TODO: make sizeof work with vars ?
   var loop_count = 0
+
+  if (program_size == 0x10)
+     return 1
 
   while (1) {
     if (pc == program_size)
