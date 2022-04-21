@@ -24,7 +24,9 @@ module RiSC16::Linker
     predefined_symbols
   end
   
-  # Link several objects into a single object, with all blocks offset set.
+  # Link several objects into a single object.
+  # It set the `absolute` field of section, which mean
+  # Attributing them an absolute location, assuming a loading location of 0.
   def merge(spec : Spec, objects : Array(RiSC16::Object)) : RiSC16::Object
     start = 0
     predefined_section_size = {} of String => UInt32
@@ -49,31 +51,26 @@ module RiSC16::Linker
     # by ordering all "sections", then each fragment of this section
     # and adding the size of each. Raise when constraint is not possible and jump directly to offset when their are gaps
     # TODO: dump layout in case of overflow
+    # TODO: otpimize size by compacting ?
+    # Since we don't overwrite offsets or address, it is now possible to re-merge objects.
     text_size = objects.flat_map(&.sections).group_by(&.name).to_a.sort_by do |(name, sections)|
       predefined_section_address[name]? || Int32::MAX
     end.reduce(start) do |absolute, (name, sections)|
       fixed = predefined_section_address[name]?.try &.to_i32
       base = fixed || absolute
-      pp "section name: #{name}, current address: #{absolute}"
       raise "Section #{name} cannot overwrite at offset #{base}, there are already data up to #{absolute}" if base < absolute
+      # `base` is an absolute address of where we want to start writing the blocks for the current section
       sections.sort_by { |section| section.offset || Int32::MAX }.reduce(base) do |absolute, section|
-        # I did nosense here. Offset as written in code are relative to section start.
-        # The offset should be relative to the base.
-        # AKA: absolute is base + offset if any.
-        # Issue should be raised if base + offset < absolute
-        # TODO: fix it. I'm tired I wont do it rn
-        if (section.offset || Int32::MAX) < absolute
-          pp objects
-          raise "Block offset conflict in section #{name}, cannot overwrite at offset #{section.offset}, there are already data up to #{absolute}"
+        # `absolute`: is an absolute address of where we CAN begin writing stuff.
+        # `section.offset`, is an offset to `base` were we WANT to begin writing stuff.
+        if base + (section.offset || UInt16::MAX) < absolute
+          raise "Block offset conflict in section #{name}, cannot overwrite at #{base} + #{section.offset}, there are already data up to #{absolute}"
+        elsif section.offset
+          absolute = base + (section.offset || 0)
         end
-        section.offset ||= absolute
-        section.definitions.values.each do |symbol|
-          symbol.address = symbol.address + section.offset.not_nil!
-        end
-        section.references.values.each &.each do |ref|
-          ref.address = (ref.address.to_i32 + section.offset.not_nil!).to_u16
-        end
-        section.offset.not_nil! + section.text.size
+        section.absolute = absolute
+        # We do not replace the address, they stay relative to the start of the code block.
+        absolute + section.text.size
       end.tap do |at_end|
         size = at_end - base
         max = predefined_section_size[name]? || Int32::MAX
@@ -90,73 +87,88 @@ module RiSC16::Linker
   end
 
   # Static link an object into a binary blob, expected to be loaded at a given lovation (default to 0).
-  # It performs the final sybomls/value substitution.
+  # It performs the final symbols/value substitution.
   # This is the piece of code that would be necessary to bootstrap to be able to
   # dynamically load programs from another program (this would also work for loading dynamic libraries).
   def static_link(spec, object, io, start : Int32 = 0)
     object = merge(spec, [object]) if object.merged == false
-    globals = symbols_from_spec(spec)
+    globals = symbols_from_spec(spec).transform_values do |symbol|
+      Tuple(Object::Section::Symbol, Object::Section?).new symbol, nil
+    end
+    # TODO:
+    # Couldnt we generate a section for those globals so they are stored within the object file after mergeing ?
+    # That would also allow to check for conflict. Less work for bootstraping to.
+    # TODO: store max_size ? so we don't need to recompute it.
 
-    if start != 0 
-      object.sections.each do |section|
-        section.definitions.values.each do |symbol|
-          symbol.address += start
-        end
-        section.references.values.each &.each do |ref|
-          ref.address = (ref.address.to_i32 + start).to_u16
-        end
-        section.offset = section.offset.not_nil! + start
+    # if start != 0 
+    #   object.sections.each do |section|
+    #     section.definitions.values.each do |symbol|
+    #       symbol.address += start
+    #     end
+    #     section.references.values.each &.each do |ref|
+    #       ref.address = (ref.address.to_i32 + start).to_u16
+    #     end
+    #     section.offset = section.offset.not_nil! + start
+    #   end
+    # end
+
+    object.sections.each do |section|
+      section.definitions.each do |(name, symbol)|
+        next unless symbol.exported
+        globals[name] = {symbol, section}
       end
     end
 
-    object.sections.each &.definitions.each do |(name, symbol)|
-      next unless symbol.exported
-      globals[name] = symbol
-    end
-
     max = object.sections.max_by do |section|
-      section.offset.not_nil! + section.text.size
+      section.absolute.not_nil! + section.text.size
     end
-    text_size = max.offset.not_nil! + max.text.size
+    text_size = max.absolute.not_nil! + max.text.size
 
     binary = Slice(UInt16).new text_size # should we actually start at *start* ?
     
     # perform references replacement
     # write to file
     object.sections.each do |section|
-      symbols = globals.merge section.definitions.reject { |name, symbol| symbol.exported } 
-      section.text.copy_to binary[(section.offset.not_nil!)...(section.offset.not_nil! + section.text.size)]
+      
+      symbols = globals.merge section.definitions.reject { |name, symbol| symbol.exported }.transform_values { |definition|
+        {definition, section}
+      }
+      
+      block_location = section.absolute.not_nil! + start
+      section.text.copy_to binary[block_location...(block_location + section.text.size)]
       section.references.each do |name, references|
-        symbol = symbols[name]? || raise "Undefined reference to symbol '#{name}' in section '#{section.name}'"
+        symbol, symbol_section = symbols[name]? || raise "Undefined reference to symbol '#{name}' in section '#{section.name}'"
         references.each do |reference|
-          value = symbol.address + reference.offset
+          value = start + symbol.address + (symbol_section.try(&.absolute) || 0) + reference.offset
+          reference_address = start + section.absolute.not_nil! + reference.address
+
           case reference.kind
             in Object::Section::Reference::Kind::Data
               if value > 0b1111_1111_1111_1111 || value < - 0b1111_1111_1111_1111
                 raise "Reference to #{name} = #{value} overflow from allowed 16 bits for symbol of type #{reference.kind}"
               end
-              binary[reference.address] = (value < 0 ? (2 ** 16) + value.bits(0...(16 - 1)) : value).to_u16
+              binary[reference_address] = (value < 0 ? (2 ** 16) + value.bits(0...(16 - 1)) : value).to_u16
             in Object::Section::Reference::Kind::Imm
               if value > 0b0011_1111 || value < - 0b0111_1111
                 raise "Reference to #{name} = #{value} overflow from allowed 7 bits for symbol of type #{reference.kind}"
               end
-              binary[reference.address] = binary[reference.address] & ~0b0111_1111 | (value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16
+              binary[reference_address] = binary[reference_address] & ~0b0111_1111 | (value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16
             in Object::Section::Reference::Kind::Lui
               if value > 0b1111_1111_1111_1111 || value < - 0b1111_1111_1111_1111
                 raise "Reference to #{name} = #{value} overflow from allowed 16 bits for symbol of type #{reference.kind}"
               end
-              binary[reference.address] = binary[reference.address] & ~0b11_1111_1111 | ((value < 0 ? (2 ** 16) + value.bits(0...(16 - 1)) : value).to_u16 >> 6)
+              binary[reference_address] = binary[reference_address] & ~0b11_1111_1111 | ((value < 0 ? (2 ** 16) + value.bits(0...(16 - 1)) : value).to_u16 >> 6)
             in Object::Section::Reference::Kind::Lli 
               if value > 0b1111_1111_1111_1111 || value < - 0b1111_1111_1111_1111
                 raise "Reference to #{name} = #{value} overflow from allowed 16 bits for symbol of type #{reference.kind}"
               end
-              binary[reference.address] = binary[reference.address] & ~0b0111_1111 | ((value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16 & 0x3f)
+              binary[reference_address] = binary[reference_address] & ~0b0111_1111 | ((value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16 & 0x3f)
             in Object::Section::Reference::Kind::Beq
               value = value - reference.address - 1
               if value > 0b0011_1111 || value < - 0b0111_1111
                 raise "Reference to #{name} = #{value} overflow from allowed 7 bits for symbol of type #{reference.kind}"
               end
-              binary[reference.address] = binary[reference.address] & ~0b0111_1111 | (value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16
+              binary[reference_address] = binary[reference_address] & ~0b0111_1111 | (value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16
           end
         end
       end

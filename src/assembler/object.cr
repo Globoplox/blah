@@ -3,9 +3,13 @@
 class RiSC16::Object
   # Optional name used to indicate the origin source of an object file, for helping humans.
   property name : String? 
+
   # The array of sections, that is, continuous piece of data, declaring and referencing symbols.
   property sections : Array(Section) = [] of Section
-  # Indicate if the object is ready for linking or not. 
+
+  # Indicate if the object is ready for linking or not.
+  # An object file incated as merged should:
+  # have all the sections it contains have a fixed, relative to 0, absolute address.
   property merged : Bool
 
   def initialize(@name = nil)
@@ -23,11 +27,13 @@ class RiSC16::Object
   # A section is a continuous block of code with it's symbols definitions and references.
   #
   # The block of code is not usable as is, it require to be linked to solve the references.
-  # All the address are relative to the start of the block of code.
-  # It has an optional offset within a namespace where it expect to be loaded.
+  # All the address are relative to the start of the block of code
+  # It has an optional offset within a namespace where it expect to be loaded
+  # When ready for merging, a section should have an absolute expected loading address.
   class	Section
     property name : String
     property offset : Int32? = nil
+    property absolute : Int32? = nil
     property text : Slice(UInt16) = Slice(UInt16).empty
     property definitions : Hash(String, Symbol) = {} of String => Symbol
     property references : Hash(String, Array(Reference)) = {} of String => Array(Reference)
@@ -92,6 +98,8 @@ class RiSC16::Object
       section.options.value.to_io io, endian
       (section.offset.nil? ? 0u8 : 1u8).to_io io, endian
       (section.offset || 0).to_io io, endian
+      (section.absolute.nil? ? 0u8 : 1u8).to_io io, endian
+      (section.absolute || 0).to_io io, endian
       section.definitions.size.to_io io, endian
       section.definitions.each do |name, definition|
         name.to_slice.size.to_io io, endian
@@ -126,6 +134,9 @@ class RiSC16::Object
       has_offset = io.read_byte
       section.offset = Int32.from_io io, endian
       section.offset = nil if has_offset == 0
+      has_absolute = io.read_byte
+      section.absolute = Int32.from_io io, endian
+      section.absolute = nil if has_absolute == 0
       (Int32.from_io io, endian).times do
         name = io.read_string (Int32.from_io io, endian)
         address = Int32.from_io io, endian
