@@ -54,9 +54,16 @@ module RiSC16::Linker
     end.reduce(start) do |absolute, (name, sections)|
       fixed = predefined_section_address[name]?.try &.to_i32
       base = fixed || absolute
+      pp "section name: #{name}, current address: #{absolute}"
       raise "Section #{name} cannot overwrite at offset #{base}, there are already data up to #{absolute}" if base < absolute
       sections.sort_by { |section| section.offset || Int32::MAX }.reduce(base) do |absolute, section|
+        # I did nosense here. Offset as written in code are relative to section start.
+        # The offset should be relative to the base.
+        # AKA: absolute is base + offset if any.
+        # Issue should be raised if base + offset < absolute
+        # TODO: fix it. I'm tired I wont do it rn
         if (section.offset || Int32::MAX) < absolute
+          pp objects
           raise "Block offset conflict in section #{name}, cannot overwrite at offset #{section.offset}, there are already data up to #{absolute}"
         end
         section.offset ||= absolute

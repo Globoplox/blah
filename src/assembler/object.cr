@@ -1,10 +1,12 @@
 # Represent a relocatable object.
 # It can be linked into other objects or into a binary. See `RiSC16::Assembler::Linker`.
 class RiSC16::Object
+  # Optional name used to indicate the origin source of an object file, for helping humans.
   property name : String? 
-  @sections : Array(Section) = [] of Section
+  # The array of sections, that is, continuous piece of data, declaring and referencing symbols.
+  property sections : Array(Section) = [] of Section
+  # Indicate if the object is ready for linking or not. 
   property merged : Bool
-  getter sections
 
   def initialize(@name = nil)
     @merged = false

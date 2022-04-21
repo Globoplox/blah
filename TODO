@@ -1,6 +1,21 @@
+optimize the compiled size (also rework cache), beginiing with easy stuff like constant affectation
+strip/obscurcificate local symbols by making them binary string (useless but fun)
+
+Feature to add to object files:
+- DCE would be critical for an easy to use stdlib.
+  Stacklang level dec is not possible, only the linker has this power.
+  HOW TO: each function as a section (already the case for stacklang),
+  a flag for weak section (do not dump unless referenced elsewhere)
+  But that would work only if we build a graph and excludes everything not related to main or start.
+  This mean we need an entry point. DCE would be an option that remove unreferenced weak sections before mergeing with the optional section.
+  instead of having a function graph, could have a section graph (then it would work from assembly, and won't be stacklang specific)
+- CLEANUP the cli, its becoming too complex
+
 STACKLANG FEATURE:
-- cast
 - prototypes blocks (extern var ?)
+- stacktrace and core dump
+- debug symbols (debugger stuff)
+- return checks for branch and function end
 
 OPTIMIZATION:
 Why into is almost always within the used registers ?

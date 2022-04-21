@@ -57,7 +57,6 @@ It is fat from full featured but powerful enough for basic stuff.
 
 Writing to the stack though use of indirect reference to variables might lead to undefined behavior due to variable caching.
 
-
 ### Syntax oddities:
 
 - `_` denote the word type. When an expression that ALWAYS require a type has no explicit type, it is a word by default.
@@ -114,6 +113,7 @@ by future calls.
   - [ ] Stack trace
 - [x] Design and write a compiler for a small stack language
   - [x] Write a program that do something (Brainfuck interpreter)
+  - [ ] Refactor compiler with better optimization and overall less spaghetti code
   - [ ] Fix line/char hints
   - [ ] Fix big move immediate overflow
   - [ ] Fix or don't fix undefined behavior due to cached var

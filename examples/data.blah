@@ -1,7 +1,1 @@
-section rodata
 export hello: 	.ascii "Hello world !"
-	 	nop
-export garbage: .ascii "garbage"
-	 	nop
-export error:	.ascii "The program detected an error and halted early."
-	 	nop

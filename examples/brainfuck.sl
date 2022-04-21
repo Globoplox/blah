@@ -6,19 +6,19 @@ fun load_io(io:*, destination:*, size):_ {
   while ((buffer = *io) != 0xff00 ) {
     if (i == size)
       return 0
-    __io_tty = *(destination + i) = buffer
+    *(destination + i) = buffer
     i += 1
   }
   return i
 }
 
-var program: [0x10]
-var ram: [0x10]
+var program: [0x1000]
+var ram: [0x1000]
 
 fun main:_ {
   var pc = 0
   var ptr = 0
-  var program_size = load_io(&__io_brainfuck, &program, 0x10) // TODO: make sizeof work with vars ?
+  var program_size = load_io(&__io_brainfuck, &program, 0x1000) // TODO: make sizeof work with vars ?
   var loop_count = 0
 
   if (program_size == 0x10)

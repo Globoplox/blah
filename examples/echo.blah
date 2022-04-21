@@ -10,25 +10,3 @@ loop:
     beq r0 r0 :loop
 end:
     halt
-
-
-multiply:
-add r1 r0 r0
-addi r2 r0 1
-addi r6 r0 1
-lw r3, r7, -4
-lw r4, r7, -3
-loop:
-nand r5 r2 r4
-nand r5 r5 r5
-beq r5 r0 :skip 
-add r1 r1 r3
-skip:
-add r3 r3 r3
-addi r2 r2 r2
-beq r2 r6 :return
-beq r0 r0 :loop
-return:
-sw r1 r7 -1
-lw r1 r7 -2
-jalr r1 r1 0

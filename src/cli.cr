@@ -27,6 +27,7 @@ module RiSC16
     target_file = "a.out"
     target_specified = false
     no_dce = false
+    silence_no_start = false
     
     OptionParser.parse do |parser|
       parser.banner = "Usage: blah [command] [options] input_file"
@@ -74,6 +75,7 @@ module RiSC16
       parser.on("-r", "--also-run", "Run the created executable.") { also_run = true }
       parser.on("-l", "--make-lib", "Make a library instead of running.") { make_lib = true }
       parser.on("--no-dce", "Disable dead code elimination when compiling an executable binary.") { no_dce = true }
+      parser.on("--silence-no-start", "Disable warning when linking executable without exported `start` symbol.") { silence_no_start = true }
 
       parser.unknown_args do |filenames, parameters|
         sources_files = filenames
@@ -111,7 +113,9 @@ module RiSC16
       end.run
 
     when :asm
-      spec = spec_file.try do |file| Spec.open file, macros end || Spec.default
+      spec = (spec_file || sources_files.find(&.ends_with? ".ini")).try do |file|
+        Spec.open file, macros
+      end || Spec.default
       intermediary_dir.try do |intermediary_dir|
         Dir.mkdir_p intermediary_dir unless Dir.exists? intermediary_dir
       end if create_intermediary
@@ -147,6 +151,10 @@ module RiSC16
             RiSC16::Object.from_io input, name: source
           end
           [object]
+        elsif source.ends_with? ".ini"
+          # Should merge files or throw error in case of multiples ini files.
+          # Maybe do it before this pass on input files and then just ignore them
+          [] of RiSC16::Object
         else raise "Unknown type of input file: #{source}" 
         end
       end
@@ -159,7 +167,7 @@ module RiSC16
         Dce.optimize objects unless no_dce
         merged_object = Linker.merge(spec, objects)
         
-        Log.warn &.emit "Linking into a binary without 'start' symbol" unless merged_object.has_start?
+        Log.warn &.emit "Linking into a binary without 'start' symbol" unless silence_no_start || merged_object.has_start? 
         binary = IO::Memory.new
         Linker.static_link spec, merged_object, binary
         
