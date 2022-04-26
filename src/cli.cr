@@ -28,6 +28,7 @@ module RiSC16
     target_specified = false
     no_dce = false
     silence_no_start = false
+    start = 0u16
     
     OptionParser.parse do |parser|
       parser.banner = "Usage: blah [command] [options] input_file"
@@ -76,6 +77,7 @@ module RiSC16
       parser.on("-l", "--make-lib", "Make a library instead of running.") { make_lib = true }
       parser.on("--no-dce", "Disable dead code elimination when compiling an executable binary.") { no_dce = true }
       parser.on("--silence-no-start", "Disable warning when linking executable without exported `start` symbol.") { silence_no_start = true }
+      parser.on("-t ADDRESS", "--start=ADDRESS", "Set the static link location target and load target") { |address| start = address.to_u16 prefix: true }
 
       parser.unknown_args do |filenames, parameters|
         sources_files = filenames
@@ -169,7 +171,7 @@ module RiSC16
         
         Log.warn &.emit "Linking into a binary without 'start' symbol" unless silence_no_start || merged_object.has_start? 
         binary = IO::Memory.new
-        Linker.static_link spec, merged_object, binary
+        Linker.static_link spec, merged_object, binary, start: start
         
         unless intermediary_only
           File.open target_file, "w" do |sink|
@@ -181,9 +183,9 @@ module RiSC16
         if also_run
           binary.rewind
           if debug
-            Debugger.new(binary, spec, merged_object).run
+            Debugger.new(binary, spec, merged_object, at: start).run
           else
-            VM.from_spec(spec).tap(&.load binary).run
+            VM.from_spec(spec).tap(&.load binary, at: start).run
           end
         end
       end

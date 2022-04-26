@@ -27,8 +27,8 @@ module RiSC16
     @definitions : Hash(UInt16, {String, Char})
     @references : Hash(UInt16, String)
 
-    def initialize(io, @spec, @object = nil)
-      @vm = VM.from_spec(@spec, io_override: {"tty" => {@input, @output} }).tap &.load io
+    def initialize(io, @spec, @object = nil, at = 0)
+      @vm = VM.from_spec(@spec, io_override: {"tty" => {@input, @output} }).tap &.load io, at: at
       @references = {} of UInt16 => String
       @object.try do |object|
         object.sections.each do |section|
@@ -126,7 +126,9 @@ module RiSC16
         windows << Table.new(
           x: (NCurses.maxx / 6 * 4).ceil, y: 0, height: (NCurses.maxy / 2).floor, width: NCurses.maxx // 3,
           columns: [3, 30], range: ((0)..(UInt16::MAX.to_i)), title: "STACK") do |address|
-          [(address == @vm.registers[7] ? ">" : " "),"0x#{address.to_u16.to_w}: 0x#{@vm.read(address.to_u16).to_w}"]
+          # Reading cause side effects in vm
+          #[(address == @vm.registers[7] ? ">" : " "),"0x#{address.to_u16.to_w}: 0x#{@vm.read(address.to_u16).to_w}"]
+          [(address == @vm.registers[7] ? ">" : " "),"0x#{address.to_u16.to_w}: 0x????"]
         end.tap(&.scroll_end)
         
         windows << CustomWindow.new x: (NCurses.maxx / 2).ceil, y: (NCurses.maxy / 2).floor, height: (NCurses.maxy / 2).ceil, width: NCurses.maxx // 2, title: "TTY" do |window|

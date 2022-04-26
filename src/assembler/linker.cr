@@ -122,9 +122,9 @@ module RiSC16::Linker
     max = object.sections.max_by do |section|
       section.absolute.not_nil! + section.text.size
     end
-    text_size = max.absolute.not_nil! + max.text.size
+    text_size = max.absolute.not_nil! + max.text.size - start
 
-    binary = Slice(UInt16).new text_size # should we actually start at *start* ?
+    binary = Slice(UInt16).new text_size # No padding, start at *start*
     
     # perform references replacement
     # write to file
@@ -134,13 +134,13 @@ module RiSC16::Linker
         {definition, section}
       }
       
-      block_location = section.absolute.not_nil! + start
+      block_location = section.absolute.not_nil! - start
       section.text.copy_to binary[block_location...(block_location + section.text.size)]
       section.references.each do |name, references|
         symbol, symbol_section = symbols[name]? || raise "Undefined reference to symbol '#{name}' in section '#{section.name}'"
         references.each do |reference|
-          value = start + symbol.address + (symbol_section.try(&.absolute) || 0) + reference.offset
-          reference_address = start + section.absolute.not_nil! + reference.address
+          value = symbol.address + (symbol_section.try(&.absolute) || 0) + reference.offset
+          reference_address = section.absolute.not_nil! + reference.address - start
 
           case reference.kind
             in Object::Section::Reference::Kind::Data
