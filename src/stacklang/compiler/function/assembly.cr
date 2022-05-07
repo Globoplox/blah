@@ -16,12 +16,24 @@ class Stacklang::Function
     @text << Instruction.new(ISA::Addi, a.value, a.value, immediate: assemble_immediate imm, Kind::Lli).encode
   end
 
-  # TODO: optimize
-  # TODO: be careful when optimizing, some caller (if and while statement ?) might rely on predicted size of movi.
-  # TODO: Add a way to predict size of a movi ? 
+  # Do nothing but predict the size a movi macro instruction will take in instructions
+  def predict_movi(a : Registers, imm : Int32 | String | Memory)
+    imm = imm.value if imm.is_a? Memory
+    if imm.is_a? Int32 && imm <= 0x3f
+      1u16
+    else
+      2u16
+    end
+  end
+  
   def movi(a : Registers, imm : Int32 | String | Memory)
-    lui a, imm
-    lli a, imm
+    imm = imm.value if imm.is_a? Memory
+    if imm.is_a? Int32 && imm <= 0x3f
+      addi a, Registers::R0, imm & 0x3f
+    else
+      lui a, imm
+      lli a, imm
+    end
   end
   
   def addi(a : Registers, b : Registers, imm : Int32 | String | Memory)

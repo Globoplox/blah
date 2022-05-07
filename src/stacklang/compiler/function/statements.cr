@@ -31,7 +31,7 @@ class Stacklang::Function
     condition_type = compile_expression if_node.condition, into: result_register
     error "Condition expression expect a word or a pointer, got #{condition_type}", node: if_node if condition_type.is_a?(Type::Struct)
     beq result_register, Registers::R0, 1u16
-    beq	Registers::R0, Registers::R0, 3u16 # FIXME: carefull, what if movi is optimized ?
+    beq	Registers::R0, Registers::R0, predict_movi(result_register, symbol_end) + 1u16
     movi result_register, symbol_end
     jalr Registers::R0, result_register
     if_node.body.each do |statement|
@@ -39,6 +39,7 @@ class Stacklang::Function
     end
     store_all
     if loop
+      # Optimization: if text has not grown too much a beq would be enough (and would be local/relativ)
       movi result_register, symbol_start
       jalr Registers::R0, result_register
     end
