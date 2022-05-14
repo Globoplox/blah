@@ -2,6 +2,8 @@ require "../vm"
 require "../spec"
 require "./curses"
 
+# NOTE: this is broken because reading the ram from vm cause IO side effects. 
+
 # multi column output
 # address, (if pseudo/data: source, if not first instruction in pseudo, then //.), instruction (source or disassembled, if data the word as it is), (compressed previous and current comments)
 # we show all the same address LOC in another window (to complete the compressed)

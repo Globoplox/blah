@@ -28,21 +28,26 @@ class Stacklang::Function
   # Per ABI
   RETURN_ADRESS_REGISTER = Registers::R6
 
-  # Represent a variable on stack with a register cache
+  # Represent a variable on stack with a register cache.
   # Or a temporary value in a stack cache.
   # Note: variables are not implicitely zero-initialized.
   class Variable
+    # There are no memory safety so the cache has no garantee of being valid.
+    # Aka, a var can be changed through a pointer without the compiler knowing,
+    # so the cache should always assumed to be old, unless we are in the case of a a temporary variable (which is supposed to be in a no-go zone).
+    # TODO: a volatile keyword to enable register caching to normal variables.
     property register : Registers? = nil
     property initialized
     @offset : Int32
     @name : String
     @constraint : Type::Any
     @initialization : AST::Expression?
+    @volatile : Bool
     getter name
     getter constraint
     getter offset
     getter initialization
-    def initialize(@name, @offset, @constraint, @initialization)
+    def initialize(@name, @offset, @constraint, @initialization, @volatile = false)
       @initialized = @initialization.nil?
     end
   end
@@ -168,12 +173,15 @@ class Stacklang::Function
   end
 
   # Represent a memory location as an offset to an address stored in a register or a variable.
-  # It can also be specified that this memory is mapped to a variable. This allows use of cached values.
+  # It can also be specified that this memory is mapped to a (temporary or volatile) variable. This allows use of cached values.
   # That memory can be used as a source or a destination.
   class Memory
+     # An offset to the reference register
     property value : Int32
-    property reference_register : Registers | Variable # the register containing the address. Or a variable If the address is stored in a variable
-    getter within_var : Variable? # used to identify that the ram correspond to a var, that could be currently cached into a register
+    # the register containing the address. Or a variable If the address is stored in a variable.
+    # For exemple, if it is r0 then this is an absolute address, if it r7 it likely a variable.
+    property reference_register : Registers | Variable 
+    getter within_var : Variable? # Used to identify that the location correspond to a variable, that could be currently cached into a register.
 
     # Helper method to use when you KNOW that the register is not held in a temporary value.
     def reference_register!

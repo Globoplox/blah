@@ -9,8 +9,8 @@ dependencies:
     github: agatan/ncurses.cr
 
 targets:
-  blah:
-    main: src/blah.cr
+  cli:
+    main: src/cli.cr
 
 crystal: 1.3.2
 
