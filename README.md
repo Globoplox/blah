@@ -19,21 +19,21 @@
   - [ ] Stack trace
 - [x] Design and write a compiler for a small stack language
   - [x] Write a program that do something (Brainfuck interpreter)
-  - [ ] Fix line/char hints
-  - [ ] Fix big move immediate overflow
   - [ ] Fix or don't fix undefined behavior due to cached var (add volatile keyword and disable all caching when not enabled)
-  - [ ] ~~Cache field of struct var~~
+  - [ ] Cache field of struct var when struct is volatile ?
   - [ ] Optimize for size
     - [ ] Better register usage
     - [ ] Use BEQ for local jump when possible
-	- [ ] Improve linker to solve local BEQ early (they are volatile)
+	- [ ] Improve linker to solve local BEQ early (they are relativ)
 	- [ ] Improve linker to strip unused symbol
+  - [ ] Fix line/char hints
+  - [ ] Fix big move immediate overflow
   - [x] Minimal standard library
   - [ ] Fix or_equal comparison
   - [ ] Cast
   - [ ] In-file prototypes
   - [ ] Unsigned and signed arithmetic in stdlib
-  - [x] Flag for trimming unused functions (need a call graph beforehand)
+  - [x] Flag for trimming unused functions
 - [ ] Write an OS
   - [ ] Relocate and load another program
   - [ ] Run multiple programs
