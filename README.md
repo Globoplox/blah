@@ -62,7 +62,7 @@ Currently, this project is a collection of tools written in [Crystal](https://cr
 Here is an example of what can be currently done with all this garbage:
 Running 
 
-    ./cli -s specs/bf.ini -dbf-source=examples/hello.bf stdlib.lib examples/brainfuck.sl
+    ./cli -s examples/brainfuck/brainfuck.ini -dbf-source=examples/brainfuck/hello.bf stdlib.lib examples/brainfuck/brainfuck.sl
 Will output
 
     Hello World!
@@ -71,7 +71,7 @@ That is actually a little more interesting than minimal hello world: It compile 
 Lets get a look at everything happening here:
 - The `./cli` is the command line interface crystal lang program that stitch everything together. You get it this way: `crystal build src/cli.cr`
 - No operation has been given to the `cli`, by default it try to compile/assemble/link then run every file given as parameters.
-- Argument `-s specs/bf.ini` is used to provide a configuration file that will set the behavior of the linker and the VM.
+- Argument `-s examples/brainfuck/brainfuck.ini` is used to provide a configuration file that will set the behavior of the linker and the VM.
 
 #### The specification file:
 
@@ -104,15 +104,15 @@ source=$bf-source
   - The `[hardware.segment]` parts are used to configure the memory of the virtual machine. Put simply, it say that address from `0x0` to `0xfffd` included are regular ram, that the address `0xfffe` is an IO register that map to the outside world TTY so we can interact with the program a little, and finally the address `0xffff` is another IO register that will read from the file `$bf-source`. The `$` mean it is a macro for setting the actual file path from the CLI because it is more practical this way. 
 
 #### Let's get back to the CLI
-- `-dbf-source=examples/hello.bf` as you might have understood set the path of the file that the `0xffff` register map to.
+- `-dbf-source=examples/brainfuck/hello.bf` as you might have understood set the path of the file that the `0xffff` register map to.
 - The file content here is 
 ```
 ++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++.
 ```
 - Which is a brainfuck program outputting hello world.
 - `stdlib.lib` is not an option, it is an input parameter. A `.lib`file is a collection of object file, it is used because it is simpler that having to provide each dependencies of the program one by one. It represent the standard library of the 'high level' language and contains the startup file. Omitting this input file would result in a warning `Linking into a binary without 'start' symbol` and the program would run errand. 
-- To obtain the the `stdlib.lib` file, run `/cli -l -o stdlib.lib stdlib/^prototypes.sl* ` (using zsh glob patterns. If you don't have them, just put every file in `stdlib/` BUT `prototypes.sl` as inputs).
-- And finally `examples/brainfuck.sl`is the program we want to run.
+- To obtain the the `stdlib.lib` file, run `./cli -l -o stdlib.lib stdlib/^prototypes.sl*` (using zsh glob patterns. If you don't have them, just put every file in `stdlib/` BUT `prototypes.sl` as inputs).
+- And finally `examples/brainfuck/brainfuck.sl`is the program we want to run.
 
 #### The program itself
 ```
@@ -388,7 +388,7 @@ kind=io
 start=0xffff
 tty=true
 ```
-example/hello.blah:
+`example/hello_with_data/hello.blah`:
 ```
 section text + 0 start:
 movi r1 :hello
@@ -401,12 +401,12 @@ loop:
         beq r0 r0 :loop
 end: halt
 ```
-example/data.blah
+`example/hello_with_data/data.blah`:
 ```
 export hello:   .ascii "Hello world !"
 ```
 ```
-./cli --silence-no-start examples/data.blah examples/hello.blah
+./cli --silence-no-start examples/hello_with_data/data.blah examples/hello_with_data/hello.blah
 ```
 So this is the same as before but the hello string is declared in another file. The code in hello.blah is forced to be at the beginning of a section named `text`, that itself will be put at the address `0` into the finale binary by the linker. So we ensure we start where we expect, and we can use data from another file.
 

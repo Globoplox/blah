@@ -9,12 +9,6 @@ module RiSC16
     end
   end
 
-  class IORegister
-    property io : ::IO
-    property address : Word
-    def initialize(@io, @address) end
-  end
-
   # Register 0 is always zero. Write are discarded.
   REGISTER_COUNT = 8
   MAX_MEMORY_SIZE = 1 + UInt16::MAX # In word. Ram address words.
