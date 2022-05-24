@@ -106,8 +106,9 @@ end
     getter name
     getter constraint
     getter initialization
+    getter volatile
     
-    def initialize(@name : Identifier, @constraint : Type, @initialization : Expression?) end
+    def initialize(@name : Identifier, @constraint : Type, @initialization : Expression?, @volatile = false) end
 
     def dump(io, indent = 0)
       indent.times { io << "  " }

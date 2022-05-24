@@ -19,15 +19,16 @@
   - [ ] Stack trace
 - [x] Design and write a compiler for a small stack language
   - [x] Write a program that do something (Brainfuck interpreter)
-  - [ ] Fix or don't fix undefined behavior due to cached var (add volatile keyword and disable all caching when not enabled)
+  - [x] Fix or don't fix undefined behavior due to cached var (add volatile keyword and disable all caching when not enabled)
   - [ ] Cache field of struct var when struct is volatile ?
   - [ ] Optimize for size
-    - [ ] Better register usage
+    - [ ] Better register usage 
     - [ ] Use BEQ for local jump when possible
 	- [ ] Improve linker to solve local BEQ early (they are relativ)
 	- [ ] Improve linker to strip unused symbol
   - [ ] Fix line/char hints
-  - [ ] Fix big move immediate overflow
+  - [x] Fix big move immediate overflow
+  - [ ] Add error for stack size exceding small immediate size
   - [x] Minimal standard library
   - [ ] Fix or_equal comparison
   - [ ] Cast

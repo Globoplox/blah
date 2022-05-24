@@ -3,7 +3,7 @@ class Stacklang::Function
   # Run a computation step while ensuring a register value is kept or cached in stack.
   # To be used with #uncache or #move.
   def with_temporary(register : Registers, constraint : Type::Any)
-    tmp = Variable.new "__temporary_var_#{@temporaries.size}", -(@temporaries.size + 1), constraint, nil, volatile = true
+    tmp = Variable.new "__temporary_var_#{@temporaries.size}", -(@temporaries.size + 1), constraint, nil, volatile: true
     tmp.register = register
     @temporaries.push tmp
     ret = yield tmp
@@ -41,6 +41,10 @@ class Stacklang::Function
     end
   end
 
+  def is_free_to_use(register)
+    (register.in? GPR) && !(register.in? @temporaries.compact_map(&.register) - @variables.values.compact_map(&.register))
+  end
+  
   # Grab a register not excluded, free to use.
   # If the grabbed register is used as a cache for a variable, or is holding a temporary value,
   # the var is written to the stack so value is not lost.

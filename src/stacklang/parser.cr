@@ -318,8 +318,9 @@ class Stacklang::Parser < Parser
       Word.new
     end
   end
-  
-  rule def variable
+
+  # Does not allows the same modifier as function variables
+  rule def global
     next unless str "var"
     next unless whitespace
     next unless name = identifier
@@ -330,6 +331,21 @@ class Stacklang::Parser < Parser
     whitespace
     init = expression
     Variable.new name, constraint, init
+  end
+
+  rule def variable
+    volatile = str "volatile"
+    next unless whitespace if volatile
+    next unless str "var"
+    next unless whitespace
+    next unless name = identifier
+    whitespace
+    next unless constraint = type_constraint
+    whitespace
+    char '='
+    whitespace
+    init = expression
+    Variable.new name, constraint, init, volatile: volatile != nil
   end
 
   rule def struct_field
@@ -400,7 +416,7 @@ class Stacklang::Parser < Parser
   end
 
   def top_level
-    or ->requirement, ->function, ->variable, ->struct_def
+    or ->requirement, ->function, ->global, ->struct_def
   end
 
   rule def unit

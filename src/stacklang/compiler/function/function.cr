@@ -127,14 +127,14 @@ class Stacklang::Function
 
     local_variables = @ast.variables.map do |variable|
       typeinfo = @unit.typeinfo variable.constraint
-      Variable.new(variable.name.name, @frame_size.to_i32, typeinfo, variable.initialization).tap do
+      Variable.new(variable.name.name, @frame_size.to_i32, typeinfo, variable.initialization, volatile: variable.volatile).tap do
         @frame_size += typeinfo.size
       end
     end
     
     parameters = @ast.parameters.map do |parameter|
       typeinfo = @unit.typeinfo parameter.constraint
-      Variable.new(parameter.name.name, @frame_size.to_i32, typeinfo, nil).tap do 
+      Variable.new(parameter.name.name, @frame_size.to_i32, typeinfo, nil, volatile: false).tap do 
         @frame_size += typeinfo.size
       end
     end
