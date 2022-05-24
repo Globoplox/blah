@@ -23,8 +23,8 @@
   - [ ] Cache field of struct var when struct is volatile ?
   - [ ] Optimize for size
     - [ ] Better register usage 
-    - [ ] Use BEQ for local jump when possible
-	- [ ] Improve linker to solve local BEQ early (they are relativ)
+    - [x] Use BEQ for local jump when possible
+	- [ ] Improve linker to solve local BEQ early (they are relative)
 	- [ ] Improve linker to strip unused symbol
   - [ ] Fix line/char hints
   - [x] Fix big move immediate overflow

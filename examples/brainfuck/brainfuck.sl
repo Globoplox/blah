@@ -12,8 +12,8 @@ fun load_io(io:*, destination:*, size):_ {
   return i
 }
 
-var program: [0x1000]
-var ram: [0x1000]
+var program: [0x100]
+var ram: [0x100]
 
 fun main:_ {
   var pc = 0

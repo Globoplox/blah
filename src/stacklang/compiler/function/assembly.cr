@@ -53,7 +53,7 @@ class Stacklang::Function
   end
 
   def beq(a : Registers, b : Registers, imm : Int32 | String | Memory)
-    @text << Instruction.new(ISA::Beq, a.value, b.value, immediate: assemble_immediate imm, Kind::Imm).encode
+    @text << Instruction.new(ISA::Beq, a.value, b.value, immediate: assemble_immediate imm, Kind::Beq).encode
   end
   
   # Helper function for assembling immediate value.

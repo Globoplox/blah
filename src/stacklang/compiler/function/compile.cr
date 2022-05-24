@@ -1,5 +1,20 @@
 class Stacklang::Function
 
+  def predict_size
+    old_refs = @section.references
+    old_defs = @section.definitions
+    old_text = @text
+    @text = [] of UInt16
+    @section.definitions = {} of String => RiSC16::Object::Section::Symbol
+    @section.references = {} of String => Array(RiSC16::Object::Section::Reference)
+    yield
+    text_size = @text.size
+    @text = old_text
+    @section.definitions = old_defs
+    @section.references = old_refs
+    text_size
+  end
+  
   # Run a computation step while ensuring a register value is kept or cached in stack.
   # To be used with #uncache or #move.
   def with_temporary(register : Registers, constraint : Type::Any)

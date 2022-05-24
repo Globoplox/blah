@@ -164,7 +164,7 @@ module RiSC16::Linker
               end
               binary[reference_address] = binary[reference_address] & ~0b0111_1111 | ((value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16 & 0x3f)
             in Object::Section::Reference::Kind::Beq
-              value = value - reference.address - 1
+              value = value - (reference.address + section.absolute.not_nil!) - 1
               if value > 0b0011_1111 || value < - 0b0111_1111
                 raise "Reference to #{name} = #{value} overflow from allowed 7 bits for symbol of type #{reference.kind}"
               end
