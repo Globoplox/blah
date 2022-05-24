@@ -32,10 +32,7 @@ class Stacklang::Function
   # Or a temporary value in a stack cache.
   # Note: variables are not implicitely zero-initialized.
   class Variable
-    # There are no memory safety so the cache has no garantee of being valid.
-    # Aka, a var can be changed through a pointer without the compiler knowing,
-    # so the cache should always assumed to be old, unless we are in the case of a a temporary variable (which is supposed to be in a no-go zone).
-    # TODO: a volatile keyword to enable register caching to normal variables.
+    # If the variable is currently held in a register. Work only on volatile variable (temporary var are volatile).
     property register : Registers? = nil
     property initialized
     @offset : Int32
@@ -47,6 +44,7 @@ class Stacklang::Function
     getter constraint
     getter offset
     getter initialization
+    getter volatile
     def initialize(@name, @offset, @constraint, @initialization, @volatile = false)
       @initialized = @initialization.nil?
     end
