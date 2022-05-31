@@ -20,6 +20,8 @@ class Stacklang::Function
     if memory.is_a? Memory && memory.within_var && memory.within_var.not_nil!.register && memory.within_var.not_nil!.volatile
       memory = memory.within_var.try &.register || memory
     end
+
+    # ARE THOSE EVER USED ? There is a lot of cool opti to do with lvalues and ptr and & and * but right now this is likely garbage
     
     # If the source is a memory location relative to an address stored into a variable, we need to get that address into a register.
     memory.reference_register.as?(Variable).try do |address_variable|

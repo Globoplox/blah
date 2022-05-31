@@ -86,12 +86,45 @@ module RiSC16::Linker
     end
   end
 
+  def strip_unused(object)
+    object.sections.each do |section|
+      section.definitions.reject! do |name, symbol|
+        !symbol.exported && (!section.references[name]? || section.references[name].empty?)
+      end
+    end
+  end
+
+  # Remove local beq
+  def link_local_beq(object)
+    object.sections.each do |section|
+      section.references.each do |name, references|
+        next unless symbol = section.definitions[name]?
+        rem = [] of RiSC16::Object::Section::Reference
+        references.each do |reference|
+          next unless reference.kind.beq?
+          value = symbol.address + reference.offset - reference.address - 1
+          if value > 0b111111 || value < -0b1111111
+            raise "Reference to #{name} = #{value} overflow from allowed 7 bits for symbol of type #{reference.kind}"
+          end
+          section.text[reference.address] = section.text[reference.address] & ~0b0111_1111 | (value < 0 ? (2 ** 7) + value.bits(0...6) : value).to_u16
+          rem << reference
+        end
+        references.reject! &.in? rem
+      end
+      section.references.reject! { |_,v| v.empty? }
+    end
+  end
+  
   # Static link an object into a binary blob, expected to be loaded at a given lovation (default to 0).
   # It performs the final symbols/value substitution.
   # This is the piece of code that would be necessary to bootstrap to be able to
   # dynamically load programs from another program (this would also work for loading dynamic libraries).
   def static_link(spec, object, io, start : Int32 = 0)
     object = merge(spec, [object]) if object.merged == false
+
+    link_local_beq object
+    strip_unused object
+    
     globals = symbols_from_spec(spec).transform_values do |symbol|
       Tuple(Object::Section::Symbol, Object::Section?).new symbol, nil
     end
@@ -99,18 +132,6 @@ module RiSC16::Linker
     # Couldnt we generate a section for those globals so they are stored within the object file after mergeing ?
     # That would also allow to check for conflict. Less work for bootstraping to.
     # TODO: store max_size ? so we don't need to recompute it.
-
-    # if start != 0 
-    #   object.sections.each do |section|
-    #     section.definitions.values.each do |symbol|
-    #       symbol.address += start
-    #     end
-    #     section.references.values.each &.each do |ref|
-    #       ref.address = (ref.address.to_i32 + start).to_u16
-    #     end
-    #     section.offset = section.offset.not_nil! + start
-    #   end
-    # end
 
     object.sections.each do |section|
       section.definitions.each do |(name, symbol)|
@@ -126,8 +147,6 @@ module RiSC16::Linker
 
     binary = Slice(UInt16).new text_size # No padding, start at *start*
     
-    # perform references replacement
-    # write to file
     object.sections.each do |section|
       
       symbols = globals.merge section.definitions.reject { |name, symbol| symbol.exported }.transform_values { |definition|

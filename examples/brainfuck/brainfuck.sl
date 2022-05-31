@@ -16,10 +16,10 @@ var program: [0x100]
 var ram: [0x100]
 
 fun main:_ {
-  var pc = 0
-  var ptr = 0
+  volatile var pc = 0
+  volatile var ptr = 0
   var program_size = load_io(&__io_brainfuck, &program, 0x1000) // TODO: make sizeof work with vars ?
-  var loop_count = 0
+  volatile var loop_count = 0
 
   if (program_size == 0x10)
      return 1
