@@ -18,6 +18,9 @@ class Stacklang::Function
     when AST::Call then compile_call expression, into: into
     when AST::Identifier then compile_identifier expression, into: into
     when AST::Operator then compile_operator expression, into: into
+    when AST::Cast
+      compile_expression expression.target, into: into
+      @unit.typeinfo expression.constraint
     else error "Unsupported expression", node: expression
     end                                                          
   end

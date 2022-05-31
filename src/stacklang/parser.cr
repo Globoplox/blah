@@ -143,11 +143,9 @@ class Stacklang::Parser < Parser
     whitespace
     next unless constraint = type_constraint false, true
     whitespace
-    next unless separator
+    next unless char ')'
     whitespace
     next unless target =  expression
-    whitespace
-    next unless char ')'
     Cast.new constraint, target
   end
 

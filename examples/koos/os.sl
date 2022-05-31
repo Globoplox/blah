@@ -1,10 +1,18 @@
 require "../../stdlib/putword.sl"
 
-fun main:_ {
-  putword(0x6666)
-  return 0x0
+struct MBRInfo {
+  size
+  reserved: [3]
 }
 
-fun load_object(io:*, max_size, start:*):_ {
-
+fun main:_ {
+  putword(((MBRInfo)__section_text_metadata).size)
+  __io_tty = 0x20
+  putword(((MBRInfo)__section_text_metadata).reserved[0])
+  __io_tty = 0x20
+  putword(((MBRInfo)__section_text_metadata).reserved[1])
+  __io_tty = 0x20
+  putword(((MBRInfo)__section_text_metadata).reserved[2])
+  __io_tty = 0x20
+  return 0x0
 }

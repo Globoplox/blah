@@ -49,6 +49,7 @@ class Stacklang::Function
     case expression
     when AST::Identifier then compile_identifier_lvalue expression
     when AST::Access then compile_access_lvalue expression
+    when AST::Cast then compile_lvalue(expression.target).try { |lvalue| { lvalue[0], @unit.typeinfo(expression.constraint) } }
     when AST::Unary, AST::Binary
       if expression.is_a?(AST::Binary) && expression.name == "["
         expression = AST::Unary.new(AST::Binary.new(AST::Unary.new(expression.left, "&"), "+", expression.right), "*")
