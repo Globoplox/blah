@@ -32,20 +32,20 @@ class Stacklang::Function
   # Or a temporary value in a stack cache.
   # Note: variables are not implicitely zero-initialized.
   class Variable
-    # If the variable is currently held in a register. Work only on volatile variable (temporary var are volatile).
+    # If the variable is currently held in a register. Work only on restricted variable (temporary var are restricted).
     property register : Registers? = nil
     property initialized
     @offset : Int32
     @name : String
     @constraint : Type::Any
     @initialization : AST::Expression?
-    @volatile : Bool
+    @restricted : Bool
     getter name
     getter constraint
     getter offset
     getter initialization
-    getter volatile
-    def initialize(@name, @offset, @constraint, @initialization, @volatile = false)
+    getter restricted
+    def initialize(@name, @offset, @constraint, @initialization, @restricted = false)
       @initialized = @initialization.nil?
     end
   end
@@ -127,14 +127,14 @@ class Stacklang::Function
 
     local_variables = @ast.variables.map do |variable|
       typeinfo = @unit.typeinfo variable.constraint
-      Variable.new(variable.name.name, @frame_size.to_i32, typeinfo, variable.initialization, volatile: variable.volatile).tap do
+      Variable.new(variable.name.name, @frame_size.to_i32, typeinfo, variable.initialization, restricted: variable.restricted).tap do
         @frame_size += typeinfo.size
       end
     end
     
     parameters = @ast.parameters.map do |parameter|
       typeinfo = @unit.typeinfo parameter.constraint
-      Variable.new(parameter.name.name, @frame_size.to_i32, typeinfo, nil, volatile: false).tap do 
+      Variable.new(parameter.name.name, @frame_size.to_i32, typeinfo, nil, restricted: false).tap do 
         @frame_size += typeinfo.size
       end
     end
@@ -171,7 +171,7 @@ class Stacklang::Function
   end
 
   # Represent a memory location as an offset to an address stored in a register or a variable.
-  # It can also be specified that this memory is mapped to a (temporary or volatile) variable. This allows use of cached values.
+  # It can also be specified that this memory is mapped to a (temporary or restricted) variable. This allows use of cached values.
   # That memory can be used as a source or a destination.
   class Memory
      # An offset to the reference register

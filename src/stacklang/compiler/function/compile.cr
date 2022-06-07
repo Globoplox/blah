@@ -18,7 +18,7 @@ class Stacklang::Function
   # Run a computation step while ensuring a register value is kept or cached in stack.
   # To be used with #uncache or #move.
   def with_temporary(register : Registers, constraint : Type::Any)
-    tmp = Variable.new "__temporary_var_#{@temporaries.size}", -(@temporaries.size + 1), constraint, nil, volatile: true
+    tmp = Variable.new "__temporary_var_#{@temporaries.size}", -(@temporaries.size + 1), constraint, nil, restricted: true
     tmp.register = register
     @temporaries.push tmp
     ret = yield tmp
@@ -44,14 +44,14 @@ class Stacklang::Function
   
   # Cache a variable in a register.
   # Used to fetch temporary variables, or to get the actual value of a variable.
-  # If the variable can be cached (volatile or temporary), the register is kept linked to
+  # If the variable can be cached (restricted or temporary), the register is kept linked to
   # the variable so next time we need the value of the variable, we can reuse this register.
   # If the register is needed for something else, it will be automatically unlinked and persisted to ram (by `grab_register`).
   def cache(variable, excludes): Registers
     variable.register || begin
       register = grab_register excludes: excludes
       lw register, STACK_REGISTER, variable.offset
-      variable.register = register if variable.volatile
+      variable.register = register if variable.restricted
       register
     end
   end

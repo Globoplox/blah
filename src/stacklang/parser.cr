@@ -332,8 +332,8 @@ class Stacklang::Parser < Parser
   end
 
   rule def variable
-    volatile = str "volatile"
-    next unless whitespace if volatile
+    restricted = str "restricted"
+    next unless whitespace if restricted
     next unless str "var"
     next unless whitespace
     next unless name = identifier
@@ -343,7 +343,7 @@ class Stacklang::Parser < Parser
     char '='
     whitespace
     init = expression
-    Variable.new name, constraint, init, volatile: volatile != nil
+    Variable.new name, constraint, init, restricted: restricted != nil
   end
 
   rule def struct_field

@@ -19,8 +19,8 @@
   - [ ] Stack trace
 - [x] Design and write a compiler for a small stack language
   - [x] Write a program that do something (Brainfuck interpreter)
-  - [x] Fix or don't fix undefined behavior due to cached var (add volatile keyword and disable all caching when not enabled)
-  - [ ] Cache field of struct var when struct is volatile ?
+  - [x] Fix or don't fix undefined behavior due to cached var (add restricted keyword and disable all caching when not enabled)
+  - [ ] Cache field of struct var when struct is restricted ?
   - [ ] Optimize for size
     - [ ] Better register usage 
     - [x] Use BEQ for local jump when possible

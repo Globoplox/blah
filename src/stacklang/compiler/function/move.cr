@@ -17,7 +17,7 @@ class Stacklang::Function
   def move(memory : Memory | Registers, constraint : Type::Any, into : Memory | Registers, force_to_memory = false)
 
     # If the source is a variable that is already cached into a register, then use this register directly.
-    if memory.is_a? Memory && memory.within_var && memory.within_var.not_nil!.register && memory.within_var.not_nil!.volatile
+    if memory.is_a? Memory && memory.within_var && memory.within_var.not_nil!.register && memory.within_var.not_nil!.restricted
       memory = memory.within_var.try &.register || memory
     end
 
@@ -38,7 +38,7 @@ class Stacklang::Function
       add into, memory, Registers::R0 unless into == memory
 
     when {Registers, Memory}
-      if force_to_memory == false && (into_var = into.within_var) && into_var.constraint.size == 1 && into_var.volatile
+      if force_to_memory == false && (into_var = into.within_var) && into_var.constraint.size == 1 && into_var.restricted
         if into_var.register
           add into_var.register.not_nil!, memory, Registers::R0
         elsif is_free_to_use memory 
@@ -55,7 +55,7 @@ class Stacklang::Function
       lw into, memory.reference_register!, memory.value
 
     when {Memory, Memory}
-      if force_to_memory == false &&  (var = into.within_var) && var.constraint.size == 1 && var.volatile
+      if force_to_memory == false &&  (var = into.within_var) && var.constraint.size == 1 && var.restricted
         target_register = var.register || grab_register excludes: [memory.reference_register!]
         lw target_register,  memory.reference_register!,  memory.value
         var.register = target_register
