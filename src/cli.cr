@@ -111,8 +111,12 @@ module RiSC16
       raise "No program specified" if sources_files.empty?
       raise "More than one program specified" if sources_files.size > 1
       File.open sources_files.first, "r" do |file|
-        VM.from_spec(spec).tap(&.load file)
-      end.run
+        if debug
+          Debugger.new(file, spec, nil, at: start).run
+        else
+          VM.from_spec(spec).tap(&.load file, at: start).run
+        end
+      end
 
     when :asm
       spec = (spec_file || sources_files.find(&.ends_with? ".ini")).try do |file|
