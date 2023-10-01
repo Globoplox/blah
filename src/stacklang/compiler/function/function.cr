@@ -82,6 +82,8 @@ class Stacklang::Function
   @unit : Unit
   # The prototype of the function, for use by other functions.
   @prototype : Prototype
+  # If this function delcaration is a prototype for an external function 
+  @extern : Bool
   # All the variables declared in the function, including parameters. 
   @variables : Hash(String, Variable)
   # The return type of the function if any.
@@ -105,6 +107,8 @@ class Stacklang::Function
 
   # Allow to share the prototype of the function to external symbols.
   getter prototype
+  # Allow to skip compilation of prototypes only
+  getter extern
 
   # Compute the prototype of the function.
   # Example of a stack frame for a simple function: `fun foobar(param1, param2):_ { var a; }`
@@ -123,6 +127,7 @@ class Stacklang::Function
   #
   def initialize(@ast, @unit)
     @return_type = ast.return_type.try { |r| @unit.typeinfo r }
+    @extern = @ast.extern
     @symbol = "__function_#{@ast.name.name}"
 
     local_variables = @ast.variables.map do |variable|

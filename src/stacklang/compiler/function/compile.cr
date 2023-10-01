@@ -77,8 +77,9 @@ class Stacklang::Function
   end
 
   # Generate the section representing the instructions for the compiled functions.
-  # TODO: find a wat to ensure every path end with a return.
+  # TODO: find a way to ensure every path end with a return.
   def compile : RiSC16::Object::Section
+    raise "An extern function should not be compiled" if @extern
     # move the stack UP by the size of the stack frame.
     addi STACK_REGISTER, STACK_REGISTER, -(@frame_size.to_i32)
     # copy the return address on the stack.

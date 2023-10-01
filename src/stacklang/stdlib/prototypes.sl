@@ -1,5 +1,4 @@
-// Prototypes for symbols defined in ./stacklang_startup.blah
-// File should not be compiled ! It is meant to be required only.
-var null:*
-var hex_digits
-fun multiply(a,b):_ {}
+// Prototypes for external symbols defined in assembly
+extern var null:*
+extern var hex_digits
+extern fun multiply(a,b):_

@@ -14,15 +14,18 @@ class Stacklang::Unit
     getter symbol
     getter type_info
     getter initialization
+    getter extern
     @initialization : Stacklang::AST::Expression?
     
     # for now globals are zero initialized
-    def initialize(@name : String, @type_info : Type::Any, @initialization)
+    def initialize(@name : String, @type_info : Type::Any, @initialization, @extern)
       @symbol = "__global_#{name}"
     end
 
+    # Used to define globals for value defined by the linker, those are raw symbols
     def initialize(@symbol : String)
       @name = @symbol
+      @extern = true
       @type_info = Type::Word.new
     end
   end
@@ -34,7 +37,7 @@ class Stacklang::Unit
   @structs : Hash(String, Type::Struct)? = nil
   @functions : Hash(String, Function)? = nil                                       
   @globals : Hash(String, Global)? = nil
-                                       
+
   def initialize(@ast : AST::Unit, @path : Path, @compiler : Compiler)
   end
   
@@ -111,7 +114,7 @@ class Stacklang::Unit
   def self_globals : Array(Global)
     @self_globals ||= @ast.globals.map do |variable|
       #raise "Initialization of global variable is not implemented" if variable.initialization
-      Global.new variable.name.name, Type::Any.solve_constraint(variable.constraint, structs), initialization: variable.initialization
+      Global.new variable.name.name, Type::Any.solve_constraint(variable.constraint, structs), initialization: variable.initialization, extern: variable.extern
     end
   end
 
@@ -137,6 +140,7 @@ class Stacklang::Unit
         code = [] of RiSC16::Word
         self_globals.each do |local|
           raise "Duplicate local global #{local.name} in #{path}" if section.definitions[local.symbol]?
+          next if local.extern
           section.definitions[local.symbol] = RiSC16::Object::Section::Symbol.new code.size, true
           if local.initialization
           # we can do _ = word, *_ = &identifier
@@ -159,8 +163,8 @@ class Stacklang::Unit
         end
         section.text = Slice.new code.size do |i| code[i] end # TODO ugly, fix
       end
-      self_functions.each do |function| 
-        object.sections << function.compile
+      self_functions.each do |function|
+        object.sections << function.compile unless function.extern
       end
     end
   end

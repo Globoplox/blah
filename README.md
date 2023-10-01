@@ -19,13 +19,7 @@ All of which are bundled within a single CLI tool, written in [Crystal](https://
 
 ## TODO
 - [x] Write an assembler able to ouput raw bitcode
-  - [x] Data statements
-  - [x] Basic math in offset
-  - [x] Predefined symbols (stack, io)
-  - [x] Relocatable object file and static linking
   - [ ] Better error output for linker
-  - [x] Generate symbol for sections
-  - [x] Allow to partition the address space between rom, ram and IOs
   - [ ] UTF-16 strings
 - [x] Write a dummy virtual machine that can execute this raw bitcode
   - [x] IO
@@ -33,34 +27,32 @@ All of which are bundled within a single CLI tool, written in [Crystal](https://
   - [ ] Propose memory paging mechanisms
   - [ ] Propose memory protection mechanisms
 - [x] Design and write a compiler for a small stack language
-  - [x] Write a program that do something (Brainfuck interpreter)
   - [x] Fix or don't fix undefined behavior due to cached var (add restricted keyword and disable all caching when not enabled)
   - [ ] Cache field of struct var when struct is restricted ?
   - [ ] Optimize for size
     - [ ] Better register usage 
-    - [x] Use BEQ for local jump when possible
-	- [ ] Improve linker to solve local BEQ early (they are relative)
-	- [ ] Improve linker to strip unused symbol
   - [ ] Fix line/char hints
-  - [x] Fix big move immediate overflow
   - [ ] Add error for stack size exceding small immediate size
-  - [x] Minimal standard library
   - [ ] Fix or_equal comparison
-  - [ ] Cast
-  - [ ] In-file prototypes
+  - [ ] && and || should be lazy
   - [ ] Unsigned and signed arithmetic in stdlib
-  - [x] Flag for trimming unused functions
 - [ ] Write an OS
+  - [ ] Implement a file system
   - [ ] Relocate and load another program
+  - [ ] Relocate and load a dynamic library
+  - [ ] Load, relocate a program with link to a dynamic library
+  - [ ] Handle syscalls 
   - [ ] Run multiple programs
-  - [ ] Handle syscalls and barebone scheduler 
-  - [ ] Memory management
+  - [ ] Memory management 
+  - [ ] Fork and threads
+  - [ ] Memory paging trhough bank switch or file system
+  - [ ] Memory protection (isolate programs and limit jump between programs)  
 - [ ] Define fixed spec for a computer
-- [ ] Define a standard configuration/description mechanism for detecting hardware (kind of ACPI)
+- [ ] Define a standard configuration/description mechanism for detecting hardware
 
 # Full example
 
-Here is an example of what can be currently done with all this garbage:
+Here is an example of what can be currently done:  
 Running 
 ```sh
 ./bin/cli -l stdlib/left_bitshift.sl stdlib/multiply.blah stdlib/putword.sl stdlib/right_bitshift.sl stdlib/stacklang_startup.blah -o build/stdlib.lib

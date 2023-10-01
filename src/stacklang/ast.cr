@@ -107,8 +107,9 @@ end
     getter constraint
     getter initialization
     getter restricted
+    getter extern
     
-    def initialize(@name : Identifier, @constraint : Type, @initialization : Expression?, @restricted = false) end
+    def initialize(@name : Identifier, @constraint : Type, @initialization : Expression?, @restricted = false, @extern = false) end
 
     def dump(io, indent = 0)
       indent.times { io << "  " }
@@ -188,8 +189,9 @@ end
     getter variables
     getter return_type
     getter body
+    getter extern
     
-    def initialize(@name : Identifier, @parameters : Array(Parameter), @return_type : Type?, @variables : Array(Variable), @body : Array(Statement)) end
+    def initialize(@name : Identifier, @parameters : Array(Parameter), @return_type : Type?, @variables : Array(Variable), @body : Array(Statement), @extern : Bool) end
 
     def dump(io, indent = 0)
       io << "fun "

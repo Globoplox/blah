@@ -319,6 +319,8 @@ class Stacklang::Parser < Parser
 
   # Does not allows the same modifier as function variables
   rule def global
+    extern = str "extern"
+    next unless whitespace if extern
     next unless str "var"
     next unless whitespace
     next unless name = identifier
@@ -328,7 +330,7 @@ class Stacklang::Parser < Parser
     char '='
     whitespace
     init = expression
-    Variable.new name, constraint, init
+    Variable.new name, constraint, init, extern: extern != nil
   end
 
   rule def variable
@@ -383,6 +385,8 @@ class Stacklang::Parser < Parser
   end
 
   rule def function
+    extern = str "extern"
+    next unless whitespace if extern
     next unless str "fun"
     next unless whitespace
     next unless name = identifier
@@ -395,22 +399,25 @@ class Stacklang::Parser < Parser
     end || [] of Function::Parameter
     whitespace
     ret_type = type_constraint explicit: true
-    
-    multiline_whitespace
-    next unless char '{'
-    expression_separators
-    
-    variables = zero_or_more ->variable, separated_by: ->expression_separators
-    if variables.empty?
+
+    unless extern
+      multiline_whitespace
+      next unless char '{'
       expression_separators
-    else
-      next unless expression_separators
+      
+      variables = zero_or_more ->variable, separated_by: ->expression_separators
+      if variables.empty?
+        expression_separators
+      else
+        next unless expression_separators
+      end
+      
+      statements = zero_or_more ->any_statement, separated_by: ->expression_separators
+      expression_separators
+      next unless char '}'
     end
-    
-    statements = zero_or_more ->any_statement, separated_by: ->expression_separators
-    expression_separators
-    next unless char '}'
-    Function.new name, parameters, ret_type, variables, statements
+
+    Function.new name, parameters, ret_type, (variables || [] of Variable), (statements || [] of Statement), extern: extern != nil
   end
 
   def top_level
