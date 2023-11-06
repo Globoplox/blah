@@ -1,9 +1,7 @@
 class Stacklang::Function
-
-
   # Compile unary operator operating on word values.
-  def compile_value_unary(unary : AST::Unary, into : Registers | Memory | Nil): Type::Any
-    if into.nil? # We optimize to nothing unless operand might have side-effects 
+  def compile_value_unary(unary : AST::Unary, into : Registers | Memory | Nil) : Type::Any
+    if into.nil? # We optimize to nothing unless operand might have side-effects
       expression_type = compile_expression unary.operand, into: nil
       error "Cannot apply unary operator '#{unary.name}' to non-word type #{expression_type}", node: unary unless expression_type.is_a? Type::Word
       expression_type
@@ -28,17 +26,17 @@ class Stacklang::Function
   end
 
   # Compile dereferencement expression.
-  # It has it's own case instead of being in `#compile_value_unary` to simplify error display. 
-  def compile_ptr_unary(operand : AST::Expression, into : Registers | Memory | Nil, node : AST::Node): Type::Any
-    if into.nil? # We optimize to nothing unless operand might have side-effects                                                                                            
+  # It has it's own case instead of being in `#compile_value_unary` to simplify error display.
+  def compile_ptr_unary(operand : AST::Expression, into : Registers | Memory | Nil, node : AST::Node) : Type::Any
+    if into.nil? # We optimize to nothing unless operand might have side-effects
       expression_type = compile_expression operand, into: nil
       error "Cannot dereference non-pointer type #{expression_type}", node: node unless expression_type.is_a? Type::Pointer
       expression_type.pointer_of
     else
-      address_register = grab_register excludes: into.used_registers # TODO: maybe useless                                                                                  
+      address_register = grab_register excludes: into.used_registers # TODO: maybe useless
       expression_type = compile_expression operand, into: address_register
       error "Cannot dereference non-pointer type #{expression_type}", node: node unless expression_type.is_a? Type::Pointer
-      # We use a temporary var to reuse the dereferencement capability of move                                                                                              
+      # We use a temporary var to reuse the dereferencement capability of move
       with_temporary(address_register, expression_type) do |temporary|
         move Memory.absolute(temporary), expression_type.pointer_of, into
       end
@@ -47,7 +45,7 @@ class Stacklang::Function
   end
 
   # Compile &() expression.
-  def compile_addressable_unary(operand : AST::Expression, into : Registers | Memory | Nil, node : AST::Node): Type::Any
+  def compile_addressable_unary(operand : AST::Expression, into : Registers | Memory | Nil, node : AST::Node) : Type::Any
     lvalue_result = compile_lvalue operand
     lvalue_result || error "Expression #{operand.to_s} is not a valid operand for operator '&'", node: node
     lvalue, targeted_type = lvalue_result
@@ -69,12 +67,11 @@ class Stacklang::Function
   end
 
   # Compile a unary operator value, and move it's value if necessary.
-  def compile_any_unary(unary : AST::Unary, into : Registers | Memory | Nil): Type::Any
+  def compile_any_unary(unary : AST::Unary, into : Registers | Memory | Nil) : Type::Any
     case unary.name
     when "&" then compile_addressable_unary unary.operand, into: into, node: unary
-    when "*"then compile_ptr_unary unary.operand, into: into, node: unary
-    else compile_value_unary unary, into: into
+    when "*" then compile_ptr_unary unary.operand, into: into, node: unary
+    else          compile_value_unary unary, into: into
     end
   end
-  
 end

@@ -1,6 +1,8 @@
+
 require "../../stdlib/prototypes.sl"
 
 fun load_io(io:*, destination:*, size):_ {
+efzf
   restricted var i = 0
   restricted var buffer
   while ((buffer = *io) != 0xff00 ) {

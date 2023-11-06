@@ -1,5 +1,4 @@
 class Stacklang::Function
-
   # Compile the value of any expression and move it's value in the function return memory location.
   # Move the stack back and jump to return address.
   def compile_return(ret : AST::Return)
@@ -29,7 +28,9 @@ class Stacklang::Function
     result_register = grab_register
 
     size_of_block = predict_size do
-      if_node.body.each do |statement|                                                                                                                              compile_statement statement                                                                                                                               end
+      if_node.body.each do |statement|
+        compile_statement statement
+      end
       store_all
     end
 
@@ -63,19 +64,17 @@ class Stacklang::Function
         jalr Registers::R0, result_register
       end
     end
-    
-    @section.definitions[symbol_end] = Object::Section::Symbol.new @text.size, false    
+
+    @section.definitions[symbol_end] = Object::Section::Symbol.new @text.size, false
   end
-  
+
   # Compile any statement.
   def compile_statement(statement)
     case statement
-    when AST::Return then compile_return statement   
-    when AST::If then compile_if statement
-    when AST::While then compile_if statement, loop: true
+    when AST::Return     then compile_return statement
+    when AST::If         then compile_if statement
+    when AST::While      then compile_if statement, loop: true
     when AST::Expression then compile_expression statement, nil
     end
   end
-
-  
 end

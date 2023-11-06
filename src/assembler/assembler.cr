@@ -12,16 +12,16 @@ module RiSC16::Assembler
       0u16
     else
       bits = case kind
-        when .imm?, .beq? then 7
-        else 16
-      end
+             when .imm?, .beq? then 7
+             else                   16
+             end
       value = (immediate.offset < 0 ? (2 ** bits) + immediate.offset.bits(0...(bits - 1)) : immediate.offset).to_u16
       value = value >> 6 if kind.lui?
       value = value & 0x3fu16 if kind.lli?
       value
     end
   end
-  
+
   def assemble(unit : AST::Unit) : Object
     current_section = Object::Section.new "text"
     object = Object.new unit.name
@@ -31,9 +31,10 @@ module RiSC16::Assembler
     all_defintions = {} of String => AST::Statement
 
     unit.statements.each do |statement|
-
       statement.section.try do |section|
-        current_section.text = Slice.new text.size do |i| text[i] end
+        current_section.text = Slice.new text.size do |i|
+          text[i]
+        end
         text.clear
         options = Object::Section::Options::None
         options |= Object::Section::Options::Weak if section.weak
@@ -48,7 +49,7 @@ module RiSC16::Assembler
         all_defintions[label] = statement
         current_section.definitions[label] = Object::Section::Symbol.new text.size, statement.exported
       end
-     
+
       statement.instruction.try do |instruction|
         case memo = instruction.memo.downcase
         when "add", "nand"
@@ -132,9 +133,10 @@ module RiSC16::Assembler
         else raise "Unknown statement memo '#{memo}' in #{unit.name || "???"} at line #{statement.line}."
         end
       end
-
     end
-    current_section.text = Slice.new text.size do |i| text[i] end
+    current_section.text = Slice.new text.size do |i|
+      text[i]
+    end
     object
   end
 end

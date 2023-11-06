@@ -1,14 +1,8 @@
 module Stacklang::AST
+  alias Node = Parser::Node
 
   class Node
-    property line : Int32?
-    property character : Int32?
-
     def dump(io)
-    end
-
-    def to_s(io)
-      dump io
     end
 
     def to_s

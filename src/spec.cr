@@ -13,12 +13,12 @@ class RiSC16::Spec
     property base_address : UInt32?
     property max_size : UInt32?
     property options : Object::Section::Options
-    
-    def initialize(@name, @base_address, @max_size, @options = Object::Section::Options::None) end
+
+    def initialize(@name, @base_address, @max_size, @options = Object::Section::Options::None)
+    end
   end
 
   abstract class Segment
-
     enum Kind
       RAM
       ROM
@@ -37,13 +37,13 @@ class RiSC16::Spec
         super
         case property = properties["read"]?
         when "true", nil then @read = true
-        when "false" then @read = false
-        else raise "Bad value for segment properties write: '#{property}'"
+        when "false"     then @read = false
+        else                  raise "Bad value for segment properties write: '#{property}'"
         end
         case property = properties["write"]?
         when "true", nil then @write = true
-        when "false" then @write = false
-        else raise "Bad value for segment properties write: '#{property}'"
+        when "false"     then @write = false
+        else                  raise "Bad value for segment properties write: '#{property}'"
         end
       end
     end
@@ -56,15 +56,15 @@ class RiSC16::Spec
         properties["size"] = "1"
         super
         case is_tty = properties["tty"]?
-        when "true" then @tty = true
+        when "true"       then @tty = true
         when "false", nil then @tty = false
-        else raise "Bad value for segment properties tty: '#{is_tty}'"
+        else                   raise "Bad value for segment properties tty: '#{is_tty}'"
         end
         @source = properties["source"]?
-        raise "Source must be provided for no-tty io segment" if @source.nil? && !@tty              
+        raise "Source must be provided for no-tty io segment" if @source.nil? && !@tty
       end
     end
-    
+
     class Rom < Segment
       property source : String
 
@@ -73,29 +73,29 @@ class RiSC16::Spec
         super
       end
     end
- 
+
     property start : UInt16
     property size : UInt16
     property name : String?
-    
+
     def initialize(properties)
       @size = properties["size"].to_u16 prefix: true
       @start = properties["start"].to_u16 prefix: true
       @name = properties["name"]?
     end
-  
+
     def self.build(properties)
       case Kind.parse properties["kind"]
-      when .ram? then Ram.new properties
-      when .rom? then Rom.new properties
-      when .io? then IO.new properties
+      when .ram?     then Ram.new properties
+      when .rom?     then Rom.new properties
+      when .io?      then IO.new properties
       when .default? then Default.new properties
       end
     end
   end
-  
+
   def initialize(@properties, @macros)
-    @properties.transform_values! &.transform_values do |value| 
+    @properties.transform_values! &.transform_values do |value|
       if value.starts_with? '$'
         @macros[value.lchop]? || value
       else
@@ -109,20 +109,20 @@ class RiSC16::Spec
       segment.start.to_i + segment.size
     end
   end
- 
+
   def self.open(filename, macros)
     File.open filename do |io|
       self.new INI.parse(io), macros
     end
   end
- 
+
   def self.default
     self.new(
       {
         "hardware.segment.ram" => {"kind" => "ram", "start" => 0x0.to_s, "size" => 0xffff.to_s},
         "hardware.segment.tty" => {"kind" => "io", "tty" => "true", "start" => 0xffff.to_s},
-        "linker.section.text" => { "start" => "0" },
-        "linker.section.stack" => { "start" => "0xff00", "size" => "0x00ff" },
+        "linker.section.text"  => {"start" => "0"},
+        "linker.section.stack" => {"start" => "0xff00", "size" => "0x00ff"},
       }, {} of String => String)
   end
 
@@ -134,7 +134,7 @@ class RiSC16::Spec
       end
     end
   end
-  
+
   def sections
     @sections ||= @properties.keys.compact_map do |key|
       key.lchop?("linker.section.").try do |section_name|
@@ -143,4 +143,3 @@ class RiSC16::Spec
     end
   end
 end
- 

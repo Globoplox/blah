@@ -1,5 +1,4 @@
 module Stacklang
-  
   abstract class Type::Any
     abstract def size
 
@@ -19,7 +18,7 @@ module Stacklang
         else
           Type::Table.new (solve_constraint target, types), ast.size.number
         end
-      when AST::Custom        
+      when AST::Custom
         actual_type = types[ast.name]? || raise "Unknown struct name: '#{ast.name}'"
         raise "Type #{actual_type.name} is recursive. This is illegal. Use a pointer to #{actual_type.name} instead." if actual_type.in? stack
         actual_type.solve types, stack + [actual_type]
@@ -27,19 +26,18 @@ module Stacklang
       else raise "Unknown Type Kind #{typeof(ast)}"
       end
     end
-    
   end
 
   class Type::Word < Type::Any
     getter size = 1u16
 
     def self.new
-      @@i ||= new _init: true 
+      @@i ||= new _init: true
     end
 
     def initialize(_init)
     end
-    
+
     def to_s(io)
       io << "_"
     end
@@ -48,7 +46,9 @@ module Stacklang
   class Type::Pointer < Type::Any
     getter size = 1u16
     getter pointer_of
-    def initialize(@pointer_of : Type::Any) end
+
+    def initialize(@pointer_of : Type::Any)
+    end
 
     def to_s(io)
       io << '*'
@@ -59,7 +59,7 @@ module Stacklang
       other.is_a?(Pointer) && other.pointer_of == @pointer_of
     end
   end
-  
+
   class Type::Table < Type::Any
     getter quantity
     getter table_of
@@ -68,7 +68,8 @@ module Stacklang
       @quantity * @table_of.size
     end
 
-    def initialize(@table_of : Type::Any, @quantity : Int32) end
+    def initialize(@table_of : Type::Any, @quantity : Int32)
+    end
 
     def to_s(io)
       io << '['
@@ -81,19 +82,21 @@ module Stacklang
       other.is_a?(Table) && other.table_of == @table_of && other.quantity == @quantity
     end
   end
-  
+
   class Type::Struct < Type::Any
     class Field
       property name
       property offset
       property constraint
-      def initialize(@name : String, @constraint : Type::Any, @offset : UInt16) end
+
+      def initialize(@name : String, @constraint : Type::Any, @offset : UInt16)
+      end
     end
 
     property name : String
     property fields : Array(Field)
     @size : UInt16? = nil
-    
+
     def initialize(@ast_struct : AST::Struct)
       @name = @ast_struct.name
       @fields = [] of Field
@@ -120,7 +123,5 @@ module Stacklang
         offset
       end
     end
-
   end
-
 end

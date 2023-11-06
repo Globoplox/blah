@@ -1,17 +1,36 @@
 # Kind of work, unused, to be used with a parser rewrite
 # that hopefully will be much better at describing error and context
 # TODO: save character and line into tokens
-module Lexer
+module Stacklang::Lexer
+  struct Token
+    getter value : String
+    getter line : Int32?
+    getter character : Int32?
+    def initialize(@value, @line, @character)
+    end
+  end
   
-  def self.run(io)
-    tokens = [] of String
+  def self.run(io) : Array(Token)
+    tokens = [] of Token
     token = [] of Char
     last = '\0'
     quote = nil
     escaped = false
     comment_stack = 0
     last_kind = nil
+    line = 1
+    character = 0
+    line_at_start = 1
+    character_at_start = 1
+
     io.each_char do |c|
+      if c == '\n'
+        character = 0
+        line += 1
+      else 
+        character += 1
+      end
+
       transform_last = nil
       kind = nil
 
@@ -30,34 +49,42 @@ module Lexer
       elsif comment_stack > 0
         if last == '*' && c == '/'
           comment_stack -= 1 
-        else
-          next
         end
       
       elsif last == '/' && c == '*'
         comment_stack += 1
         unless token.size > 1
-          tokens << token[0...-1].join
+          tokens << Token.new token[0...-1].join, line_at_start, character_at_start if token.size > 1
           token.clear
+          line_at_start = line
+          character_at_start = character
         end
 
       elsif c == '\n' || c == ';'
-        next if last == ';'
-        transform_last = ';'
-        tokens << token.join unless token.empty?
-        tokens << "\n"
-        token.clear
+        unless last == '\n'
+          transform_last = '\n'
+          tokens << Token.new token.join, line_at_start, character_at_start unless token.empty?
+          tokens << Token.new "\n", line, character unless tokens[-1]?.try &.value.== "\n"
+          token.clear
+          line_at_start = line
+          character_at_start = character
+        end
 
       elsif c == ' ' || c == '\t'
         unless token.empty?
-          tokens << token.join unless token.empty?
+          tokens << Token.new token.join, line_at_start, character_at_start  unless token.empty?
           token.clear
+          line_at_start = line
+          character_at_start = character
         end
       
-      elsif c.in? ['[', ']', '{', '}', '(', ')', ':']
-        tokens << token.join unless token.empty?
-        tokens << c.to_s
+      elsif c.in? ['[', ']', '{', '}', '(', ')', ':', ',']
+        tokens << Token.new token.join, line_at_start, character_at_start  unless token.empty?
+        tokens << Token.new c.to_s, line, character
         token.clear
+        line_at_start = line
+        character_at_start = character
+
       
       else
 
@@ -70,8 +97,11 @@ module Lexer
         end
 
         if (kind == :operator && last_kind != :operator) || (kind != :operator && last_kind == :operator)
-          tokens << token.join unless token.empty?
+          tokens << Token.new token.join, line_at_start, character_at_start  unless token.empty?
           token.clear
+          line_at_start = line
+          character_at_start = character
+
           token << c
         else
           token << c
@@ -81,10 +111,8 @@ module Lexer
       end
       last = transform_last || c
     end
+    tokens << Token.new token.join, line_at_start, character_at_start  unless token.empty?
+
     tokens
   end
-end
-
-File.open "examples/brainfuck/brainfuck.sl" do |file|
-  puts Lexer.run(file).join ' '
 end

@@ -9,13 +9,13 @@ require "../unit"
 class Stacklang::Function
   include RiSC16
   alias Kind = Object::Section::Reference::Kind
-  
+
   enum Registers : UInt16
-    R0;R1;R2;R3;R4;R5;R6;R7
+    R0; R1; R2; R3; R4; R5; R6; R7
 
     # Return an array containg self
     # Useful when dealing with Registers | Memory unions
-    def	used_registers:	Array(Registers)
+    def used_registers : Array(Registers)
       [self]
     end
   end
@@ -45,6 +45,7 @@ class Stacklang::Function
     getter offset
     getter initialization
     getter restricted
+
     def initialize(@name, @offset, @constraint, @initialization, @restricted = false)
       @initialized = @initialization.nil?
     end
@@ -61,8 +62,11 @@ class Stacklang::Function
       getter name
       getter offset
       getter constraint
-      def initialize(@name, @constraint, @offset) end
+
+      def initialize(@name, @constraint, @offset)
+      end
     end
+
     @parameters = [] of Parameter
     @return_type : Type::Any?
     @return_value_offset : Int32?
@@ -71,20 +75,22 @@ class Stacklang::Function
     getter return_type
     getter return_value_offset
     getter symbol
-    def initialize(@symbol, @parameters, @return_type, @return_value_offset) end
+
+    def initialize(@symbol, @parameters, @return_type, @return_value_offset)
+    end
   end
 
   # The ast of the function.
   @ast : AST::Function
-  # The exported symbol holding the address of the function 
+  # The exported symbol holding the address of the function
   @symbol : String
   # The unit containing the functions, for fetching prototypes and types.
   @unit : Unit
   # The prototype of the function, for use by other functions.
   @prototype : Prototype
-  # If this function delcaration is a prototype for an external function 
+  # If this function delcaration is a prototype for an external function
   @extern : Bool
-  # All the variables declared in the function, including parameters. 
+  # All the variables declared in the function, including parameters.
   @variables : Hash(String, Variable)
   # The return type of the function if any.
   @return_type : Type::Any?
@@ -96,7 +102,7 @@ class Stacklang::Function
   @section : RiSC16::Object::Section
   # The compiled instructions.
   @text = [] of UInt16
-  # A stack of temporary variables, to cache temporary values stored in register while doing other computation. 
+  # A stack of temporary variables, to cache temporary values stored in register while doing other computation.
   @temporaries = [] of Variable
   # Used to generate local uniq symbols.
   @local_uniq = 0
@@ -121,7 +127,7 @@ class Stacklang::Function
   #  | param2               |
   #  +----------------------+ <- Used internaly to store return address
   #  | reserved (always)    |
-  #  +----------------------+ 
+  #  +----------------------+
   #  | return value         |
   #  +----------------------+ <- Stack Pointer (R7) value from caller
   #
@@ -136,10 +142,10 @@ class Stacklang::Function
         @frame_size += typeinfo.size
       end
     end
-    
+
     parameters = @ast.parameters.map do |parameter|
       typeinfo = @unit.typeinfo parameter.constraint
-      Variable.new(parameter.name.name, @frame_size.to_i32, typeinfo, nil, restricted: false).tap do 
+      Variable.new(parameter.name.name, @frame_size.to_i32, typeinfo, nil, restricted: false).tap do
         @frame_size += typeinfo.size
       end
     end
@@ -158,11 +164,11 @@ class Stacklang::Function
       @return_value_offset = @frame_size
       @frame_size += @return_type.not_nil!.size
     end
-    
+
     @prototype = Prototype.new @symbol, (parameters.map do |parameter|
       Prototype::Parameter.new parameter.name, parameter.constraint, parameter.offset - @frame_size
     end), @return_type, @return_value_offset.try &.to_i32.-(@frame_size)
-    
+
     @section = RiSC16::Object::Section.new @symbol, options: RiSC16::Object::Section::Options::Weak # all functions sections are weak,
     # so dce can remove unused functions when building an executable binary.
     @section.definitions[@symbol] = Object::Section::Symbol.new 0, true
@@ -179,35 +185,36 @@ class Stacklang::Function
   # It can also be specified that this memory is mapped to a (temporary or restricted) variable. This allows use of cached values.
   # That memory can be used as a source or a destination.
   class Memory
-     # An offset to the reference register
+    # An offset to the reference register
     property value : Int32
     # the register containing the address. Or a variable If the address is stored in a variable.
     # For exemple, if it is r0 then this is an absolute address, if it r7 it likely a variable.
-    property reference_register : Registers | Variable 
+    property reference_register : Registers | Variable
     getter within_var : Variable? # Used to identify that the location correspond to a variable, that could be currently cached into a register.
 
     # Helper method to use when you KNOW that the register is not held in a temporary value.
     def reference_register!
       @reference_register.as Registers
     end
-        
-    def initialize(@reference_register, @value, @within_var) end
+
+    def initialize(@reference_register, @value, @within_var)
+    end
 
     # Create a memory that is an offset to the stack. Used to create memory for variable.
     def self.offset(value : Int32, var : Variable? = nil)
       new STACK_REGISTER, value, var
     end
 
-    # Create an absolute memory location relative to any register. 
+    # Create an absolute memory location relative to any register.
     def self.absolute(register : Registers | Variable)
       new register, 0, nil
     end
 
     # Return a list of registers that this memory is using
-    def used_registers: Array(Registers)
+    def used_registers : Array(Registers)
       [within_var.try(&.register), reference_register.as?(Registers) || reference_register.as(Variable).register].compact
     end
-  end  
+  end
 end
 
 require "./assembly"

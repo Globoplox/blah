@@ -1,5 +1,4 @@
 class Stacklang::Function
-
   # Get the memory location and type represented an access.
   # This work by obtaining a memory location for its subvalue and adding the accessed field offset.
   def compile_access_lvalue(access : AST::Access) : {Memory, Type::Any}?
@@ -14,7 +13,7 @@ class Stacklang::Function
       else
         error "Cannot access field #{access.field} on expression #{access.operand} of type #{constraint}", node: access
       end
-    else 
+    else
       error "Cannot compute lvalue for #{access}", node: access
     end
   end
@@ -38,24 +37,24 @@ class Stacklang::Function
       {compile_variable_lvalue(variable), variable.constraint}
     else
       global = @unit.globals[identifier.name]? || error "Unknown identifier #{identifier.name}", node: identifier
-      {compile_global_lvalue(global), global.type_info}             
+      {compile_global_lvalue(global), global.type_info}
     end
   end
- 
+
   # Get the memory location represented by an expression.
   # This is limited to global, variable, dereferenced pointer and access to them.
   # TODO: Optimization when we do not need the Memory target and only care for side effect ?
   def compile_lvalue(expression : AST::Expression) : {Memory, Type::Any}?
     case expression
     when AST::Identifier then compile_identifier_lvalue expression
-    when AST::Access then compile_access_lvalue expression
-    when AST::Cast then compile_lvalue(expression.target).try { |lvalue| { lvalue[0], @unit.typeinfo(expression.constraint) } }
+    when AST::Access     then compile_access_lvalue expression
+    when AST::Cast       then compile_lvalue(expression.target).try { |lvalue| {lvalue[0], @unit.typeinfo(expression.constraint)} }
     when AST::Unary, AST::Binary
       if expression.is_a?(AST::Binary) && expression.name == "["
         expression = AST::Unary.new(AST::Binary.new(AST::Unary.new(expression.left, "&"), "+", expression.right), "*")
       end
       if expression.is_a?(AST::Unary) && expression.name == "*"
-        # TODO: use Any register destination instead of grabbing one ? 
+        # TODO: use Any register destination instead of grabbing one ?
         destination_register = grab_register
         constraint = compile_expression expression.operand, into: destination_register
         if constraint.is_a? Type::Pointer
@@ -63,7 +62,8 @@ class Stacklang::Function
         else
           error "Cannot dereference an expression of type #{constraint}", node: expression
         end
-      else nil
+      else
+        nil
       end
     else nil
     end
@@ -72,7 +72,7 @@ class Stacklang::Function
   # Compile an assignement of any value to any other value.
   # The left side of the assignement must be solvable to a memory location (a lvalue).
   # The written value can also be written to another location (An assignement do have a type and an expression).
-  def compile_assignment(left_side : AST::Expression, right_side : AST::Expression, into : Registers | Memory | Nil): Type::Any
+  def compile_assignment(left_side : AST::Expression, right_side : AST::Expression, into : Registers | Memory | Nil) : Type::Any
     lvalue_result = compile_lvalue left_side
     lvalue_result || raise "Expression #{left_side.to_s} is not a valid left value for an assignement in #{@unit.path} at line #{left_side.line}"
     lvalue, destination_type = lvalue_result
@@ -91,5 +91,4 @@ class Stacklang::Function
     move lvalue, destination_type, into: into if into
     destination_type
   end
-  
 end

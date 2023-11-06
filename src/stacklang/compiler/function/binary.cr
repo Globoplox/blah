@@ -1,19 +1,18 @@
 class Stacklang::Function
-
-  def compile_addition(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any} , into : Registers | Memory, node : AST::Node, soustract = false): Type::Any
+  def compile_addition(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST::Node, soustract = false) : Type::Any
     left_side_register, left_side_type = left_side
     right_side_register, right_side_type = right_side
     ret_type = case {left_side_type, right_side_type}
-      when {Type::Word, Type::Word} then Type::Word.new
-      when {Type::Pointer, Type::Word} then left_side_type
-      when {Type::Word, Type::Pointer} then right_side_type
-      else error "Cannot add values of types #{left_side_type} and #{right_side_type} together", node: node
-    end
-    result_register = grab_register excludes: [left_side_register, right_side_register]# TODO: maybe protect into for optimal code ?
+               when {Type::Word, Type::Word}    then Type::Word.new
+               when {Type::Pointer, Type::Word} then left_side_type
+               when {Type::Word, Type::Pointer} then right_side_type
+               else                                  error "Cannot add values of types #{left_side_type} and #{right_side_type} together", node: node
+               end
+    result_register = grab_register excludes: [left_side_register, right_side_register] # TODO: maybe protect into for optimal code ?
     # It is not critical, only case is is not R7 relative are from assignment lvalue and they are tmp val protected.
     if soustract
       nand result_register, right_side_register, right_side_register
-      addi result_register,result_register, 1
+      addi result_register, result_register, 1
       right_side_register = result_register
     end
     add result_register, left_side_register, right_side_register
@@ -21,13 +20,13 @@ class Stacklang::Function
     ret_type
   end
 
-  def compile_bitwise_and(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any} , into : Registers | Memory, node : AST::Node, inv = false): Type::Any
+  def compile_bitwise_and(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST::Node, inv = false) : Type::Any
     left_side_register, left_side_type = left_side
     right_side_register, right_side_type = right_side
     ret_type = case {left_side_type, right_side_type}
-      when {Type::Word, Type::Word} then Type::Word.new
-      else error "Cannot apply 'bitewise nand' to values of types #{left_side_type} and #{right_side_type} together", node: node
-    end 
+               when {Type::Word, Type::Word} then Type::Word.new
+               else                               error "Cannot apply 'bitewise nand' to values of types #{left_side_type} and #{right_side_type} together", node: node
+               end
     result_register = grab_register excludes: [left_side_register, right_side_register]
     nand result_register, left_side_register, right_side_register
     nand result_register, result_register, result_register unless inv
@@ -35,13 +34,13 @@ class Stacklang::Function
     ret_type
   end
 
-  def compile_bitwise_or(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any} , into : Registers | Memory, node : AST::Node, inv = false): Type::Any
+  def compile_bitwise_or(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST::Node, inv = false) : Type::Any
     left_side_register, left_side_type = left_side
     right_side_register, right_side_type = right_side
     ret_type = case {left_side_type, right_side_type}
-      when {Type::Word, Type::Word} then Type::Word.new
-      else error "Cannot apply 'bitewise or' to values of types #{left_side_type} and #{right_side_type} together", node: node
-    end 
+               when {Type::Word, Type::Word} then Type::Word.new
+               else                               error "Cannot apply 'bitewise or' to values of types #{left_side_type} and #{right_side_type} together", node: node
+               end
     result_register_1 = grab_register excludes: [left_side_register, right_side_register]
     nand result_register_1, left_side_register, left_side_register
     result_register_2 = grab_register excludes: [right_side_register, result_register_1]
@@ -52,16 +51,16 @@ class Stacklang::Function
     move result_register, ret_type, into: into
     ret_type
   end
-  
+
   # TODO: Allow ptr comparison ?
   # FIXME: should not compute right side if left side is falsy
-  def compile_logic_and(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any} , into : Registers | Memory, node : AST::Node): Type::Any
+  def compile_logic_and(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST::Node) : Type::Any
     left_side_register, left_side_type = left_side
     right_side_register, right_side_type = right_side
     ret_type = case {left_side_type, right_side_type}
-      when {Type::Word, Type::Word} then Type::Word.new
-      else error "Cannot compare two values of types #{left_side_type} and #{right_side_type}", node: node
-    end
+               when {Type::Word, Type::Word} then Type::Word.new
+               else                               error "Cannot compare two values of types #{left_side_type} and #{right_side_type}", node: node
+               end
     result_register = grab_register excludes: [left_side_register, right_side_register]
     add result_register, result_register, Registers::R0
     beq left_side_register, Registers::R0, 0x2
@@ -73,19 +72,19 @@ class Stacklang::Function
 
   # TODO: Allow ptr comparison ?
   # FIXME: should not compute right side if left side is truthy
-  def compile_logic_or(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any} , into : Registers | Memory, node : AST::Node): Type::Any
-   compile_bitwise_or left_side, right_side, into, node 
+  def compile_logic_or(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST::Node) : Type::Any
+    compile_bitwise_or left_side, right_side, into, node
   end
-  
+
   # TODO: Add long type equal ?
   # TODO: Allow ptr comparison ?
-  def compile_equal(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any} , into : Registers | Memory, node : AST::Node, neq = false): Type::Any
+  def compile_equal(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST::Node, neq = false) : Type::Any
     left_side_register, left_side_type = left_side
     right_side_register, right_side_type = right_side
     ret_type = case {left_side_type, right_side_type}
-      when {Type::Word, Type::Word} then Type::Word.new
-      else error "Cannot compare two values of types #{left_side_type} and #{right_side_type}", node: node
-    end
+               when {Type::Word, Type::Word} then Type::Word.new
+               else                               error "Cannot compare two values of types #{left_side_type} and #{right_side_type}", node: node
+               end
     result_register = grab_register excludes: [left_side_register, right_side_register]
     unless neq
       addi result_register, Registers::R0, 1
@@ -100,13 +99,13 @@ class Stacklang::Function
     ret_type
   end
 
-  def compile_comparator(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any} , into : Registers | Memory, node : AST::Node,  superior_to = false, or_equal = false): Type::Any
+  def compile_comparator(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST::Node, superior_to = false, or_equal = false) : Type::Any
     left_side_register, left_side_type = left_side
     right_side_register, right_side_type = right_side
     ret_type = case {left_side_type, right_side_type}
-      when {Type::Word, Type::Word} then Type::Word.new
-      else error "Cannot compare two values of types #{left_side_type} and #{right_side_type}", node: node
-    end
+               when {Type::Word, Type::Word} then Type::Word.new
+               else                               error "Cannot compare two values of types #{left_side_type} and #{right_side_type}", node: node
+               end
     result_register = grab_register excludes: [left_side_register, right_side_register]
     left_side_register, right_side_register = {right_side_register, left_side_register} if superior_to
     # we inv right_side
@@ -123,10 +122,10 @@ class Stacklang::Function
     # if tmp register hold 0x8000 it is true
     # else it holds zero, it is false. Tmp register hold the result.
     # if or_equal
-    #   # donc result & 0xffff => 0 que si result != 0 (donc sir result == 0, donne truthy) <= COULD REWORK == to use this to avoid beq     
+    #   # donc result & 0xffff => 0 que si result != 0 (donc sir result == 0, donne truthy) <= COULD REWORK == to use this to avoid beq
     #   literal_register = grab_register excludes: [left_side_register, right_side_register, result_register, tmp_register]
     #   movi literal_register, 0xffff
-    #   nand result_register, result_register, literal_register      
+    #   nand result_register, result_register, literal_register
     #   # then or tmp and result
     #   nand tmp_register, tmp_register, tmp_register
     #   nand result_register, result_register, result_register
@@ -135,30 +134,30 @@ class Stacklang::Function
     move tmp_register, left_side_type, into: into
     Type::Word.new
   end
-  
-  def compile_binary_to_call(binary : AST::Binary, into : Registers | Memory | Nil): Type::Any
+
+  def compile_binary_to_call(binary : AST::Binary, into : Registers | Memory | Nil) : Type::Any
     call_name = case binary.name
-    when "<<" then "left_bitshift"
-    when ">>" then "right_bitshift"
-    when "*" then "multiply"
-    else error "Usupported binary operator '#{binary.name}'", node: binary
-    end
+                when "<<" then "left_bitshift"
+                when ">>" then "right_bitshift"
+                when "*"  then "multiply"
+                else           error "Usupported binary operator '#{binary.name}'", node: binary
+                end
     call = AST::Call.new(AST::Identifier.new(call_name), [binary.left, binary.right])
     call.line = binary.line
     call.character = binary.character
     compile_call call, into: into
   end
 
-  def compile_sugar_assignment(binary : AST::Binary, into : Registers | Memory | Nil): Type::Any
+  def compile_sugar_assignment(binary : AST::Binary, into : Registers | Memory | Nil) : Type::Any
     sugared = binary.name.rchop "="
-    compile_assignment binary.left,  AST::Binary.new(binary.left, sugared, binary.right), into: into
+    compile_assignment binary.left, AST::Binary.new(binary.left, sugared, binary.right), into: into
   end
 
-  def compile_table_access(binary : AST::Binary, into : Registers | Memory | Nil): Type::Any
+  def compile_table_access(binary : AST::Binary, into : Registers | Memory | Nil) : Type::Any
     compile_expression AST::Unary.new(AST::Binary.new(AST::Unary.new(binary.left, "&"), "+", binary.right), "*"), into: into
   end
 
-  def compile_binary(binary : AST::Binary, into : Registers | Memory | Nil): Type::Any
+  def compile_binary(binary : AST::Binary, into : Registers | Memory | Nil) : Type::Any
     if into.nil?
       compile_expression binary.left, into: nil
       compile_expression binary.right, into: nil
@@ -174,35 +173,34 @@ class Stacklang::Function
         left_side = {left_side_register, left_side_type}
         right_side = {right_side_register, right_side_type}
         case binary.name
-        when "+" then compile_addition left_side, right_side, into: into, node: binary
-        when "-" then compile_addition left_side, right_side, into: into, node: binary, soustract: true
-        when "&" then compile_bitwise_and left_side, right_side, into: into, node: binary
+        when "+"  then compile_addition left_side, right_side, into: into, node: binary
+        when "-"  then compile_addition left_side, right_side, into: into, node: binary, soustract: true
+        when "&"  then compile_bitwise_and left_side, right_side, into: into, node: binary
         when "&&" then compile_logic_and left_side, right_side, into: into, node: binary
         when "||" then compile_logic_or left_side, right_side, into: into, node: binary
         when "~&" then compile_bitwise_and left_side, right_side, into: into, node: binary, inv: true
-        when "|" then compile_bitwise_or left_side, right_side, into: into, node: binary
+        when "|"  then compile_bitwise_or left_side, right_side, into: into, node: binary
         when "~|" then compile_bitwise_or left_side, right_side, into: into, node: binary, inv: true
         when "==" then compile_equal left_side, right_side, into: into, node: binary
         when "!=" then compile_equal left_side, right_side, into: into, node: binary, neq: true
-        when ">" then compile_comparator left_side, right_side, node: binary, into: into, superior_to: true
-        # when ">=" then compile_comparator left_side, right_side, node: binary, into: into, superior_to: true, or_equal: true
+        when ">"  then compile_comparator left_side, right_side, node: binary, into: into, superior_to: true
+          # when ">=" then compile_comparator left_side, right_side, node: binary, into: into, superior_to: true, or_equal: true
         when "<" then compile_comparator left_side, right_side, node: binary, into: into
-        # when "<=" then compile_comparator left_side, right_side, node: binary, into: into, or_equal: true
+          # when "<=" then compile_comparator left_side, right_side, node: binary, into: into, or_equal: true
         else error "Unusupported binary operation '#{binary.name}'", node: binary
         end
       end
     end
   end
-  
+
   # Compile a binary operator value, and move it's value if necessary.
-  def compile_assignment_or_binary(binary : AST::Binary, into : Registers | Memory | Nil): Type::Any
+  def compile_assignment_or_binary(binary : AST::Binary, into : Registers | Memory | Nil) : Type::Any
     case binary.name
-    when "=" then compile_assignment binary.left, binary.right, into: into
-    when "<<", ">>", "*", "/" then compile_binary_to_call binary, into: into
-    when "[" then compile_table_access binary, into: into 
+    when "="                                        then compile_assignment binary.left, binary.right, into: into
+    when "<<", ">>", "*", "/"                       then compile_binary_to_call binary, into: into
+    when "["                                        then compile_table_access binary, into: into
     when "+=", "-=", "&=", "~=", "|=", "<<=", ">>=" then compile_sugar_assignment binary, into: into
-    else compile_binary binary, into: into
+    else                                                 compile_binary binary, into: into
     end
   end
-  
 end

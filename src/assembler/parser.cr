@@ -10,7 +10,7 @@ class RiSC16::Assembler::Parser < Parser
     case str ["0x", "0b"]
     when "0x" then base = 16
     when "0b" then base = 2
-    else base = 10
+    else           base = 10
     end
     next unless digits = one_or_more ->{ char ['0'..'9', 'a'..'f', 'A'..'F'] }
     (sign + digits.join).to_i32 base: base
@@ -24,11 +24,11 @@ class RiSC16::Assembler::Parser < Parser
     next if text =~ /\\[^\\]/
     Text.new text.gsub("\\\\", "\\")
   end
-  
+
   rule def register
     next unless char 'r'
     next unless digit = char '0'..'7'
-    Register.new digit.to_i32 
+    Register.new digit.to_i32
   end
 
   rule def reference
@@ -43,7 +43,7 @@ class RiSC16::Assembler::Parser < Parser
     next unless symbol || offset
     Immediate.new offset || 0, symbol
   end
-  
+
   rule def comment
     next unless char '#'
     consume_until "\n"
@@ -79,14 +79,14 @@ class RiSC16::Assembler::Parser < Parser
     next unless whitespace
     true
   end
-  
+
   rule def label_definition
     exported = export_keyword != nil
     next unless label = one_or_more ->{ char ['0'..'9', '_'..'_', 'a'..'z', 'A'..'Z'] }
     next unless char ':'
     {label.join, exported}
   end
-  
+
   rule def section_specifier
     next unless str "section"
     next unless whitespace
@@ -104,27 +104,26 @@ class RiSC16::Assembler::Parser < Parser
     else
       weak = false
     end
-    Section.new name.join, offset, weak: weak  
+    Section.new name.join, offset, weak: weak
   end
-  
+
   rule def unit(name = nil)
     multiline_whitespace
-    statements = zero_or_more ->statement, separated_by: ->multiline_whitespace 
+    statements = zero_or_more ->statement, separated_by: ->multiline_whitespace
     multiline_whitespace
     next unless read_fully?
     Unit.new statements.reject(&.empty?), name: name
   end
 
-  def initialize(path : String, debug = false)
+  def initialize(path : String)
     @path = path
     File.open path do |io|
-      super(io, debug)
+      super(io)
     end
   end
 
-  def initialize(io : IO, debug = false)
+  def initialize(io : IO)
     @path = nil
-    super(io, debug)
+    super(io)
   end
-  
 end

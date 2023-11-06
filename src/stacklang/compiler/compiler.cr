@@ -7,22 +7,21 @@ require "../../spec"
 class Stacklang::Compiler
   @units : Hash(Path, Unit)
   getter spec
-  
+
   def initialize(paths : Array(String), @spec : RiSC16::Spec, @debug = true)
     @units = {} of Path => Unit
     @units = paths.to_h do |path|
-      absolute =  Path[path].expand home: true
+      absolute = Path[path].expand home: true
       File.open absolute do |file|
-        parser = Stacklang::Parser.new(file, @debug)
+        parser = Stacklang::Parser.new(file)
         ast = parser.unit
         unless ast
-          parser.trace_root.try &.dump
           raise "Could not parse unit '#{path}'"
         end
         unit = Unit.new ast, absolute, self
-        { absolute, unit }
+        {absolute, unit}
       end
-    end    
+    end
   end
 
   def compile : Array(RiSC16::Object)
@@ -35,16 +34,14 @@ class Stacklang::Compiler
     absolute = Path[path].expand home: true, base: from.path.dirname
     @units[absolute]? || begin
       File.open absolute do |file|
-        parser = Stacklang::Parser.new(file, @debug)
+        parser = Stacklang::Parser.new(file)
         ast = parser.unit
         unless ast
-          parser.trace_root.try &.dump
           raise "Could not parse unit '#{path}'"
         end
         unit = Unit.new ast, absolute, self
         @units[absolute] = unit
-      end    
+      end
     end
   end
-    
 end

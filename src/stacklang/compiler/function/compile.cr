@@ -1,5 +1,4 @@
 class Stacklang::Function
-
   def predict_size
     old_refs = @section.references
     old_defs = @section.definitions
@@ -14,7 +13,7 @@ class Stacklang::Function
     @section.references = old_refs
     text_size
   end
-  
+
   # Run a computation step while ensuring a register value is kept or cached in stack.
   # To be used with #uncache or #move.
   def with_temporary(register : Registers, constraint : Type::Any)
@@ -41,13 +40,13 @@ class Stacklang::Function
       variable.register = nil
     end
   end
-  
+
   # Cache a variable in a register.
   # Used to fetch temporary variables, or to get the actual value of a variable.
   # If the variable can be cached (restricted or temporary), the register is kept linked to
   # the variable so next time we need the value of the variable, we can reuse this register.
   # If the register is needed for something else, it will be automatically unlinked and persisted to ram (by `grab_register`).
-  def cache(variable, excludes): Registers
+  def cache(variable, excludes) : Registers
     variable.register || begin
       register = grab_register excludes: excludes
       lw register, STACK_REGISTER, variable.offset
@@ -59,7 +58,7 @@ class Stacklang::Function
   def is_free_to_use(register)
     (register.in? GPR) && !(register.in? @temporaries.compact_map(&.register) - @variables.values.compact_map(&.register))
   end
-  
+
   # Grab a register not excluded, free to use.
   # If the grabbed register is used as a cache for a variable, or is holding a temporary value,
   # the var is written to the stack so value is not lost.
@@ -97,9 +96,10 @@ class Stacklang::Function
       compile_statement statement
     end
 
-    @section.text = Slice.new @text.size do |i| @text[i] end
+    @section.text = Slice.new @text.size do |i|
+      @text[i]
+    end
     @text.clear
     @section
   end
-  
 end

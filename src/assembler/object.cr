@@ -2,7 +2,7 @@
 # It can be linked into other objects or into a binary. See `RiSC16::Assembler::Linker`.
 class RiSC16::Object
   # Optional name used to indicate the origin source of an object file, for helping humans.
-  property name : String? 
+  property name : String?
 
   # The array of sections, that is, continuous piece of data, declaring and referencing symbols.
   property sections : Array(Section) = [] of Section
@@ -31,7 +31,7 @@ class RiSC16::Object
   # It has an optional offset within a namespace where it expect to be loaded.
   # When ready for merging, a section should have an absolute, expected loading address (relative to address 0).
   # This allows the linker to quickly adjust the symbols addresses given the real loading address.
-  class	Section
+  class Section
     property name : String
     property offset : Int32? = nil
     property absolute : Int32? = nil
@@ -39,14 +39,15 @@ class RiSC16::Object
     property definitions : Hash(String, Symbol) = {} of String => Symbol
     property references : Hash(String, Array(Reference)) = {} of String => Array(Reference)
     property options : Options
-    
+
     @[Flags]
     enum Options
       Weak # The section fragments might be ignored in static binary if there are no references to any of its exported symbols.
-           # This option can differ from section fragment to section fragment. It is usefull only when building a static binary.
+      # This option can differ from section fragment to section fragment. It is usefull only when building a static binary.
     end
 
-    def initialize(@name, @offset = nil, @options = Options::None) end
+    def initialize(@name, @offset = nil, @options = Options::None)
+    end
 
     # Represent a symbol defined by a section.
     # It can be static to the section or global depending on `#exported`.
@@ -54,8 +55,10 @@ class RiSC16::Object
     class Symbol
       # NOTE the address is sometimes used to store macros values from the specification. file `RiSC16::Spec`. This is why it must allows negative values.
       property address : Int32
-      property exported	: Bool
-      def initialize(@address, @exported) end
+      property exported : Bool
+
+      def initialize(@address, @exported)
+      end
     end
 
     # Represent a reference to a symbol.
@@ -67,8 +70,8 @@ class RiSC16::Object
       property offset : Int32
       property kind : Kind
       enum Kind
-        # Value must be converted to a 7 bit complement form signed integer, to write in the 7 lsb of the `Reference#offset`'th word of `Section#text`.  
-	Imm
+        # Value must be converted to a 7 bit complement form signed integer, to write in the 7 lsb of the `Reference#offset`'th word of `Section#text`.
+        Imm
 
         # Value must be converted to a 16 bit complement form signed integer, to write the 10 msb of in the 10 lsb of the `Reference#offset`'th word of `Section#text`.
         Lui
@@ -77,17 +80,19 @@ class RiSC16::Object
         Lli
 
         # Value must be converted to a 16 bit complement form signed integer, to write in the `Reference#offset`'th word of `Section#text`.
-	Data
+        Data
 
         # Value must be made relative to reference addres, then converted to a 7 bit complement form signed integer,
         # to write in the 7 lsb of the `Reference#offset`'th word of `Section#text`.
         Beq #
       end
-      def initialize(@address, @offset, @kind) end
+
+      def initialize(@address, @offset, @kind)
+      end
     end
   end
 
-  ENDIAN = IO::ByteFormat::BigEndian 
+  ENDIAN = IO::ByteFormat::BigEndian
 
   # Serialize this object to the given *io*.
   def to_io(io, endian = ENDIAN)
@@ -129,7 +134,7 @@ class RiSC16::Object
     object = self.new(name)
     object.merged = UInt8.from_io(io, endian) != 0
     (Int32.from_io io, endian).times do
-      section = Section.new io.read_string (Int32.from_io io, endian)
+      section = Section.new io.read_string(Int32.from_io io, endian)
       object.sections << section
       section.options = Section::Options.from_value Int32.from_io io, endian
       has_offset = io.read_byte
@@ -139,13 +144,13 @@ class RiSC16::Object
       section.absolute = Int32.from_io io, endian
       section.absolute = nil if has_absolute == 0
       (Int32.from_io io, endian).times do
-        name = io.read_string (Int32.from_io io, endian)
+        name = io.read_string(Int32.from_io io, endian)
         address = Int32.from_io io, endian
         exported = io.read_byte
         section.definitions[name] = Section::Symbol.new address, exported != 0
       end
       (Int32.from_io io, endian).times do
-        name = io.read_string (Int32.from_io io, endian)
+        name = io.read_string(Int32.from_io io, endian)
         references = [] of Section::Reference
         (Int32.from_io io, endian).times do
           address = UInt16.from_io io, endian

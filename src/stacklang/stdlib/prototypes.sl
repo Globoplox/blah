@@ -1,4 +1,4 @@
 // Prototypes for external symbols defined in assembly
-extern var null:*
-extern var hex_digits
-extern fun multiply(a,b):_
+var extern null:*
+var extern hex_digits
+fun extern multiply(a,b):_

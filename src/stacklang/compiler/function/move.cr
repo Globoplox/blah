@@ -4,7 +4,7 @@ class Stacklang::Function
   # Move a bunch of memory from a source to a destination.
   # It handle a wide range of case:
   # - If the source value is in a register
-  # - If the source value is found at an address represented by an offset relative to an address in a register 
+  # - If the source value is found at an address represented by an offset relative to an address in a register
   # - If the source value is a variable that is cached in a register
   # - If the source value is found at an address represented by an offset relative to a address in a variable
   # - If the destination is a register
@@ -15,14 +15,13 @@ class Stacklang::Function
   # thanks to caching within register can be disabled by setting *force_to_memory* to true.
   # That should be usefull only when storing a var because it's cache register is needed for something else.
   def move(memory : Memory | Registers, constraint : Type::Any, into : Memory | Registers, force_to_memory = false)
-
     # If the source is a variable that is already cached into a register, then use this register directly.
     if memory.is_a? Memory && memory.within_var && memory.within_var.not_nil!.register && memory.within_var.not_nil!.restricted
       memory = memory.within_var.try &.register || memory
     end
 
     # ARE THOSE EVER USED ? There is a lot of cool opti to do with lvalues and ptr and & and * but right now this is likely garbage
-    
+
     # If the source is a memory location relative to an address stored into a variable, we need to get that address into a register.
     memory.reference_register.as?(Variable).try do |address_variable|
       memory.reference_register = cache address_variable, excludes: into.used_registers
@@ -36,12 +35,11 @@ class Stacklang::Function
     case {memory, into}
     when {Registers, Registers}
       add into, memory, Registers::R0 unless into == memory
-
     when {Registers, Memory}
       if force_to_memory == false && (into_var = into.within_var) && into_var.constraint.size == 1 && into_var.restricted
         if into_var.register
           add into_var.register.not_nil!, memory, Registers::R0
-        elsif is_free_to_use memory 
+        elsif is_free_to_use memory
           into_var.register = memory
         else
           sw memory, into.reference_register!, into.value
@@ -49,19 +47,16 @@ class Stacklang::Function
       else
         sw memory, into.reference_register!, into.value
       end
-
     when {Memory, Registers}
       error "Illegal move of multiple word into register" if constraint.size > 1
       lw into, memory.reference_register!, memory.value
-
     when {Memory, Memory}
-      if force_to_memory == false &&  (var = into.within_var) && var.constraint.size == 1 && var.restricted
+      if force_to_memory == false && (var = into.within_var) && var.constraint.size == 1 && var.restricted
         target_register = var.register || grab_register excludes: [memory.reference_register!]
-        lw target_register,  memory.reference_register!,  memory.value
+        lw target_register, memory.reference_register!, memory.value
         var.register = target_register
-
       else
-        if (constraint.size - 1) * 2 < 1 # approximate cost of other branch. Hard to compute because it might involve uncaching  
+        if (constraint.size - 1) * 2 < 1 # approximate cost of other branch. Hard to compute because it might involve uncaching
           tmp_register = grab_register excludes: [into.reference_register!, memory.reference_register!]
           (0...(constraint.size)).each do |index|
             lw tmp_register, memory.reference_register!, memory.value + index
@@ -83,9 +78,7 @@ class Stacklang::Function
           beq index_register, Registers::R0, 1
           beq Registers::R0, Registers::R0, -7
         end
-        
       end
     end
   end
-  
 end

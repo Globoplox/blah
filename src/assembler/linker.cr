@@ -5,7 +5,7 @@ module RiSC16::Linker
   extend self
 
   ENDIAN = IO::ByteFormat::BigEndian
-  
+
   def symbols_from_spec(spec)
     predefined_symbols = {} of String => Object::Section::Symbol
     spec.segments.each do |segment|
@@ -23,7 +23,7 @@ module RiSC16::Linker
     end
     predefined_symbols
   end
-  
+
   # Link several objects into a single object.
   # It set the `absolute` field of section, which mean
   # Attributing them an absolute location, assuming a loading location of 0.
@@ -111,10 +111,10 @@ module RiSC16::Linker
         end
         references.reject! &.in? rem
       end
-      section.references.reject! { |_,v| v.empty? }
+      section.references.reject! { |_, v| v.empty? }
     end
   end
-  
+
   # Static link an object into a binary blob, expected to be loaded at a given lovation (default to 0).
   # It performs the final symbols/value substitution.
   # This is the piece of code that would be necessary to bootstrap to be able to
@@ -124,7 +124,7 @@ module RiSC16::Linker
 
     link_local_beq object
     strip_unused object
-    
+
     globals = symbols_from_spec(spec).transform_values do |symbol|
       Tuple(Object::Section::Symbol, Object::Section?).new symbol, nil
     end
@@ -146,13 +146,12 @@ module RiSC16::Linker
     text_size = max.absolute.not_nil! + max.text.size - start
 
     binary = Slice(UInt16).new text_size # No padding, start at *start*
-    
+
     object.sections.each do |section|
-      
       symbols = globals.merge section.definitions.reject { |name, symbol| symbol.exported }.transform_values { |definition|
         {definition, section}
       }
-      
+
       block_location = section.absolute.not_nil! - start
       section.text.copy_to binary[block_location...(block_location + section.text.size)]
       section.references.each do |name, references|
@@ -162,32 +161,32 @@ module RiSC16::Linker
           reference_address = section.absolute.not_nil! + reference.address - start
 
           case reference.kind
-            in Object::Section::Reference::Kind::Data
-              if value > 0b1111_1111_1111_1111 || value < - 0b1111_1111_1111_1111
-                raise "Reference to #{name} = #{value} overflow from allowed 16 bits for symbol of type #{reference.kind}"
-              end
-              binary[reference_address] = (value < 0 ? (2 ** 16) + value.bits(0...(16 - 1)) : value).to_u16
-            in Object::Section::Reference::Kind::Imm
-              if value > 0b0011_1111 || value < - 0b0111_1111
-                raise "Reference to #{name} = #{value} overflow from allowed 7 bits for symbol of type #{reference.kind}"
-              end
-              binary[reference_address] = binary[reference_address] & ~0b0111_1111 | (value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16
-            in Object::Section::Reference::Kind::Lui
-              if value > 0b1111_1111_1111_1111 || value < - 0b1111_1111_1111_1111
-                raise "Reference to #{name} = #{value} overflow from allowed 16 bits for symbol of type #{reference.kind}"
-              end
-              binary[reference_address] = binary[reference_address] & ~0b11_1111_1111 | ((value < 0 ? (2 ** 16) + value.bits(0...(16 - 1)) : value).to_u16 >> 6)
-            in Object::Section::Reference::Kind::Lli 
-              if value > 0b1111_1111_1111_1111 || value < - 0b1111_1111_1111_1111
-                raise "Reference to #{name} = #{value} overflow from allowed 16 bits for symbol of type #{reference.kind}"
-              end
-              binary[reference_address] = binary[reference_address] & ~0b0111_1111 | ((value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16 & 0x3f)
-            in Object::Section::Reference::Kind::Beq
-              value = value - (reference.address + section.absolute.not_nil!) - 1
-              if value > 0b0011_1111 || value < - 0b0111_1111
-                raise "Reference to #{name} = #{value} overflow from allowed 7 bits for symbol of type #{reference.kind}"
-              end
-              binary[reference_address] = binary[reference_address] & ~0b0111_1111 | (value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16
+          in Object::Section::Reference::Kind::Data
+            if value > 0b1111_1111_1111_1111 || value < -0b1111_1111_1111_1111
+              raise "Reference to #{name} = #{value} overflow from allowed 16 bits for symbol of type #{reference.kind}"
+            end
+            binary[reference_address] = (value < 0 ? (2 ** 16) + value.bits(0...(16 - 1)) : value).to_u16
+          in Object::Section::Reference::Kind::Imm
+            if value > 0b0011_1111 || value < -0b0111_1111
+              raise "Reference to #{name} = #{value} overflow from allowed 7 bits for symbol of type #{reference.kind}"
+            end
+            binary[reference_address] = binary[reference_address] & ~0b0111_1111 | (value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16
+          in Object::Section::Reference::Kind::Lui
+            if value > 0b1111_1111_1111_1111 || value < -0b1111_1111_1111_1111
+              raise "Reference to #{name} = #{value} overflow from allowed 16 bits for symbol of type #{reference.kind}"
+            end
+            binary[reference_address] = binary[reference_address] & ~0b11_1111_1111 | ((value < 0 ? (2 ** 16) + value.bits(0...(16 - 1)) : value).to_u16 >> 6)
+          in Object::Section::Reference::Kind::Lli
+            if value > 0b1111_1111_1111_1111 || value < -0b1111_1111_1111_1111
+              raise "Reference to #{name} = #{value} overflow from allowed 16 bits for symbol of type #{reference.kind}"
+            end
+            binary[reference_address] = binary[reference_address] & ~0b0111_1111 | ((value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16 & 0x3f)
+          in Object::Section::Reference::Kind::Beq
+            value = value - (reference.address + section.absolute.not_nil!) - 1
+            if value > 0b0011_1111 || value < -0b0111_1111
+              raise "Reference to #{name} = #{value} overflow from allowed 7 bits for symbol of type #{reference.kind}"
+            end
+            binary[reference_address] = binary[reference_address] & ~0b0111_1111 | (value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16
           end
         end
       end
@@ -196,7 +195,5 @@ module RiSC16::Linker
     binary.each do |word|
       word.to_io io, ENDIAN
     end
-    
   end
-    
 end

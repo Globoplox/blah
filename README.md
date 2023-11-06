@@ -14,7 +14,6 @@ It consists of:
 - A [compiler](/wiki/compiler.md) for a minimalistic higher-level programming language
 - A [debugger](/wiki/debugger.md) curse tool for visualizing binaries and execution
 
-
 All of which are bundled within a single CLI tool, written in [Crystal](https://crystal-lang.org/).
 
 ## TODO

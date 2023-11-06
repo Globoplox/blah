@@ -1,7 +1,6 @@
 require "ncurses"
 
 module RiSC16
-
   abstract class Window
     getter x : Int32
     getter y : Int32
@@ -9,13 +8,16 @@ module RiSC16
     getter height : Int32
     getter title
     property focus : Bool = false
+
     def initialize(x, y, width, height, @title : String? = nil)
       @x = x.to_i
       @y = y.to_i
       @height = height.to_i
       @width = width.to_i
     end
+
     abstract def content(window : NCurses::Window)
+
     def draw
       NCurses::Window.subwin(x: @x, y: @y, height: @height, width: @width, parent: NCurses.stdscr) do |window|
         window.border
@@ -30,8 +32,10 @@ module RiSC16
         window.refresh
       end
     end
+
     def up
     end
+
     def down
     end
   end
@@ -40,6 +44,7 @@ module RiSC16
     def initialize(x, y, width, height, title = nil, &@block : NCurses::Window ->)
       super(x, y, width, height, title)
     end
+
     def content(window : NCurses::Window)
       @block.call(window)
     end
@@ -49,6 +54,7 @@ module RiSC16
     getter content_cursor : Int32
     getter line_cursor : Int32
     getter range : Range(Int32, Int32) | Range(Int32, Nil)
+
     def initialize(x, y, width, height, title = nil, @range = (0..), &@block : Int32 -> String?)
       super(x, y, width, height, title)
       @content_cursor = @range.begin
@@ -78,7 +84,7 @@ module RiSC16
 
     def content(window : NCurses::Window)
       (1..(@height - 2)).each do |line|
-        window.attron(NCurses::Attribute::REVERSE)  if line == @line_cursor
+        window.attron(NCurses::Attribute::REVERSE) if line == @line_cursor
         content = @block.call(@content_cursor + line - 1)
         content ||= "".ljust(@width - 2, ' ') if line == @line_cursor
         window.mvaddstr content, x: 1, y: line if content
@@ -96,5 +102,4 @@ module RiSC16
       end
     end
   end
-
 end
