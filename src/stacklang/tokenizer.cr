@@ -1,15 +1,22 @@
-# Kind of work, unused, to be used with a parser rewrite
-# that hopefully will be much better at describing error and context
-module Stacklang::Lexer
+# Split a stream of text into tokens
+module Stacklang::Tokenizer
   struct Token
     getter value : String
+    getter source : String?
     getter line : Int32?
     getter character : Int32?
-    def initialize(@value, @line, @character)
+    def initialize(@value, @line, @character, @source)
     end
   end
-  
-  def self.run(io) : Array(Token)
+
+  def self.tokenize(filename : String) : Array(Token) 
+    source = Path[filename].expend
+    File.open filename do |io|
+      tokenize io, source: source
+    end
+  end
+
+  def self.tokenize(io : IO, source = nil) : Array(Token)
     tokens = [] of Token
     token = [] of Char
     last = '\0'
@@ -53,7 +60,7 @@ module Stacklang::Lexer
       elsif last == '/' && c == '*'
         comment_stack += 1
         unless token.size > 1
-          tokens << Token.new token[0...-1].join, line_at_start, character_at_start if token.size > 1
+          tokens << Token.new token[0...-1].join, line_at_start, character_at_start, source if token.size > 1
           token.clear
           line_at_start = line
           character_at_start = character
@@ -62,8 +69,8 @@ module Stacklang::Lexer
       elsif c == '\n' || c == ';'
         unless last == '\n'
           transform_last = '\n'
-          tokens << Token.new token.join, line_at_start, character_at_start unless token.empty?
-          tokens << Token.new "\n", line, character unless tokens[-1]?.try &.value.== "\n"
+          tokens << Token.new token.join, line_at_start, character_at_start, source unless token.empty?
+          tokens << Token.new "\n", line, character, source unless tokens[-1]?.try &.value.== "\n"
           token.clear
           line_at_start = line
           character_at_start = character
@@ -71,15 +78,15 @@ module Stacklang::Lexer
 
       elsif c == ' ' || c == '\t'
         unless token.empty?
-          tokens << Token.new token.join, line_at_start, character_at_start  unless token.empty?
+          tokens << Token.new token.join, line_at_start, character_at_start, source unless token.empty?
           token.clear
           line_at_start = line
           character_at_start = character
         end
       
       elsif c.in? ['[', ']', '{', '}', '(', ')', ':', ',']
-        tokens << Token.new token.join, line_at_start, character_at_start  unless token.empty?
-        tokens << Token.new c.to_s, line, character
+        tokens << Token.new token.join, line_at_start, character_at_start, source unless token.empty?
+        tokens << Token.new c.to_s, line, character, source
         token.clear
         line_at_start = line
         character_at_start = character
@@ -96,7 +103,7 @@ module Stacklang::Lexer
         end
 
         if (kind == :operator || last_kind == :operator)
-          tokens << Token.new token.join, line_at_start, character_at_start  unless token.empty?
+          tokens << Token.new token.join, line_at_start, character_at_start, source unless token.empty?
           token.clear
           line_at_start = line
           character_at_start = character
@@ -110,7 +117,7 @@ module Stacklang::Lexer
       end
       last = transform_last || c
     end
-    tokens << Token.new token.join, line_at_start, character_at_start  unless token.empty?
+    tokens << Token.new token.join, line_at_start, character_at_start, source unless token.empty?
 
     tokens
   end

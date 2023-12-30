@@ -1,20 +1,14 @@
+require "./tokenizer"
+
 module Stacklang::AST
 
-  class Node
-    property line : Int32?
-    property character : Int32?
+  abstract class Node
+    property token : Tokenizer::Token?
 
-    def dump(io)
-    end
+    abstract def dump(io, indent = 0)
 
-    def to_s(io)
+    def to_s(io : IO)
       dump io
-    end
-
-    def to_s
-      String.build do |io|
-        dump io
-      end
     end
   end
 
@@ -57,7 +51,7 @@ module Stacklang::AST
   class Requirement < Node
     getter target
 
-    def initialize(@target : String)
+    def initialize(@token, @target : String)
     end
 
     def dump(io, indent = 0)
@@ -66,24 +60,24 @@ module Stacklang::AST
   end
 
   abstract class Statement < Node
-    abstract def dump(io, indent = 0)
   end
 
   abstract class Type < Node
-    abstract def dump(io, indent = 0)
   end
 
   class Word < Type
+    def initialize(@token)
+    end
+
     def dump(io, indent = 0)
       io << "_"
     end
   end
 
   class Pointer < Type
-    def initialize(@target : Type)
-    end
-
     getter target
+    def initialize(@token, @target : Type)
+    end
 
     def dump(io, indent = 0)
       io << "*"
@@ -92,11 +86,11 @@ module Stacklang::AST
   end
 
   class Table < Type
-    def initialize(@target : Type, @size : Literal)
-    end
-
     getter target
     getter size
+
+    def initialize(@token, @target : Type, @size : Literal)
+    end
 
     def dump(io, indent = 0)
       @target.dump io, indent
@@ -107,10 +101,10 @@ module Stacklang::AST
   end
 
   class Custom < Type
-    def initialize(@name : String)
-    end
-
     getter name
+
+    def initialize(@token, @name : String)
+    end
 
     def dump(io, indent = 0)
       io << @name
@@ -124,7 +118,7 @@ module Stacklang::AST
     getter restricted
     getter extern
 
-    def initialize(@name : Identifier, @constraint : Type, @initialization : Expression?, @restricted = false, @extern = false)
+    def initialize(@token, @name : Identifier, @constraint : Type, @initialization : Expression?, @restricted = false, @extern = false)
     end
 
     def dump(io, indent = 0)
@@ -143,11 +137,11 @@ module Stacklang::AST
   end
 
   class If < Statement
-    def initialize(@condition : Expression, @body : Array(Statement))
-    end
-
     getter condition
     getter body
+
+    def initialize(@token, @condition : Expression, @body : Array(Statement))
+    end
 
     def dump(io, indent = 0)
       io << "if ("
@@ -164,11 +158,11 @@ module Stacklang::AST
   end
 
   class While < Statement
-    def initialize(@condition : Expression, @body : Array(Statement))
-    end
-
     getter condition
     getter body
+
+    def initialize(@token, @condition : Expression, @body : Array(Statement))
+    end
 
     def dump(io, indent = 0)
       io << "while ("
@@ -185,10 +179,10 @@ module Stacklang::AST
   end
 
   class Return < Statement
-    def initialize(@value : Expression?)
-    end
-
     getter value
+
+    def initialize(@token, @value : Expression?)
+    end
 
     def dump(io, indent = 0)
       io << "return "
@@ -197,12 +191,12 @@ module Stacklang::AST
   end
 
   class Function < Node
-    class Parameter
-      def initialize(@name : Identifier, @constraint : Type)
-      end
-
+    class Parameter < Node
       getter name
       getter constraint
+
+      def initialize(@token, @name : Identifier, @constraint : Type)
+      end
 
       def dump(io, indent = 0)
         @name.dump io, indent
@@ -218,7 +212,7 @@ module Stacklang::AST
     getter body
     getter extern
 
-    def initialize(@name : Identifier, @parameters : Array(Parameter), @return_type : Type?, @variables : Array(Variable), @body : Array(Statement), @extern : Bool)
+    def initialize(@token, @name : Identifier, @parameters : Array(Parameter), @return_type : Type?, @variables : Array(Variable), @body : Array(Statement), @extern : Bool)
     end
 
     def dump(io, indent = 0)
@@ -259,7 +253,7 @@ module Stacklang::AST
       getter name
       getter constraint
 
-      def initialize(@name : Identifier, @constraint : Type)
+      def initialize(@token, @name : Identifier, @constraint : Type)
       end
 
       def dump(io, indent = 0)
@@ -271,7 +265,7 @@ module Stacklang::AST
       end
     end
 
-    def initialize(@name : String, @fields : Array(Field))
+    def initialize(@token, @name : String, @fields : Array(Field))
     end
 
     def dump(io, indent = 0)
@@ -282,14 +276,13 @@ module Stacklang::AST
   end
 
   abstract class Expression < Statement
-    abstract def dump(io, indent = 0)
   end
 
   class Literal < Expression
-    def initialize(@number : Int32)
-    end
-
     getter number
+
+    def initialize(@token, @number : Int32)
+    end
 
     def dump(io, indent = 0)
       io << "0x"
@@ -298,10 +291,10 @@ module Stacklang::AST
   end
 
   class Sizeof < Expression
-    def initialize(@constraint : Type)
-    end
-
     getter constraint
+
+    def initialize(@token, @constraint : Type)
+    end
 
     def dump(io, indent = 0)
       io << "sizeof("
@@ -311,11 +304,11 @@ module Stacklang::AST
   end
 
   class Cast < Expression
-    def initialize(@constraint : Type, @target : Expression)
-    end
-
     getter constraint
     getter target
+
+    def initialize(@token, @constraint : Type, @target : Expression)
+    end
 
     def dump(io, indent = 0)
       io << "("
@@ -326,10 +319,10 @@ module Stacklang::AST
   end
 
   class Identifier < Expression
-    def initialize(@name : String)
-    end
-
     getter name
+
+    def initialize(@token, @name : String)
+    end
 
     def dump(io, indent = 0)
       io << @name
@@ -337,11 +330,11 @@ module Stacklang::AST
   end
 
   class Call < Expression
-    def initialize(@name : Identifier, @parameters : Array(Expression))
-    end
-
     getter name
     getter parameters
+
+    def initialize(@token, @name : Identifier, @parameters : Array(Expression))
+    end
 
     def dump(io, indent = 0)
       @name.dump io, indent
@@ -355,15 +348,14 @@ module Stacklang::AST
   end
 
   abstract class Operator < Expression
-    abstract def dump(io, indent = 0)
   end
 
   class Access < Operator
-    def initialize(@operand : Expression, @field : Identifier)
-    end
-
     getter operand
     getter field
+
+    def initialize(@token, @operand : Expression, @field : Identifier)
+    end
 
     def dump(io, indent = 0)
       @operand.dump io, indent
@@ -373,11 +365,11 @@ module Stacklang::AST
   end
 
   class Unary < Operator
-    def initialize(@operand : Expression, @name : String)
-    end
-
     getter operand
     getter name
+
+    def initialize(@token, @operand : Expression, @name : String)
+    end
 
     def dump(io, indent = 0)
       io << @name
@@ -386,12 +378,12 @@ module Stacklang::AST
   end
 
   class Binary < Operator
-    def initialize(@left : Expression, @name : String, @right : Expression)
-    end
-
     getter name
     getter left
     getter right
+
+    def initialize(@token, @left : Expression, @name : String, @right : Expression)
+    end
 
     def dump(io, indent = 0)
       @left.dump io, indent

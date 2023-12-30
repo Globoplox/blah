@@ -1,16 +1,15 @@
-require "./lexer"
+require "./tokenizer"
 require "./ast"
 
 # TODO: 
-# - Store tokens metadata (line, char, filename) within AST
 # - Structure declaration
 # - Statements: if, while
 # - Expression: cast, sizeof
-# - Rename Lexer to Tokenizer
 # - Update tokenizer to support multi character operators
 # - Move consume functions to tokenizer
 class Stacklang::Parser
   include Stacklang::AST
+  alias Token = Tokenizer::Token
   
   # rule def statement_if
   #   next unless str "if"
@@ -295,7 +294,7 @@ class Stacklang::Parser
   #   Struct.new name, fields
   # end
 
-  alias Component = {kind: Symbol, value: String | Array(Component) | {name: String, parameters: Array(Array(Component))}}
+  alias Component = {kind: Symbol, value: Tokenizer::Token | Array(Component) | {name: Tokenizer::Token, parameters: Array(Array(Component))}}
   # TODO: consume greedely:
   ## An unary, then reapeat
   ## else a literal or identifier (check if call)
@@ -308,15 +307,9 @@ class Stacklang::Parser
     allows = [:unary_operator, :operand]
     expect_more = false
     loop do
-      pp "CURRENT CHAIN:"
-      pp chain
-      pp "ALLOWED"
-      pp allows
       break if peek &.in? [")", "}", ","]
       token = next_token! "Any expression"
-      pp "TOKEN: #{token}"
-      puts
-      case token
+      case token.value
       
       when "("
         unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :operand 
@@ -359,17 +352,19 @@ class Stacklang::Parser
       
       else
         unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :operand
-        if token.starts_with? '"'
+        if token.value.starts_with? '"'
           chain << {kind: :string_literal, value: token}
-        elsif token.starts_with? '0'
+        elsif token.value.starts_with? '0'
           chain << {kind: :number_literal, value: token}
         else
+          # if consume? # simpler
           if peek &.== "("
             next_token? # Consume it
             call_parameters = [] of Array(Component)
             loop do
               call_parameters << expression_chain
-              case next_token! "A ',' or a ')'"
+              token = next_token! "A ',' or a ')'"
+              case token.value
               when "," then next
               when ")" then break
               else unexpected! "A ',' or a ')'"
@@ -390,136 +385,133 @@ class Stacklang::Parser
   end
 
   def expression
-    expression_chain
-    pp "EXPRESSION CHAIN:"
     pp expression_chain
-    puts
+    nil
   end
   
   def statement(token)
-    case token
+    case token.value
     when "return"
       if consume? NEWLINE
-        Return.new nil
+        Return.new token, nil
       else
-        Return.new expression
+        Return.new token, expression
       end
     when "if"
       # TODO
-      Identifier.new "placeholder-if"
+      Identifier.new  token, "placeholder-if"
     when "while"
       # TODO
-      Identifier.new "placeholder-while"
+      Identifier.new token, "placeholder-while"
     else
       expression
-      Identifier.new "placeholder-expression"
+      Identifier.new token, "placeholder-expression"
     end
-    # var w/o restricted
-    # oterhwise, suppsed to be an expression:
-    # parenthesis, literal (then nothing, operator), identifier (then nothing, operator, call), unary (then identifier or literal)
-    # after a thing (paren, literal, identifier, call, unary then other), then check for operator. If no, expect a newline
   end
 
   # Parse and return an identifier.
   # If an identifier is given as a parameter, it use it instead of consuming a token.
-  def identifier(value = nil)
-    value ||= next_token! "identifier"
-    unexpected! "identifier" unless value.chars.all? do |c|
+  def identifier(token = nil)
+    token ||= next_token! "identifier"
+    unexpected! "identifier" unless token.value.chars.all? do |c|
       c == '_' || c.lowercase?
     end
-    Identifier.new value
+    Identifier.new token, token.value
   end
 
   # Try to parse and return a type name.
   # If a type name is given as a parameter,  it use it instead of consuming a token.
   # If it fail, it return nil and does not alter the state.
-  def type_name?(value = nil)
+  def type_name?(token = nil)
     save = @index
-    value ||= next_token?
-    return unless value
-    unless value.chars.first.uppercase? && value.chars.all? { |c| c == '_' || c.alphanumeric? }
+    token ||= next_token?
+    return unless token
+    unless token.value.chars.first.uppercase? && token.value.chars.all? { |c| c == '_' || c.alphanumeric? }
       @index = save
       return
     end
-    value
+    token 
   end
 
   # parse and return a type name.
   # If a type name is given as a parameter, it use it instead of consuming a token.
-  def type_name(value = nil)
-    type_name?(value) || unexpected! "type_name"
+  def type_name(token = nil)
+    type_name?(token) || unexpected! "type_name"
   end
     
-  def number(value = nil)
-    value ||= next_token! "number"
-    Literal.new value.to_i whitespace: false, underscore: true, prefix: true, strict: true, leading_zero_is_octal: false
+  def number(token = nil)
+    token ||= next_token! "number"
+    Literal.new token, token.value.to_i whitespace: false, underscore: true, prefix: true, strict: true, leading_zero_is_octal: false
   rescue ex
     unexpected! "number literal"
   end
 
-  def literal(value = nil)
-    number value
+  def literal(token = nil)
+    number token
   end
 
-  def type_constraint(colon = true, explicit = false)
+  def type_constraint(colon = true, explicit = false, context_token = nil)
     if colon
       unless consume? ":"
         if explicit
           unexpected! ":"
         else
-          return Word.new
+          return Word.new context_token
         end
       end
     end
 
     save = @index
-    case token = next_token! "type_specifier"
-    when "*"  then return Pointer.new type_constraint colon: false
+    token = next_token! "type_specifier"
+    case token.value 
+    when "*"  then return Pointer.new token, type_constraint colon: false
     when "[" then
       size = literal
       expect! "]"
-      return Table.new type_constraint(colon: false), size 
-    when "_" then return Word.new
+      return Table.new token, type_constraint(colon: false), size 
+    when "_" then return Word.new token
     else
       # Either a type name, or _ if explicit == false
       custom_name = type_name? token
-      return Custom.new custom_name if custom_name
+      return Custom.new token, custom_name.value if custom_name
       @index = save # The token was not meant for this, rollbacking.
-      return Word.new unless explicit
+      # TODO do it better
+      return Word.new context_token unless explicit
       unexpected! "custom_type_name"
     end
   end
 
-  # Parse and return a function, assuming "fun" keyword has already been consumed.
+  # Parse and return a function.
   def function
+    root = expect! "fun"
     extern = consume? "extern"
     name = identifier
     token = next_token! "( or :"
     parameters = [] of Function::Parameter
 
-    if token  == "("
+    if token.value == "("
     
       first = true
       had_separator = false
       loop do
-        token = next_token?
-        if token == ")" 
+        token = next_token! "A function parameter declaration or ')'"
+        if token.value == ")"
           break
-        elsif token == ","
+        elsif token.value == ","
           had_separator = true
           next
         else
           unexpected! ", or )" if !first && !had_separator
           param_name = identifier token
-          param_constraint = type_constraint
-          parameters << Function::Parameter.new param_name, param_constraint
+          param_constraint = type_constraint context_token: token
+          parameters << Function::Parameter.new token, param_name, param_constraint
           first = false
           had_separator = false
         end 
       end
-      ret_type = type_constraint colon: true, explicit: true
-    elsif token == ":"
-      ret_type = type_constraint colon: false, explicit: true
+      ret_type = type_constraint colon: true, explicit: true, context_token: root
+    elsif token.value == ":"
+      ret_type = type_constraint colon: false, explicit: true, context_token: root
     else
       unexpected! "( or :"
     end
@@ -532,7 +524,8 @@ class Stacklang::Parser
       expect! "{"
       consume? NEWLINE
       loop do
-        case token = next_token! "A function statement or '}'"
+        token = next_token! "A function statement or '}'"
+        case token.value
         when "}" then break
         when "var"
           # TODO
@@ -542,30 +535,31 @@ class Stacklang::Parser
       end
     end
 
-    Function.new name, parameters, ret_type, variables, statements, extern: extern
+    Function.new root, name, parameters, ret_type, variables, statements, extern: extern
   end
 
   def global
+    root = expect! "var"
     extern = consume? "extern"
     name = identifier
     constraint = type_constraint colon: true, explicit: false
-    # NO INIT YET
-    Variable.new name, constraint, nil, extern: extern != nil
+    Variable.new root, name, constraint, nil, extern: extern != nil
   end
 
   def requirement
-    literal = next_token! "A quoted string literal"
-    unless literal.starts_with?('"') && literal.ends_with?('"')
+    root = expect! "require"
+    token = next_token! "A quoted string literal"
+    unless token.value.starts_with?('"') && token.value.ends_with?('"')
       unexpected! "A quoted string literal"
     end
-    Requirement.new literal.strip '"'
+    Requirement.new root, token.value.strip '"'
   end
 
   def unit
     elements = [] of Requirement | Function | Variable | Struct
     loop do
       consume? NEWLINE
-      case next_token?
+      case current.try &.value
       when "require" then elements << requirement
       when "var" then elements << global
       when "fun" then elements << function
@@ -581,9 +575,16 @@ class Stacklang::Parser
 
   NEWLINE = "\n"
 
-  # Consume a token and raise if it not equal to *expected*
-  def expect!(expected)
-    unexpected! expected.dump unless next_token? == expected
+  # Consume a token and raise if it not equal to *expected*.
+  # Return the token.
+  def expect!(expected) : Token
+    token = (@tokens[@index]? || unexpected! expected).tap do 
+      @index += 1
+    end
+
+    unexpected! expected.dump unless token.value == expected
+
+    token
   end
 
   # Raise an error stating that the current token is unexpected.
@@ -600,7 +601,7 @@ class Stacklang::Parser
     STR
   end
 
-  # Return true and consume the current token if it is equal to *token* parameter.
+  # Return true and consume the current token value if it is equal to *token* parameter.
   # return false otherwise.
   def consume?(token)
     if @tokens[@index]?.try(&.value) == token
@@ -611,8 +612,13 @@ class Stacklang::Parser
     end
   end
 
+  # Return the current token
+  def current
+    @tokens[@index]?
+  end
+
   # Return true if the block return true for the current token.
-  # Does not cosume
+  # Does not consume
   def peek
     yield @tokens[@index]?.try &.value
   end
@@ -622,24 +628,24 @@ class Stacklang::Parser
     @index >= @tokens.size
   end
 
-  # Get the ,next token. Raise if none. 
+  # Get the next token value. Raise if none. 
   # Parameter *expected* is used to document the raised error.
-  def next_token!(expected)
+  def next_token!(expected) : Token
     (@tokens[@index]? || unexpected! expected).tap do 
       @index += 1
-    end.value
+    end
   end
 
-   # Get the, next token if any
-  def next_token?
-    @tokens[@index]?.try &.value.tap do 
+   # Get the next token value if any
+  def next_token? : Token?
+    @tokens[@index]?.try &.tap do 
       @index += 1
     end
   end
 
   @filename : String?
   def initialize(io : IO, @filename = nil)
-    @tokens = Lexer.run io
+    @tokens = Tokenizer.tokenize io
     pp @tokens.map(&.value)
     @index = 0
   end
