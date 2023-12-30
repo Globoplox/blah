@@ -1,6 +1,5 @@
 # Kind of work, unused, to be used with a parser rewrite
 # that hopefully will be much better at describing error and context
-# TODO: save character and line into tokens
 module Stacklang::Lexer
   struct Token
     getter value : String
@@ -96,7 +95,7 @@ module Stacklang::Lexer
           kind = :operator
         end
 
-        if (kind == :operator && last_kind != :operator) || (kind != :operator && last_kind == :operator)
+        if (kind == :operator || last_kind == :operator)
           tokens << Token.new token.join, line_at_start, character_at_start  unless token.empty?
           token.clear
           line_at_start = line

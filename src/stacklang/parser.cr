@@ -1,6 +1,14 @@
 require "./lexer"
 require "./ast"
 
+# TODO: 
+# - Store tokens metadata (line, char, filename) within AST
+# - Structure declaration
+# - Statements: if, while
+# - Expression: cast, sizeof
+# - Rename Lexer to Tokenizer
+# - Update tokenizer to support multi character operators
+# - Move consume functions to tokenizer
 class Stacklang::Parser
   include Stacklang::AST
   
@@ -287,54 +295,130 @@ class Stacklang::Parser
   #   Struct.new name, fields
   # end
 
-  # rule def requirement
-  #   next unless str "require"
-  #   next unless whitespace
-  #   next unless char '"'
-  #   next unless filename = consume_until "\""
-  #   next unless char '"'
-  #   Requirement.new filename
-  # end
+  alias Component = {kind: Symbol, value: String | Array(Component) | {name: String, parameters: Array(Array(Component))}}
+  # TODO: consume greedely:
+  ## An unary, then reapeat
+  ## else a literal or identifier (check if call)
+  ## then maybe a binary
+  
+  # Consume greedely all tokens of a single expression.
+  # Stop when it reach a ')',  '}', ',' 
+  def expression_chain
+    chain = [] of Component
+    allows = [:unary_operator, :operand]
+    expect_more = false
+    loop do
+      pp "CURRENT CHAIN:"
+      pp chain
+      pp "ALLOWED"
+      pp allows
+      break if peek &.in? [")", "}", ","]
+      token = next_token! "Any expression"
+      pp "TOKEN: #{token}"
+      puts
+      case token
+      
+      when "("
+        unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :operand 
+        chain << {kind: :parenthesis, value: expression_chain}
+        expect! ")"
+        allows = [:binary_operator]
+        expect_more = false
+      
+      when "~", ".", "!"
+        unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :unary_operator 
+        chain << {kind: :unary_operator, value: token}
+        allows = [:unary_operator, :operand]
+        expect_more = true
+      
+      when "<", ">", "=", ">=", "<=", "==", "/", "%", "|", "^", "&&", "||", "+"
+        unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :binary_operator 
+        chain << {kind: :binary_operator, value: token}
+        allows = [:unary_operator, :operand]
+        expect_more = true        
+      
+      when "-", "*", "&"
+        if allows.includes? :unary_operator
+          unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes?(:binary_operator) || allows.includes?(:unary_operator)
+          chain << {kind: :unary_operator, value: token}
+        elsif allows.includes? :binary_operator
+          unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :binary_operator
+          chain << {kind: :binary_operator, value: token}
+        else
+          # Should not happen
+        end
+        allows = [:unary_operator, :operand]
+        expect_more = true
+      
+      when NEWLINE
+        if expect_more
+          next
+        else
+          break
+        end
+      
+      else
+        unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :operand
+        if token.starts_with? '"'
+          chain << {kind: :string_literal, value: token}
+        elsif token.starts_with? '0'
+          chain << {kind: :number_literal, value: token}
+        else
+          if peek &.== "("
+            next_token? # Consume it
+            call_parameters = [] of Array(Component)
+            loop do
+              call_parameters << expression_chain
+              case next_token! "A ',' or a ')'"
+              when "," then next
+              when ")" then break
+              else unexpected! "A ',' or a ')'"
+              end
+            end
+            chain << {kind: :number_literal, value: {name: token, parameters: call_parameters}}
+          else
+            chain << {kind: :identifier, value: token}
+          end
+        end
+        allows = [:binary_operator]
+        expect_more = false
+      end
 
+    end
+    unexpected! "A #{allows.map(&.to_s).join " or "}" if expect_more
+    chain
+  end
 
-  # rule def function
-  #   extern = str "extern"
-  #   next unless whitespace if extern
-  #   next unless str "fun"
-  #   @checkpoint.name = "Function"
-  #   @checkpoint.locked = true
-  #   next unless whitespace
-  #   next unless name = identifier
-  #   @checkpoint.name = "Function #{name.name}"
-  #   parameters = checkpoint "parameters" do
-  #     next unless char '('
-  #     next unless params = one_or_more ->function_parameter, separated_by: ->separator
-  #     next unless char ')'
-  #     params
-  #   end || [] of Function::Parameter
-  #   whitespace
-  #   ret_type = type_constraint explicit: true
-
-  #   unless extern
-  #     multiline_whitespace
-  #     next unless char '{'
-  #     expression_separators
-
-  #     variables = zero_or_more ->variable, separated_by: ->expression_separators
-  #     if variables.empty?
-  #       expression_separators
-  #     else
-  #       next unless expression_separators
-  #     end
-
-  #     statements = zero_or_more ->any_statement, separated_by: ->expression_separators
-  #     expression_separators
-  #     next unless char '}'
-  #   end
-
-  #   Function.new name, parameters, ret_type, (variables || [] of Variable), (statements || [] of Statement), extern: extern != nil
-  # end
-
+  def expression
+    expression_chain
+    pp "EXPRESSION CHAIN:"
+    pp expression_chain
+    puts
+  end
+  
+  def statement(token)
+    case token
+    when "return"
+      if consume? NEWLINE
+        Return.new nil
+      else
+        Return.new expression
+      end
+    when "if"
+      # TODO
+      Identifier.new "placeholder-if"
+    when "while"
+      # TODO
+      Identifier.new "placeholder-while"
+    else
+      expression
+      Identifier.new "placeholder-expression"
+    end
+    # var w/o restricted
+    # oterhwise, suppsed to be an expression:
+    # parenthesis, literal (then nothing, operator), identifier (then nothing, operator, call), unary (then identifier or literal)
+    # after a thing (paren, literal, identifier, call, unary then other), then check for operator. If no, expect a newline
+  end
 
   # Parse and return an identifier.
   # If an identifier is given as a parameter, it use it instead of consuming a token.
@@ -439,22 +523,42 @@ class Stacklang::Parser
     else
       unexpected! "( or :"
     end
+    
+    variables = [] of Variable
+    statements = [] of Statement
 
     unless extern
       consume? NEWLINE
       expect! "{"
       consume? NEWLINE
       loop do
-        case next_token?
+        case token = next_token! "A function statement or '}'"
         when "}" then break
-        else # HANDLE STATEMENT
+        when "var"
+          # TODO
+        else
+          statements << statement token
         end
       end
     end
 
-    variables = nil
-    statements = nil
-    Function.new name, parameters, ret_type, (variables || [] of Variable), (statements || [] of Statement), extern: extern != nil
+    Function.new name, parameters, ret_type, variables, statements, extern: extern
+  end
+
+  def global
+    extern = consume? "extern"
+    name = identifier
+    constraint = type_constraint colon: true, explicit: false
+    # NO INIT YET
+    Variable.new name, constraint, nil, extern: extern != nil
+  end
+
+  def requirement
+    literal = next_token! "A quoted string literal"
+    unless literal.starts_with?('"') && literal.ends_with?('"')
+      unexpected! "A quoted string literal"
+    end
+    Requirement.new literal.strip '"'
   end
 
   def unit
@@ -462,8 +566,8 @@ class Stacklang::Parser
     loop do
       consume? NEWLINE
       case next_token?
-      #when "require" then
-      #when "var" then
+      when "require" then elements << requirement
+      when "var" then elements << global
       when "fun" then elements << function
       #when "struct" then
       when nil then break
@@ -507,6 +611,12 @@ class Stacklang::Parser
     end
   end
 
+  # Return true if the block return true for the current token.
+  # Does not cosume
+  def peek
+    yield @tokens[@index]?.try &.value
+  end
+
   # True if End Of File is reached.
   def eof?
     @index >= @tokens.size
@@ -527,7 +637,6 @@ class Stacklang::Parser
     end
   end
 
-
   @filename : String?
   def initialize(io : IO, @filename = nil)
     @tokens = Lexer.run io
@@ -537,5 +646,7 @@ class Stacklang::Parser
 end
 
 File.open ARGV.first do |file|
-  puts Stacklang::Parser.new(file).unit
+  unit = Stacklang::Parser.new(file).unit
+  pp unit
+  puts unit.to_s
 end

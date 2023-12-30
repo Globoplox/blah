@@ -130,6 +130,7 @@ module Stacklang::AST
     def dump(io, indent = 0)
       indent.times { io << "  " }
       io << "var "
+      io << "extern " if @extern
       @name.dump io, indent
       io << " : "
       @constraint.dump io, indent
@@ -222,6 +223,7 @@ module Stacklang::AST
 
     def dump(io, indent = 0)
       io << "fun "
+      io << "extern " if @extern
       @name.dump io, indent
       io << "("
       @parameters.each_with_index do |param, index|
@@ -231,19 +233,21 @@ module Stacklang::AST
       io << ") "
       io << ": " if @return_type
       @return_type.try &.dump io, indent
-      io << " {\n"
-      @variables.each do |var|
-        (indent + 1).times { io << "  " }
-        var.dump io, indent
-      end
-      io << "\n"
-      @body.each do |expression|
-        (indent + 1).times { io << "  " }
-        expression.dump io, indent + 1
+      unless @extern
+        io << " {\n"
+        @variables.each do |var|
+          (indent + 1).times { io << "  " }
+          var.dump io, indent
+        end
         io << "\n"
+        @body.each do |expression|
+          (indent + 1).times { io << "  " }
+          expression.dump io, indent + 1
+          io << "\n"
+        end
+        indent.times { io << "  " }
+        io << "}\n\n"
       end
-      indent.times { io << "  " }
-      io << "}\n\n"
     end
   end
 
