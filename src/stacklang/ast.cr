@@ -233,7 +233,7 @@ module Stacklang::AST
           (indent + 1).times { io << "  " }
           var.dump io, indent
         end
-        io << "\n"
+        io << "\n" unless @variables.empty?
         @body.each do |expression|
           (indent + 1).times { io << "  " }
           expression.dump io, indent + 1
@@ -389,30 +389,6 @@ module Stacklang::AST
       @left.dump io, indent
       io << " #{@name} "
       @right.dump io, indent
-    end
-
-    RIGHT_ASSOCIATIVE_OPERATORS = ["="]
-
-    def self.from_chain(operands : Array(Expression), operators : Array(String)) : Expression
-      leftside = operands.first
-      operators.each_with_index do |operator, index|
-        if operator.in? RIGHT_ASSOCIATIVE_OPERATORS
-          return Binary.new operands[index], operator, (from_chain operands[(index + 1)..], operators[(index + 1)..])
-        else
-          leftside = Binary.new leftside, operator, operands[index + 1]
-        end
-      end
-      leftside
-    end
-
-    def self.from_chain(left : Expression, chain : Array({String, Expression})?) : Expression
-      operands = [left]
-      operators = [] of String
-      chain.each do |(operator, operand)|
-        operands << operand
-        operators << operator
-      end
-      from_chain operands, operators
     end
   end
 end

@@ -2,11 +2,10 @@ require "./tokenizer"
 require "./ast"
 
 # TODO: 
+# - Decide on how access should be handled: parser, or as a generic binary operator visited later
 # - Structure declaration
 # - Statements: if, while
 # - Expression: cast, sizeof
-# - Update tokenizer to support multi character operators
-# - Move consume functions to tokenizer
 class Stacklang::Parser
   include Stacklang::AST
   alias Token = Tokenizer::Token
@@ -33,13 +32,6 @@ class Stacklang::Parser
   #   If.new condition, statements
   # end
 
-  # rule def statement_return
-  #   next unless str "return"
-  #   whitespace
-  #   expr = expression
-  #   Return.new expr
-  # end
-
   # rule def statement_while
   #   next unless str "while"
   #   whitespace
@@ -62,24 +54,6 @@ class Stacklang::Parser
   #   While.new condition, statements
   # end
 
-  # rule def call
-  #   next unless name = identifier
-  #   whitespace
-  #   next unless char '('
-  #   parameters = zero_or_more ->expression, separated_by: ->separator
-  #   next unless char ')'
-  #   Call.new name, parameters
-  # end
-
-  # rule def unary_operation
-  #   next unless operator = str ["!", "*", "&", "-", "~"]
-  #   next unless expr = leaf_expression
-  #   # Has to be leaf else *foo.bar would be *(foo.bar) instead of (*foo).bar
-  #   # and more importantly *foo = bar would be *(foo = bar)
-  #   # So if we want to use an unary on a complex expression, wrap it with parenthesis
-  #   Unary.new expr, operator
-  # end
-
   # rule def sizeof
   #   next unless str "sizeof"
   #   whitespace
@@ -100,136 +74,6 @@ class Stacklang::Parser
   #   whitespace
   #   next unless target = expression
   #   Cast.new constraint, target
-  # end
-
-  # def leaf_expression
-  #   or ->sizeof, ->cast, ->literal, ->unary_operation, ->parenthesis, ->call, ->identifier
-  # end
-
-  # rule def affectation_chain
-  #   next unless name = str ["=", "-=", "+=", "&=", "~=", "|=", "<<=", ">>="]
-  #   whitespace
-  #   next unless right = low_priority_operation
-  #   whitespace
-  #   {name, right}
-  # end
-
-  # # Please note that all Binary operation are flattened and then
-  # # Linked into a tree of expression with varying kind of associativity
-  # # depending on the operator. See #Binary.from_chain
-
-  # rule def affectation_operation
-  #   next unless left = low_priority_operation
-  #   whitespace
-  #   chain = zero_or_more ->affectation_chain
-  #   Binary.from_chain left, chain
-  # end
-
-  # rule def low_chain
-  #   next unless name = str ["&", "|", "~&", "~|", "<<", ">>", "+", "-"]
-  #   whitespace
-  #   next unless right = medium_priority_operation
-  #   whitespace
-  #   {name, right}
-  # end
-
-  # rule def low_priority_operation
-  #   next unless left = medium_priority_operation
-  #   whitespace
-  #   chain = zero_or_more ->low_chain
-  #   Binary.from_chain left, chain
-  # end
-
-  # rule def medium_chain
-  #   next unless name = str ["**", "*", "/", "%"]
-  #   whitespace
-  #   next unless right = high_priority_operation
-  #   whitespace
-  #   {name, right}
-  # end
-
-  # rule def medium_priority_operation
-  #   next unless left = high_priority_operation
-  #   whitespace
-  #   chain = zero_or_more ->medium_chain
-  #   Binary.from_chain left, chain
-  # end
-
-  # rule def high_chain
-  #   next unless name = str ["<=", ">=", "==", "!=", "||", "&&", "<", ">", "^", "["]
-  #   whitespace
-  #   if name == "["
-  #     next unless right = expression
-  #     whitespace
-  #     next unless char ']' if name == "["
-  #   else
-  #     next unless right = access
-  #   end
-  #   whitespace
-  #   {name, right}
-  # end
-
-  # rule def high_priority_operation
-  #   next unless left = access
-  #   whitespace
-  #   chain = zero_or_more ->high_chain
-  #   Binary.from_chain left, chain
-  # end
-
-  # rule def access_chain
-  #   next unless char '.'
-  #   next unless id = identifier
-  #   id
-  # end
-
-  # rule def access
-  #   next unless expr = leaf_expression
-  #   chain = zero_or_more ->access_chain
-  #   chain.reduce(expr) do |expr, field|
-  #     Access.new expr, field
-  #   end
-  # end
-
-  # def operation
-  #   affectation_operation
-  # end
-
-  # rule def number
-  #   sign = str(["-", "+"]) || ""
-  #   case str ["0x", "0b"]
-  #   when "0x" then base = 16
-  #   when "0b" then base = 2
-  #   else           base = 10
-  #   end
-  #   next unless digits = one_or_more ->{ char ['0'..'9', 'a'..'f', 'A'..'F'] }
-  #   begin
-  #     Literal.new (sign + digits.join).to_i32 base: base
-  #   rescue
-  #     nil
-  #   end
-  # end
-
-  # def literal
-  #   number
-  # end
-
-  # rule def parenthesis
-  #   next unless char '('
-  #   multiline_whitespace
-  #   expr = expression
-  #   multiline_whitespace
-  #   next unless char ')'
-  #   expr
-  # end
-
-  # rule def expression
-  #   operation
-  # end
-
-  # def any_statement : Statement?
-  #   # checkpoint "any statement" do
-  #   or(->statement_if, ->statement_while, ->statement_return, ->expression).as(Statement?)
-  #   # end
   # end
 
   # rule def type_name
@@ -324,19 +168,19 @@ class Stacklang::Parser
         allows = [:binary_operator]
         expect_more = false
       
-      when "~", ".", "!"
+      when "~", "!"
         unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :unary_operator 
         chain << {kind: Arity::Unary, value: token}
         allows = [:unary_operator, :operand]
         expect_more = true
       
-      when "<", ">", "=", ">=", "<=", "==", "/", "%", "|", "^", "&&", "||", "+"
+      when "<", ">", "=", ">=", "<=", "==", "/", "%", "|", "^", "&&", "||", "+", ".", "+=", "-=", "&=", "|=", "^=", "*=", "/=", "%="
         unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :binary_operator 
         chain << {kind: Arity::Binary, value: token}
         allows = [:unary_operator, :operand]
         expect_more = true        
       
-      when "-", "*", "&"
+      when "-", "*", "&" # Ambiguous ones, determined on context
         if allows.includes? :unary_operator
           unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes?(:binary_operator) || allows.includes?(:unary_operator)
           chain << {kind: Arity::Unary, value: token}
@@ -361,7 +205,7 @@ class Stacklang::Parser
         unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :operand
         if token.value.starts_with? '"'
           raise "Quoted string literal are not supported"
-        elsif token.value.starts_with? '0'
+        elsif token.value.chars.first.ascii_number?
           chain << number token
         else
           pp "b"
@@ -400,12 +244,13 @@ class Stacklang::Parser
   # List of operator groups ordered by decreasing precedence.
   # Mostly following crystal lang 
   OPERATORS_PRIORITIES = [
-    {Arity::Binary, Associativity::Left, ["."]},
     {Arity::Unary, nil, ["!", "~", "&", "*", "-"]},
+    {Arity::Binary, Associativity::Left, ["."]},
     {Arity::Binary, Associativity::Left, ["/", "*"]},
+    {Arity::Binary, Associativity::Left, ["+", "-"]},
     {Arity::Binary, Associativity::Left, ["&"]},
     {Arity::Binary, Associativity::Left, ["|", "^"]},
-    {Arity::Binary, Associativity::Left, ["=="]},
+    {Arity::Binary, Associativity::Left, ["==", "!="]},
     {Arity::Binary, Associativity::Left, ["<", ">", ">=", "<="]},
     {Arity::Binary, Associativity::Left, ["&&"]},
     {Arity::Binary, Associativity::Left, ["||"]},
@@ -438,11 +283,12 @@ class Stacklang::Parser
               component.is_a?({kind: Arity, value: Token}) && 
               component[:kind] == kind && 
               component[:value].value.in? operators 
-          end.try do |reversed_index|
+            end.try do |reversed_index|
               chain.size - 1 - reversed_index
             end
           end
           if index
+            pp "HAS FOUND OPERAOTR #{index}"
             # Replace the component by an ast node.
             token = chain[index].as({kind: Arity, value: Token})[:value]
             a = chain[index - 1].as Expression
@@ -453,11 +299,13 @@ class Stacklang::Parser
             break
           end
         in Arity::Unary
-          index = chain.index do |component| 
+          index = chain.reverse.index do |component| 
             component.is_a?({kind: Arity, value: Token}) && 
             component[:kind] == kind && 
             component[:value].value.in? operators 
-        end
+          end.try do |reversed_index|
+            chain.size - 1 - reversed_index
+          end
           if index
             pp "FOUND operator at index #{index}"
             pp chain
@@ -489,8 +337,9 @@ class Stacklang::Parser
     return ast
   end
   
-  def statement(token)
-    case token.value
+  def statement
+    token = current
+    case token.try &.value
     when "return"
       if consume? NEWLINE
         Return.new token, nil
@@ -585,10 +434,9 @@ class Stacklang::Parser
     root = expect! "fun"
     extern = consume? "extern"
     name = identifier
-    token = next_token! "( or :"
     parameters = [] of Function::Parameter
 
-    if token.value == "("
+    if consume? "("
     
       first = true
       had_separator = false
@@ -609,10 +457,10 @@ class Stacklang::Parser
         end 
       end
       ret_type = type_constraint colon: true, explicit: true, context_token: root
-    elsif token.value == ":"
+    elsif consume? ":"
       ret_type = type_constraint colon: false, explicit: true, context_token: root
     else
-      unexpected! "( or :"
+      ret_type = nil
     end
     
     variables = [] of Variable
@@ -623,14 +471,16 @@ class Stacklang::Parser
       expect! "{"
       consume? NEWLINE
       loop do
-        case current.try &.value
-        when "}" then break
+        pp "LOOP FUNC"
+        pp current
+        break if consume? "}"
+        next if consume? NEWLINE
+        token = current
+        case token.try &.value
         when "var"
           # TODO
-        when NEWLINE
-          # Do nothing
         else
-          statements << statement token
+          statements << statement
         end
       end
     end
@@ -658,14 +508,18 @@ class Stacklang::Parser
   def unit
     elements = [] of Requirement | Function | Variable | Struct
     loop do
-      consume? NEWLINE
+      next if consume? NEWLINE
       case current.try &.value
       when "require" then elements << requirement
       when "var" then elements << global
       when "fun" then elements << function
       #when "struct" then
       when nil then break
-      else unexpected! "require or var or fun or struct"
+      else
+        pp @index
+        pp current
+        pp @tokens 
+        unexpected! "require or var or fun or struct"
       end
     end
     consume? NEWLINE

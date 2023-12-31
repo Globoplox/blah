@@ -1,4 +1,8 @@
+fun test {
+  *0*(**0)
+}
 
+/*
 require "stdlib/prototypes.sl"
 
 
@@ -11,11 +15,9 @@ fun load_io(io:*, destination:*, size):_ {
 
   !~(var + other_var) + var & call(a, b, !c + x) *
    4
-   /* Allowed: */
    *6
 }
 
-  /*
 var program: [0x100]
 var ram: [0x100]
 

@@ -1,5 +1,6 @@
 # Split a stream of text into tokens
 module Stacklang::Tokenizer
+  
   struct Token
     getter value : String
     getter source : String?
@@ -100,7 +101,9 @@ module Stacklang::Tokenizer
           kind = :operator
         end
 
-        if (kind == :operator || last_kind == :operator)
+        # Multi char operator are allowed only for affectation & comparaison, all ending in '='
+
+        if (kind != last_kind || (kind == :operator && c != '=')) 
           tokens << Token.new token.join, line_at_start, character_at_start, source unless token.empty?
           token.clear
           line_at_start = line
