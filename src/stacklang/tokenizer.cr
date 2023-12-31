@@ -91,9 +91,7 @@ module Stacklang::Tokenizer
         line_at_start = line
         character_at_start = character
 
-      
       else
-
         if c == '"'
           quote = c
         elsif c.alphanumeric? || c == '_'

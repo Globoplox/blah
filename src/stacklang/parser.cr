@@ -294,49 +294,55 @@ class Stacklang::Parser
   #   Struct.new name, fields
   # end
 
-  alias Component = {kind: Symbol, value: Tokenizer::Token | Array(Component) | {name: Tokenizer::Token, parameters: Array(Array(Component))}}
-  # TODO: consume greedely:
-  ## An unary, then reapeat
-  ## else a literal or identifier (check if call)
-  ## then maybe a binary
+  enum Arity
+    Unary
+    Binary
+  end
+
+  alias Component = Expression | {kind: Arity, value: Tokenizer::Token}
   
   # Consume greedely all tokens of a single expression.
-  # Stop when it reach a ')',  '}', ',' 
-  def expression_chain
+  # Stop when it reach a ')',  '}', ','.
+  # It parse leaf expression as ast node, but keep operators as is in the order they appear.
+  # Return an array of all the component of the expression in their original order,
+  #  mixing ast node and tuples in the form {kind: Symbol, value: Token} for operators.
+  def expression_lexer : Array(Expression | {kind: Arity, value: Tokenizer::Token})
     chain = [] of Component
     allows = [:unary_operator, :operand]
     expect_more = false
     loop do
       break if peek &.in? [")", "}", ","]
       token = next_token! "Any expression"
+      pp "TOKEN"
+      pp token
       case token.value
       
       when "("
         unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :operand 
-        chain << {kind: :parenthesis, value: expression_chain}
+        chain << expression
         expect! ")"
         allows = [:binary_operator]
         expect_more = false
       
       when "~", ".", "!"
         unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :unary_operator 
-        chain << {kind: :unary_operator, value: token}
+        chain << {kind: Arity::Unary, value: token}
         allows = [:unary_operator, :operand]
         expect_more = true
       
       when "<", ">", "=", ">=", "<=", "==", "/", "%", "|", "^", "&&", "||", "+"
         unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :binary_operator 
-        chain << {kind: :binary_operator, value: token}
+        chain << {kind: Arity::Binary, value: token}
         allows = [:unary_operator, :operand]
         expect_more = true        
       
       when "-", "*", "&"
         if allows.includes? :unary_operator
           unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes?(:binary_operator) || allows.includes?(:unary_operator)
-          chain << {kind: :unary_operator, value: token}
+          chain << {kind: Arity::Unary, value: token}
         elsif allows.includes? :binary_operator
           unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :binary_operator
-          chain << {kind: :binary_operator, value: token}
+          chain << {kind: Arity::Binary, value: token}
         else
           # Should not happen
         end
@@ -351,28 +357,30 @@ class Stacklang::Parser
         end
       
       else
+        pp "a"
         unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :operand
         if token.value.starts_with? '"'
-          chain << {kind: :string_literal, value: token}
+          raise "Quoted string literal are not supported"
         elsif token.value.starts_with? '0'
-          chain << {kind: :number_literal, value: token}
+          chain << number token
         else
+          pp "b"
           # if consume? # simpler
           if peek &.== "("
             next_token? # Consume it
-            call_parameters = [] of Array(Component)
+            call_parameters = [] of Expression
             loop do
-              call_parameters << expression_chain
-              token = next_token! "A ',' or a ')'"
-              case token.value
+              call_parameters << expression
+              case next_token!("A ',' or a ')'").value
               when "," then next
               when ")" then break
               else unexpected! "A ',' or a ')'"
               end
             end
-            chain << {kind: :number_literal, value: {name: token, parameters: call_parameters}}
+            chain << Call.new token, Identifier.new(token, token.value), call_parameters
           else
-            chain << {kind: :identifier, value: token}
+            pp "c"
+            chain << identifier token
           end
         end
         allows = [:binary_operator]
@@ -384,9 +392,101 @@ class Stacklang::Parser
     chain
   end
 
+  enum Associativity
+    Left
+    Right
+  end
+
+  # List of operator groups ordered by decreasing precedence.
+  # Mostly following crystal lang 
+  OPERATORS_PRIORITIES = [
+    {Arity::Binary, Associativity::Left, ["."]},
+    {Arity::Unary, nil, ["!", "~", "&", "*", "-"]},
+    {Arity::Binary, Associativity::Left, ["/", "*"]},
+    {Arity::Binary, Associativity::Left, ["&"]},
+    {Arity::Binary, Associativity::Left, ["|", "^"]},
+    {Arity::Binary, Associativity::Left, ["=="]},
+    {Arity::Binary, Associativity::Left, ["<", ">", ">=", "<="]},
+    {Arity::Binary, Associativity::Left, ["&&"]},
+    {Arity::Binary, Associativity::Left, ["||"]},
+    {Arity::Binary, Associativity::Right, ["=", "+=", "-="]},
+  ]
+
+  # Take a chain of `Expression` ast nodes and unprocessed operators (as the output of `#expression_lexer`)
+  # and solve the operator precedence and associativity to produce one single `Expression` ast node.
+  def expression_parser(chain : Array(Expression | {kind: Arity, value: Tokenizer::Token})) : Expression
+    pp "---------"
+    pp "ROUND OF EXP PARSER"
+    pp "INPUT"
+    pp chain
+    OPERATORS_PRIORITIES.each do |kind, associativity, operators|
+      # Loop until we dont find any operator of this precedence
+      loop do
+        case kind
+        in Arity::Binary
+          index = case associativity
+          in Associativity::Left, nil
+            # Search for the operator, but looks starting at the end
+            chain.index do |component| 
+              component.is_a?({kind: Arity, value: Token}) && 
+                component[:kind] == kind && 
+                component[:value].value.in? operators 
+            end
+          in Associativity::Right
+            # Search for the operator, but looks starting at the end
+            chain.reverse.index do |component| 
+              component.is_a?({kind: Arity, value: Token}) && 
+              component[:kind] == kind && 
+              component[:value].value.in? operators 
+          end.try do |reversed_index|
+              chain.size - 1 - reversed_index
+            end
+          end
+          if index
+            # Replace the component by an ast node.
+            token = chain[index].as({kind: Arity, value: Token})[:value]
+            a = chain[index - 1].as Expression
+            b = chain[index + 1].as Expression
+            node = Binary.new token, name: token.value, left: a, right: b
+            chain[index -1, 3] = [node]
+          else
+            break
+          end
+        in Arity::Unary
+          index = chain.index do |component| 
+            component.is_a?({kind: Arity, value: Token}) && 
+            component[:kind] == kind && 
+            component[:value].value.in? operators 
+        end
+          if index
+            pp "FOUND operator at index #{index}"
+            pp chain
+            token = chain[index].as({kind: Arity, value: Token})[:value]
+            a = chain[index + 1].as Expression
+            node = Unary.new token, name: token.value, operand: a
+            chain[index, 2] = [node]
+            pp chain
+          else 
+            break
+          end
+        end
+      end
+    end
+
+    pp "OUTPUT"
+    pp chain
+
+    raise "Clutter found in expression #{chain}" unless chain.size == 1
+    return chain.first.as?(Expression) || raise "Unknown operators in expression #{chain}"
+  end
+
   def expression
-    pp expression_chain
-    nil
+    chain = expression_lexer
+    pp "LEXER OUTPUT:"
+    pp chain
+    ast = expression_parser chain
+    pp ast
+    return ast
   end
   
   def statement(token)
@@ -405,7 +505,6 @@ class Stacklang::Parser
       Identifier.new token, "placeholder-while"
     else
       expression
-      Identifier.new token, "placeholder-expression"
     end
   end
 
@@ -524,11 +623,12 @@ class Stacklang::Parser
       expect! "{"
       consume? NEWLINE
       loop do
-        token = next_token! "A function statement or '}'"
-        case token.value
+        case current.try &.value
         when "}" then break
         when "var"
           # TODO
+        when NEWLINE
+          # Do nothing
         else
           statements << statement token
         end
