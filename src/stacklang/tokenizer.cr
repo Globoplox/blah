@@ -31,12 +31,7 @@ module Stacklang::Tokenizer
     character_at_start = 1
 
     io.each_char do |c|
-      if c == '\n'
-        character = 0
-        line += 1
-      else 
-        character += 1
-      end
+      character += 1
 
       transform_last = nil
       kind = nil
@@ -117,6 +112,11 @@ module Stacklang::Tokenizer
       last_kind = kind
       end
       last = transform_last || c
+
+      if c == '\n'
+        character = 0
+        line += 1
+      end
     end
     tokens << Token.new token.join, line_at_start, character_at_start, source unless token.empty?
 

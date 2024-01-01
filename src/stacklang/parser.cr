@@ -3,8 +3,9 @@ require "./ast"
 
 # TODO: 
 # - Structure declaration
+# - Function variables
 # - Statements: if, while
-# - Expression: cast, sizeof
+# - Expression: cast
 # - Array access and affectation operator
 class Stacklang::Parser
   alias Token = Tokenizer::Token
@@ -53,17 +54,6 @@ class Stacklang::Parser
   #   While.new condition, statements
   # end
 
-  # rule def sizeof
-  #   next unless str "sizeof"
-  #   whitespace
-  #   next unless char '('
-  #   whitespace
-  #   next unless constraint = type_constraint false, true
-  #   whitespace
-  #   next unless char ')'
-  #   Sizeof.new constraint
-  # end
-
   # rule def cast
   #   next unless char '('
   #   whitespace
@@ -73,33 +63,6 @@ class Stacklang::Parser
   #   whitespace
   #   next unless target = expression
   #   Cast.new constraint, target
-  # end
-
-  # rule def type_name
-  #   next unless head = char 'A'..'Z'
-  #   tail = zero_or_more ->{ char ['A'..'Z', 'a'..'z', '0'..'1', '_'..'_'] }
-  #   return String.build do |io|
-  #     io << head
-  #     tail.each do |tail_char|
-  #       io << tail_char
-  #     end
-  #   end
-  # end
-
-  # # Does not allows the same modifier as function variables
-  # rule def global
-  #   extern = str "extern"
-  #   next unless whitespace if extern
-  #   next unless str "var"
-  #   next unless whitespace
-  #   next unless name = identifier
-  #   whitespace
-  #   next unless constraint = type_constraint
-  #   whitespace
-  #   char '='
-  #   whitespace
-  #   init = expression
-  #   Variable.new name, constraint, init, extern: extern != nil
   # end
 
   # rule def variable
@@ -142,8 +105,16 @@ class Stacklang::Parser
     Binary
   end
 
+  @[Flags]
+  enum Category
+    Operand
+    UnaryOperator
+    BinaryOperator
+  end
+
   alias Component = AST::Expression | {kind: Arity, value: Tokenizer::Token}
   
+
   # Consume greedely all tokens of a single expression.
   # Stop when it reach a ')',  '}', ','.
   # It parse leaf expression as ast node, but keep operators as is in the order they appear.
@@ -151,7 +122,7 @@ class Stacklang::Parser
   #  mixing ast node and tuples in the form {kind: Symbol, value: Token} for operators.
   def expression_lexer : Array(AST::Expression | {kind: Arity, value: Tokenizer::Token})
     chain = [] of Component
-    allows = [:unary_operator, :operand]
+    allows = Category::UnaryOperator | Category::Operand
     expect_more = false
     loop do
       break if current.try &.value.in? [")", "}", ","]
@@ -159,35 +130,31 @@ class Stacklang::Parser
       case token.value
       
       when "("
-        unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :operand 
+        raise syntax_error allows.to_s unless allows.operand? 
         chain << expression
-        expect! ")"
-        allows = [:binary_operator]
+        consume! ")"
+        allows = Category::BinaryOperator
         expect_more = false
       
       when "~", "!"
-        unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :unary_operator 
+        raise syntax_error allows.to_s unless allows.unary_operator? 
         chain << {kind: Arity::Unary, value: token}
-        allows = [:unary_operator, :operand]
+        allows = Category::UnaryOperator | Category::Operand
         expect_more = true
       
       when "<", ">", "=", ">=", "<=", "==", "/", "%", "|", "^", "&&", "||", "+", ".", "+=", "-=", "&=", "|=", "^=", "*=", "/=", "%="
-        unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :binary_operator 
+        raise syntax_error allows.to_s unless allows.binary_operator? 
         chain << {kind: Arity::Binary, value: token}
-        allows = [:unary_operator, :operand]
+        allows = Category::UnaryOperator | Category::Operand
         expect_more = true        
       
       when "-", "*", "&" # Ambiguous ones, determined on context
-        if allows.includes? :unary_operator
-          unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes?(:binary_operator) || allows.includes?(:unary_operator)
+        if allows.unary_operator?
           chain << {kind: Arity::Unary, value: token}
-        elsif allows.includes? :binary_operator
-          unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :binary_operator
+        elsif allows.binary_operator?
           chain << {kind: Arity::Binary, value: token}
-        else
-          # Should not happen
         end
-        allows = [:unary_operator, :operand]
+        allows = Category::UnaryOperator | Category::Operand
         expect_more = true
       
       when NEWLINE
@@ -198,7 +165,7 @@ class Stacklang::Parser
         end
       
       else
-        unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :operand
+        raise syntax_error allows.to_s unless allows.includes? :operand
         if token.value.starts_with? '"'
           raise "Quoted string literal are not supported"
         elsif token.value.chars.first.ascii_number?
@@ -207,7 +174,7 @@ class Stacklang::Parser
           if consume? "("
             if token.value == "sizeof"
               chain << AST::Sizeof.new token, type_constraint colon: false, explicit: true
-              expect! ")"
+              consume! ")"
             else
               call_parameters = [] of AST::Expression
               loop do
@@ -215,7 +182,7 @@ class Stacklang::Parser
                 case next_token!("A ',' or a ')'").value
                 when "," then next
                 when ")" then break
-                else unexpected! "A ',' or a ')'"
+                else raise syntax_error "A ',' or a ')'"
                 end
               end
               chain << AST::Call.new token, AST::Identifier.new(token, token.value), call_parameters
@@ -224,12 +191,12 @@ class Stacklang::Parser
             chain << identifier token
           end
         end
-        allows = [:binary_operator]
+        allows = Category::BinaryOperator
         expect_more = false
       end
 
     end
-    unexpected! "A #{allows.map(&.to_s).join " or "}" if expect_more
+    raise syntax_error allows.to_s if expect_more
     chain
   end
 
@@ -287,7 +254,7 @@ class Stacklang::Parser
             b = chain[index + 1].as AST::Expression
 
             if token.value == "."
-              b = b.as?(AST::Identifier) || unexpected! "Right side of access operator must be an identifier", context: b.token
+              b = b.as?(AST::Identifier) || raise syntax_error "Right side of access operator must be an identifier", context: b.token
               node = AST::Access.new token, operand: a, field: b
             else
               node = AST::Binary.new token, name: token.value, left: a, right: b
@@ -350,7 +317,7 @@ class Stacklang::Parser
   # If an identifier is given as a parameter, it use it instead of consuming a token.
   def identifier(token = nil)
     token ||= next_token! "identifier"
-    unexpected! "identifier" unless token.value.chars.all? do |c|
+    raise syntax_error "identifier" unless token.value.chars.all? do |c|
       c == '_' || c.lowercase?
     end
     AST::Identifier.new token, token.value
@@ -361,8 +328,7 @@ class Stacklang::Parser
   # If it fail, it return nil and does not alter the state.
   def type_name?(token = nil)
     save = @index
-    token ||= next_token?
-    return unless token
+    token ||= next_token! "A type name"
     unless token.value.chars.first.uppercase? && token.value.chars.all? { |c| c == '_' || c.alphanumeric? }
       @index = save
       return
@@ -373,14 +339,14 @@ class Stacklang::Parser
   # parse and return a type name.
   # If a type name is given as a parameter, it use it instead of consuming a token.
   def type_name(token = nil)
-    type_name?(token) || unexpected! "type_name"
+    type_name?(token) || raise syntax_error "type_name"
   end
     
   def number(token = nil)
     token ||= next_token! "number"
     AST::Literal.new token, token.value.to_i whitespace: false, underscore: true, prefix: true, strict: true, leading_zero_is_octal: false
   rescue ex
-    unexpected! "number literal"
+    raise syntax_error "number literal"
   end
 
   def literal(token = nil)
@@ -391,7 +357,7 @@ class Stacklang::Parser
     if colon
       unless consume? ":"
         if explicit
-          unexpected! ":"
+          raise syntax_error ":"
         else
           return AST::Word.new context_token
         end
@@ -405,7 +371,7 @@ class Stacklang::Parser
     when "*"  then return AST::Pointer.new token, type_constraint colon: false
     when "[" then
       size = literal
-      expect! "]"
+      consume! "]"
       return AST::Table.new token, type_constraint(colon: false), size 
     when "_" then return AST::Word.new token
     else
@@ -415,13 +381,13 @@ class Stacklang::Parser
       @index = save # The token was not meant for this, rollbacking.
       # TODO do it better
       return AST::Word.new context_token unless explicit
-      unexpected! "custom_type_name"
+      raise syntax_error "custom_type_name"
     end
   end
 
   # Parse and return a function.
   def function
-    root = expect! "fun"
+    root = consume! "fun"
     extern = consume? "extern"
     name = identifier
     parameters = [] of AST::Function::Parameter
@@ -438,7 +404,7 @@ class Stacklang::Parser
           had_separator = true
           next
         else
-          unexpected! ", or )" if !first && !had_separator
+          raise syntax_error ", or )" if !first && !had_separator
           param_name = identifier token
           param_constraint = type_constraint context_token: token
           parameters << AST::Function::Parameter.new token, param_name, param_constraint
@@ -458,7 +424,7 @@ class Stacklang::Parser
 
     unless extern
       consume? NEWLINE
-      expect! "{"
+      consume! "{"
       consume? NEWLINE
       loop do
         break if consume? "}"
@@ -477,7 +443,7 @@ class Stacklang::Parser
   end
 
   def global
-    root = expect! "var"
+    root = consume! "var"
     extern = consume? "extern"
     name = identifier
     constraint = type_constraint colon: true, explicit: false
@@ -485,10 +451,10 @@ class Stacklang::Parser
   end
 
   def requirement
-    root = expect! "require"
+    root = consume! "require"
     token = next_token! "A quoted string literal"
     unless token.value.starts_with?('"') && token.value.ends_with?('"')
-      unexpected! "A quoted string literal"
+      raise syntax_error "A quoted string literal"
     end
     AST::Requirement.new root, token.value.strip '"'
   end
@@ -504,11 +470,11 @@ class Stacklang::Parser
       #when "struct" then
       when nil then break
       else
-        unexpected! "require or var or fun or struct"
+        raise syntax_error "require or var or fun or struct"
       end
     end
     consume? NEWLINE
-    unexpected! "End Of File" unless eof?
+    raise syntax_error "End Of File" unless eof?
     AST::Unit.from_top_level elements
   end
 
@@ -516,24 +482,24 @@ class Stacklang::Parser
 
   # Consume a token and raise if it not equal to *expected*.
   # Return the token.
-  def expect!(expected) : Token
-    token = (@tokens[@index]? || unexpected! expected).tap do 
+  def consume!(expected) : Token
+    token = (@tokens[@index]? || raise syntax_error expected).tap do 
       @index += 1
     end
 
-    unexpected! expected.dump unless token.value == expected
+    raise syntax_error expected.dump unless token.value == expected
 
     token
   end
 
   # Raise an error stating that the current token is unexpected.
   # The *expected* parameter is used to document the error.
-  def unexpected!(expected, context = nil) : NoReturn
+  def syntax_error(expected, context = nil) : Exception
     token = context || @tokens[@index - 1]?
     value = token.try(&.value) || "End Of File"
     line = token.try(&.line) || @tokens[-1].line
     character = token.try(&.character) || @tokens[-1].character
-    raise Exception.new <<-STR
+    Exception.new <<-STR
     In #{@filename} line #{line} character #{character}:
     Unexpected token #{value.dump}
     Expected: #{expected}
@@ -564,14 +530,7 @@ class Stacklang::Parser
   # Get the next token value. Raise if none. 
   # Parameter *expected* is used to document the raised error.
   def next_token!(expected) : Token
-    (@tokens[@index]? || unexpected! expected).tap do 
-      @index += 1
-    end
-  end
-
-   # Get the next token value if any
-  def next_token? : Token?
-    @tokens[@index]?.try &.tap do 
+    (@tokens[@index]? || raise syntax_error expected).tap do 
       @index += 1
     end
   end
