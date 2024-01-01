@@ -173,7 +173,7 @@ class Stacklang::Parser
         else
           if consume? "("
             if token.value == "sizeof"
-              chain << AST::Sizeof.new token, type_constraint colon: false, explicit: true
+              chain << AST::Sizeof.new token, type_constraint colon: false, explicit: true, context_token: token
               consume! ")"
             else
               call_parameters = [] of AST::Expression
@@ -184,7 +184,7 @@ class Stacklang::Parser
                 when ")" then break
                 else raise syntax_error "A ',' or a ')'"
                 end
-              end
+              end unless consume? ")"
               chain << AST::Call.new token, AST::Identifier.new(token, token.value), call_parameters
             end
           else
@@ -212,6 +212,7 @@ class Stacklang::Parser
     {Arity::Binary, Associativity::Left, ["."]},
     {Arity::Binary, Associativity::Left, ["/", "*"]},
     {Arity::Binary, Associativity::Left, ["+", "-"]},
+    {Arity::Binary, Associativity::Left, [">>", "<<"]},
     {Arity::Binary, Associativity::Left, ["&"]},
     {Arity::Binary, Associativity::Left, ["|", "^"]},
     {Arity::Binary, Associativity::Left, ["==", "!="]},
@@ -295,17 +296,16 @@ class Stacklang::Parser
   
   def statement
     token = current
-    case token.try &.value
-    when "return"
+    if consume? "return"
       if consume? NEWLINE
         AST::Return.new token, nil
       else
         AST::Return.new token, expression
       end
-    when "if"
+    elsif consume? "if"
       # TODO
       AST::Identifier.new  token, "placeholder-if"
-    when "while"
+    elsif consume? "while"
       # TODO
       AST::Identifier.new token, "placeholder-while"
     else
@@ -353,7 +353,8 @@ class Stacklang::Parser
     number token
   end
 
-  def type_constraint(colon = true, explicit = false, context_token = nil)
+  # Context token is used to document syntax error in case a type AST node is generated implicitely 
+  def type_constraint(context_token : Token, colon = true, explicit = false)
     if colon
       unless consume? ":"
         if explicit
@@ -368,11 +369,11 @@ class Stacklang::Parser
     token = next_token! "type_specifier"
 
     case token.value 
-    when "*"  then return AST::Pointer.new token, type_constraint colon: false
+    when "*"  then return AST::Pointer.new token, type_constraint colon: false, context_token: token
     when "[" then
       size = literal
       consume! "]"
-      return AST::Table.new token, type_constraint(colon: false), size 
+      return AST::Table.new token, type_constraint(colon: false, context_token: token), size 
     when "_" then return AST::Word.new token
     else
       # Either a type name, or _ if explicit == false
@@ -446,7 +447,7 @@ class Stacklang::Parser
     root = consume! "var"
     extern = consume? "extern"
     name = identifier
-    constraint = type_constraint colon: true, explicit: false
+    constraint = type_constraint colon: true, explicit: false, context_token: root
     AST::Variable.new root, name, constraint, nil, extern: extern != nil
   end
 
@@ -487,7 +488,10 @@ class Stacklang::Parser
       @index += 1
     end
 
-    raise syntax_error expected.dump unless token.value == expected
+    unless token.value == expected
+      @index -= 1
+      raise syntax_error expected.dump 
+    end
 
     token
   end
@@ -495,7 +499,7 @@ class Stacklang::Parser
   # Raise an error stating that the current token is unexpected.
   # The *expected* parameter is used to document the error.
   def syntax_error(expected, context = nil) : Exception
-    token = context || @tokens[@index - 1]?
+    token = context || @tokens[@index]?
     value = token.try(&.value) || "End Of File"
     line = token.try(&.line) || @tokens[-1].line
     character = token.try(&.character) || @tokens[-1].character
@@ -537,12 +541,13 @@ class Stacklang::Parser
 
   @filename : String?
   def initialize(io : IO, @filename = nil)
-    @tokens = Tokenizer.tokenize io
+    @tokens = Tokenizer.tokenize io, @filename
     @index = 0
   end
-end
 
-File.open ARGV.first do |file|
-  unit = Stacklang::Parser.new(file).unit
-  puts unit.to_s
+  def self.open(path)
+    File.open path do |io| 
+      new io, path
+    end
+  end
 end

@@ -3,29 +3,20 @@ require "../parser"
 require "../../assembler/object"
 require "../../spec"
 
-# TODO: getting more than one path is useless.
 class Stacklang::Compiler
-  @units : Hash(Path, Unit)
+  # Cache of all units opened
+  @units =  {} of Path => Unit
+  # The unit to compile
+  @unit : Unit?
   getter spec
 
-  def initialize(paths : Array(String), @spec : RiSC16::Spec, @debug = true)
-    @units = {} of Path => Unit
-    @units = paths.to_h do |path|
-      absolute = Path[path].expand home: true
-      File.open absolute do |file|
-        parser = Stacklang::Parser.new(file)
-        ast = parser.unit
-        unless ast
-          raise "Could not parse unit '#{path}'"
-        end
-        unit = Unit.new ast, absolute, self
-        {absolute, unit}
-      end
-    end
+  def initialize(path : String, @spec : RiSC16::Spec, @debug = true)
+    absolute = Path[path].expand home: true
+    @units[absolute] = @unit = Unit.new Stacklang::Parser.open(path).unit, absolute, self
   end
 
-  def compile : Array(RiSC16::Object)
-    @units.values.map &.compile
+  def compile : RiSC16::Object
+    @unit.not_nil!.compile
   end
 
   # Fetch a required unit from cache or parse it.
@@ -33,15 +24,7 @@ class Stacklang::Compiler
   def require(path : String, from : Unit) : Unit
     absolute = Path[path].expand home: true, base: from.path.dirname
     @units[absolute]? || begin
-      File.open absolute do |file|
-        parser = Stacklang::Parser.new(file)
-        ast = parser.unit
-        unless ast
-          raise "Could not parse unit '#{path}'"
-        end
-        unit = Unit.new ast, absolute, self
-        @units[absolute] = unit
-      end
+      @units[absolute] = Unit.new Stacklang::Parser.open(absolute.to_s).unit, absolute, self
     end
   end
 end

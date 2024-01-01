@@ -1,5 +1,5 @@
 class Stacklang::Function
-  def compile_addition(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST::Node, soustract = false) : Type::Any
+  def compile_addition(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST, soustract = false) : Type::Any
     left_side_register, left_side_type = left_side
     right_side_register, right_side_type = right_side
     ret_type = case {left_side_type, right_side_type}
@@ -20,7 +20,7 @@ class Stacklang::Function
     ret_type
   end
 
-  def compile_bitwise_and(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST::Node, inv = false) : Type::Any
+  def compile_bitwise_and(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST, inv = false) : Type::Any
     left_side_register, left_side_type = left_side
     right_side_register, right_side_type = right_side
     ret_type = case {left_side_type, right_side_type}
@@ -34,7 +34,7 @@ class Stacklang::Function
     ret_type
   end
 
-  def compile_bitwise_or(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST::Node, inv = false) : Type::Any
+  def compile_bitwise_or(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST, inv = false) : Type::Any
     left_side_register, left_side_type = left_side
     right_side_register, right_side_type = right_side
     ret_type = case {left_side_type, right_side_type}
@@ -54,7 +54,7 @@ class Stacklang::Function
 
   # TODO: Allow ptr comparison ?
   # FIXME: should not compute right side if left side is falsy
-  def compile_logic_and(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST::Node) : Type::Any
+  def compile_logic_and(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST) : Type::Any
     left_side_register, left_side_type = left_side
     right_side_register, right_side_type = right_side
     ret_type = case {left_side_type, right_side_type}
@@ -72,13 +72,13 @@ class Stacklang::Function
 
   # TODO: Allow ptr comparison ?
   # FIXME: should not compute right side if left side is truthy
-  def compile_logic_or(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST::Node) : Type::Any
+  def compile_logic_or(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST) : Type::Any
     compile_bitwise_or left_side, right_side, into, node
   end
 
   # TODO: Add long type equal ?
   # TODO: Allow ptr comparison ?
-  def compile_equal(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST::Node, neq = false) : Type::Any
+  def compile_equal(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST, neq = false) : Type::Any
     left_side_register, left_side_type = left_side
     right_side_register, right_side_type = right_side
     ret_type = case {left_side_type, right_side_type}
@@ -99,7 +99,7 @@ class Stacklang::Function
     ret_type
   end
 
-  def compile_comparator(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST::Node, superior_to = false, or_equal = false) : Type::Any
+  def compile_comparator(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST, superior_to = false, or_equal = false) : Type::Any
     left_side_register, left_side_type = left_side
     right_side_register, right_side_type = right_side
     ret_type = case {left_side_type, right_side_type}
@@ -143,8 +143,6 @@ class Stacklang::Function
                 else           error "Usupported binary operator '#{binary.name}'", node: binary
                 end
     call = AST::Call.new(AST::Identifier.new(call_name), [binary.left, binary.right])
-    call.line = binary.line
-    call.character = binary.character
     compile_call call, into: into
   end
 

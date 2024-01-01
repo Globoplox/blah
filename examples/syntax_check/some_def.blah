@@ -1,0 +1,1 @@
+export __global_output_character: .word 0x40

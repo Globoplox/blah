@@ -3,14 +3,22 @@ require "./tokenizer"
 abstract class Stacklang::AST
 
   property token : Tokenizer::Token?
-
+  
+  def line 
+    @token.try &.line || "???"
+  end
+  
+  def character 
+    @token.try &.character || "???"
+  end
+  
   abstract def dump(io, indent = 0)
 
   def to_s(io : IO)
     dump io
   end
 
-  class Unit < AST
+  class Unit
     getter requirements
     getter types
     getter globals
@@ -282,6 +290,10 @@ abstract class Stacklang::AST
     def initialize(@token, @number : Int32)
     end
 
+    # For codegen / syntaxic sugar. TODO: track origin
+    def initialize(@number : Int32)
+    end
+
     def dump(io, indent = 0)
       io << "0x"
       io << @number.to_s base: 16
@@ -322,6 +334,10 @@ abstract class Stacklang::AST
     def initialize(@token, @name : String)
     end
 
+    # For codegen / syntaxic sugar. TODO: track origin
+    def initialize(@name : String)
+    end
+
     def dump(io, indent = 0)
       io << @name
     end
@@ -332,6 +348,10 @@ abstract class Stacklang::AST
     getter parameters
 
     def initialize(@token, @name : Identifier, @parameters : Array(Expression))
+    end
+
+    # For codegen / syntaxic sugar. TODO: track origin
+    def initialize(@name : Identifier, @parameters : Array(Expression))
     end
 
     def dump(io, indent = 0)
@@ -369,6 +389,11 @@ abstract class Stacklang::AST
     def initialize(@token, @operand : Expression, @name : String)
     end
 
+    # For codegen / syntaxic sugar. TODO: track origin
+    def initialize(@operand : Expression, @name : String)
+    end
+
+
     def dump(io, indent = 0)
       io << @name
       @operand.dump io, indent
@@ -381,6 +406,10 @@ abstract class Stacklang::AST
     getter right
 
     def initialize(@token, @left : Expression, @name : String, @right : Expression)
+    end
+
+    # For codegen / syntaxic sugar. TODO: track origin
+    def initialize(@left : Expression, @name : String, @right : Expression)
     end
 
     def dump(io, indent = 0)

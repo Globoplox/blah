@@ -126,7 +126,7 @@ module RiSC16
         end if create_intermediary
         objects = sources_files.flat_map do |source|
           if source.ends_with?(".sl")
-            object = Stacklang::Compiler.new([source], spec, debug).compile.first
+            object = Stacklang::Compiler.new(source, spec, debug).compile
             name = source.gsub(".sl", ".ro")
             if create_intermediary
               File.open Path[(intermediary_dir || Dir.current).not_nil!, Path[name].basename], "w" do |output|
@@ -197,7 +197,6 @@ module RiSC16
       else          raise "Invalid command: #{command}"
       end
     rescue error
-      puts error.message
       raise error
     end
   end

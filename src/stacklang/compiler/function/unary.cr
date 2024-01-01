@@ -27,7 +27,7 @@ class Stacklang::Function
 
   # Compile dereferencement expression.
   # It has it's own case instead of being in `#compile_value_unary` to simplify error display.
-  def compile_ptr_unary(operand : AST::Expression, into : Registers | Memory | Nil, node : AST::Node) : Type::Any
+  def compile_ptr_unary(operand : AST::Expression, into : Registers | Memory | Nil, node : AST) : Type::Any
     if into.nil? # We optimize to nothing unless operand might have side-effects
       expression_type = compile_expression operand, into: nil
       error "Cannot dereference non-pointer type #{expression_type}", node: node unless expression_type.is_a? Type::Pointer
@@ -45,7 +45,7 @@ class Stacklang::Function
   end
 
   # Compile &() expression.
-  def compile_addressable_unary(operand : AST::Expression, into : Registers | Memory | Nil, node : AST::Node) : Type::Any
+  def compile_addressable_unary(operand : AST::Expression, into : Registers | Memory | Nil, node : AST) : Type::Any
     lvalue_result = compile_lvalue operand
     lvalue_result || error "Expression #{operand.to_s} is not a valid operand for operator '&'", node: node
     lvalue, targeted_type = lvalue_result
