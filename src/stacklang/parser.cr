@@ -2,12 +2,11 @@ require "./tokenizer"
 require "./ast"
 
 # TODO: 
-# - Decide on how access should be handled: parser, or as a generic binary operator visited later
 # - Structure declaration
 # - Statements: if, while
 # - Expression: cast, sizeof
+# - Array access and affectation operator
 class Stacklang::Parser
-  include Stacklang::AST
   alias Token = Tokenizer::Token
   
   # rule def statement_if
@@ -143,22 +142,20 @@ class Stacklang::Parser
     Binary
   end
 
-  alias Component = Expression | {kind: Arity, value: Tokenizer::Token}
+  alias Component = AST::Expression | {kind: Arity, value: Tokenizer::Token}
   
   # Consume greedely all tokens of a single expression.
   # Stop when it reach a ')',  '}', ','.
   # It parse leaf expression as ast node, but keep operators as is in the order they appear.
   # Return an array of all the component of the expression in their original order,
   #  mixing ast node and tuples in the form {kind: Symbol, value: Token} for operators.
-  def expression_lexer : Array(Expression | {kind: Arity, value: Tokenizer::Token})
+  def expression_lexer : Array(AST::Expression | {kind: Arity, value: Tokenizer::Token})
     chain = [] of Component
     allows = [:unary_operator, :operand]
     expect_more = false
     loop do
-      break if peek &.in? [")", "}", ","]
+      break if current.try &.value.in? [")", "}", ","]
       token = next_token! "Any expression"
-      pp "TOKEN"
-      pp token
       case token.value
       
       when "("
@@ -201,29 +198,29 @@ class Stacklang::Parser
         end
       
       else
-        pp "a"
         unexpected! "A #{allows.map(&.to_s).join " or "}" unless allows.includes? :operand
         if token.value.starts_with? '"'
           raise "Quoted string literal are not supported"
         elsif token.value.chars.first.ascii_number?
           chain << number token
         else
-          pp "b"
-          # if consume? # simpler
-          if peek &.== "("
-            next_token? # Consume it
-            call_parameters = [] of Expression
-            loop do
-              call_parameters << expression
-              case next_token!("A ',' or a ')'").value
-              when "," then next
-              when ")" then break
-              else unexpected! "A ',' or a ')'"
+          if consume? "("
+            if token.value == "sizeof"
+              chain << AST::Sizeof.new token, type_constraint colon: false, explicit: true
+              expect! ")"
+            else
+              call_parameters = [] of AST::Expression
+              loop do
+                call_parameters << expression
+                case next_token!("A ',' or a ')'").value
+                when "," then next
+                when ")" then break
+                else unexpected! "A ',' or a ')'"
+                end
               end
+              chain << AST::Call.new token, AST::Identifier.new(token, token.value), call_parameters
             end
-            chain << Call.new token, Identifier.new(token, token.value), call_parameters
           else
-            pp "c"
             chain << identifier token
           end
         end
@@ -259,11 +256,7 @@ class Stacklang::Parser
 
   # Take a chain of `Expression` ast nodes and unprocessed operators (as the output of `#expression_lexer`)
   # and solve the operator precedence and associativity to produce one single `Expression` ast node.
-  def expression_parser(chain : Array(Expression | {kind: Arity, value: Tokenizer::Token})) : Expression
-    pp "---------"
-    pp "ROUND OF EXP PARSER"
-    pp "INPUT"
-    pp chain
+  def expression_parser(chain : Array(AST::Expression | {kind: Arity, value: Tokenizer::Token})) : AST::Expression
     OPERATORS_PRIORITIES.each do |kind, associativity, operators|
       # Loop until we dont find any operator of this precedence
       loop do
@@ -288,12 +281,17 @@ class Stacklang::Parser
             end
           end
           if index
-            pp "HAS FOUND OPERAOTR #{index}"
             # Replace the component by an ast node.
             token = chain[index].as({kind: Arity, value: Token})[:value]
-            a = chain[index - 1].as Expression
-            b = chain[index + 1].as Expression
-            node = Binary.new token, name: token.value, left: a, right: b
+            a = chain[index - 1].as AST::Expression
+            b = chain[index + 1].as AST::Expression
+
+            if token.value == "."
+              b = b.as?(AST::Identifier) || unexpected! "Right side of access operator must be an identifier", context: b.token
+              node = AST::Access.new token, operand: a, field: b
+            else
+              node = AST::Binary.new token, name: token.value, left: a, right: b
+            end
             chain[index -1, 3] = [node]
           else
             break
@@ -307,13 +305,10 @@ class Stacklang::Parser
             chain.size - 1 - reversed_index
           end
           if index
-            pp "FOUND operator at index #{index}"
-            pp chain
             token = chain[index].as({kind: Arity, value: Token})[:value]
-            a = chain[index + 1].as Expression
-            node = Unary.new token, name: token.value, operand: a
+            a = chain[index + 1].as AST::Expression
+            node = AST::Unary.new token, name: token.value, operand: a
             chain[index, 2] = [node]
-            pp chain
           else 
             break
           end
@@ -321,19 +316,13 @@ class Stacklang::Parser
       end
     end
 
-    pp "OUTPUT"
-    pp chain
-
     raise "Clutter found in expression #{chain}" unless chain.size == 1
-    return chain.first.as?(Expression) || raise "Unknown operators in expression #{chain}"
+    return chain.first.as?(AST::Expression) || raise "Unknown operators in expression #{chain}"
   end
 
   def expression
     chain = expression_lexer
-    pp "LEXER OUTPUT:"
-    pp chain
     ast = expression_parser chain
-    pp ast
     return ast
   end
   
@@ -342,16 +331,16 @@ class Stacklang::Parser
     case token.try &.value
     when "return"
       if consume? NEWLINE
-        Return.new token, nil
+        AST::Return.new token, nil
       else
-        Return.new token, expression
+        AST::Return.new token, expression
       end
     when "if"
       # TODO
-      Identifier.new  token, "placeholder-if"
+      AST::Identifier.new  token, "placeholder-if"
     when "while"
       # TODO
-      Identifier.new token, "placeholder-while"
+      AST::Identifier.new token, "placeholder-while"
     else
       expression
     end
@@ -364,7 +353,7 @@ class Stacklang::Parser
     unexpected! "identifier" unless token.value.chars.all? do |c|
       c == '_' || c.lowercase?
     end
-    Identifier.new token, token.value
+    AST::Identifier.new token, token.value
   end
 
   # Try to parse and return a type name.
@@ -389,7 +378,7 @@ class Stacklang::Parser
     
   def number(token = nil)
     token ||= next_token! "number"
-    Literal.new token, token.value.to_i whitespace: false, underscore: true, prefix: true, strict: true, leading_zero_is_octal: false
+    AST::Literal.new token, token.value.to_i whitespace: false, underscore: true, prefix: true, strict: true, leading_zero_is_octal: false
   rescue ex
     unexpected! "number literal"
   end
@@ -404,27 +393,28 @@ class Stacklang::Parser
         if explicit
           unexpected! ":"
         else
-          return Word.new context_token
+          return AST::Word.new context_token
         end
       end
     end
 
     save = @index
     token = next_token! "type_specifier"
+
     case token.value 
-    when "*"  then return Pointer.new token, type_constraint colon: false
+    when "*"  then return AST::Pointer.new token, type_constraint colon: false
     when "[" then
       size = literal
       expect! "]"
-      return Table.new token, type_constraint(colon: false), size 
-    when "_" then return Word.new token
+      return AST::Table.new token, type_constraint(colon: false), size 
+    when "_" then return AST::Word.new token
     else
       # Either a type name, or _ if explicit == false
       custom_name = type_name? token
-      return Custom.new token, custom_name.value if custom_name
+      return AST::Custom.new token, custom_name.value if custom_name
       @index = save # The token was not meant for this, rollbacking.
       # TODO do it better
-      return Word.new context_token unless explicit
+      return AST::Word.new context_token unless explicit
       unexpected! "custom_type_name"
     end
   end
@@ -434,7 +424,7 @@ class Stacklang::Parser
     root = expect! "fun"
     extern = consume? "extern"
     name = identifier
-    parameters = [] of Function::Parameter
+    parameters = [] of AST::Function::Parameter
 
     if consume? "("
     
@@ -451,7 +441,7 @@ class Stacklang::Parser
           unexpected! ", or )" if !first && !had_separator
           param_name = identifier token
           param_constraint = type_constraint context_token: token
-          parameters << Function::Parameter.new token, param_name, param_constraint
+          parameters << AST::Function::Parameter.new token, param_name, param_constraint
           first = false
           had_separator = false
         end 
@@ -463,16 +453,14 @@ class Stacklang::Parser
       ret_type = nil
     end
     
-    variables = [] of Variable
-    statements = [] of Statement
+    variables = [] of AST::Variable
+    statements = [] of AST::Statement
 
     unless extern
       consume? NEWLINE
       expect! "{"
       consume? NEWLINE
       loop do
-        pp "LOOP FUNC"
-        pp current
         break if consume? "}"
         next if consume? NEWLINE
         token = current
@@ -485,7 +473,7 @@ class Stacklang::Parser
       end
     end
 
-    Function.new root, name, parameters, ret_type, variables, statements, extern: extern
+    AST::Function.new root, name, parameters, ret_type, variables, statements, extern: extern
   end
 
   def global
@@ -493,7 +481,7 @@ class Stacklang::Parser
     extern = consume? "extern"
     name = identifier
     constraint = type_constraint colon: true, explicit: false
-    Variable.new root, name, constraint, nil, extern: extern != nil
+    AST::Variable.new root, name, constraint, nil, extern: extern != nil
   end
 
   def requirement
@@ -502,11 +490,11 @@ class Stacklang::Parser
     unless token.value.starts_with?('"') && token.value.ends_with?('"')
       unexpected! "A quoted string literal"
     end
-    Requirement.new root, token.value.strip '"'
+    AST::Requirement.new root, token.value.strip '"'
   end
 
   def unit
-    elements = [] of Requirement | Function | Variable | Struct
+    elements = [] of AST::Requirement | AST::Function | AST::Variable | AST::Struct
     loop do
       next if consume? NEWLINE
       case current.try &.value
@@ -516,15 +504,12 @@ class Stacklang::Parser
       #when "struct" then
       when nil then break
       else
-        pp @index
-        pp current
-        pp @tokens 
         unexpected! "require or var or fun or struct"
       end
     end
     consume? NEWLINE
     unexpected! "End Of File" unless eof?
-    Unit.from_top_level elements
+    AST::Unit.from_top_level elements
   end
 
   NEWLINE = "\n"
@@ -543,8 +528,8 @@ class Stacklang::Parser
 
   # Raise an error stating that the current token is unexpected.
   # The *expected* parameter is used to document the error.
-  def unexpected!(expected) : NoReturn
-    token = @tokens[@index - 1]?
+  def unexpected!(expected, context = nil) : NoReturn
+    token = context || @tokens[@index - 1]?
     value = token.try(&.value) || "End Of File"
     line = token.try(&.line) || @tokens[-1].line
     character = token.try(&.character) || @tokens[-1].character
@@ -571,12 +556,6 @@ class Stacklang::Parser
     @tokens[@index]?
   end
 
-  # Return true if the block return true for the current token.
-  # Does not consume
-  def peek
-    yield @tokens[@index]?.try &.value
-  end
-
   # True if End Of File is reached.
   def eof?
     @index >= @tokens.size
@@ -600,13 +579,11 @@ class Stacklang::Parser
   @filename : String?
   def initialize(io : IO, @filename = nil)
     @tokens = Tokenizer.tokenize io
-    pp @tokens.map(&.value)
     @index = 0
   end
 end
 
 File.open ARGV.first do |file|
   unit = Stacklang::Parser.new(file).unit
-  pp unit
   puts unit.to_s
 end

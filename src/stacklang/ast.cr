@@ -1,18 +1,16 @@
 require "./tokenizer"
 
-module Stacklang::AST
+abstract class Stacklang::AST
 
-  abstract class Node
-    property token : Tokenizer::Token?
+  property token : Tokenizer::Token?
 
-    abstract def dump(io, indent = 0)
+  abstract def dump(io, indent = 0)
 
-    def to_s(io : IO)
-      dump io
-    end
+  def to_s(io : IO)
+    dump io
   end
 
-  class Unit < Node
+  class Unit < AST
     getter requirements
     getter types
     getter globals
@@ -48,7 +46,7 @@ module Stacklang::AST
     end
   end
 
-  class Requirement < Node
+  class Requirement < AST
     getter target
 
     def initialize(@token, @target : String)
@@ -59,10 +57,10 @@ module Stacklang::AST
     end
   end
 
-  abstract class Statement < Node
+  abstract class Statement < AST
   end
 
-  abstract class Type < Node
+  abstract class Type < AST
   end
 
   class Word < Type
@@ -111,7 +109,7 @@ module Stacklang::AST
     end
   end
 
-  class Variable < Node
+  class Variable < AST
     getter name
     getter constraint
     getter initialization
@@ -190,8 +188,8 @@ module Stacklang::AST
     end
   end
 
-  class Function < Node
-    class Parameter < Node
+  class Function < AST
+    class Parameter < AST
       getter name
       getter constraint
 
@@ -245,7 +243,7 @@ module Stacklang::AST
     end
   end
 
-  class Struct < Node
+  class Struct < AST
     getter name
     getter fields
 
