@@ -1,6 +1,6 @@
 # Stacklang
 
-Stacklang is a work-in-progress, minimalistic C-inspired languages.  
+Stacklang is a work-in-progress, rudimentary C-inspired imperative language.  
 
 ```sl
 require "things_doer"
@@ -12,14 +12,14 @@ fun main {
 
 It is composed of:
 - A compiler parsing stacklang files (.sl) and producing [object files](/wiki/object.md)
-- A minimalistic standatd library
+- A minimalistic standard library
 
-While it much more practical to use than assembly, it generally inefficient code.  
+While being more practical to use than assembly, it is not very efficient.  
 It is not feature complete, can be buggy, has specification hole and pretty much a constant WIP.
-But outside of heavy refactoring time it does work.  
+But outside of heavy refactoring time it does works.  
 
 ## Specification 
-See [Specifications](/wiki/stacklang/specification).
+See [Specifications](/wiki/stacklang/specification.md).
 
 ## Usage 
 

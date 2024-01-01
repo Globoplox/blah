@@ -126,7 +126,12 @@ module RiSC16
         end if create_intermediary
         objects = sources_files.flat_map do |source|
           if source.ends_with?(".sl")
-            object = Stacklang::Compiler.new(source, spec, debug).compile
+            begin
+              object = Stacklang::Compiler.new(source, spec, debug).compile
+            rescue ex : Stacklang::Compiler::Exception 
+              puts ex.message
+              exit 1
+            end
             name = source.gsub(".sl", ".ro")
             if create_intermediary
               File.open Path[(intermediary_dir || Dir.current).not_nil!, Path[name].basename], "w" do |output|

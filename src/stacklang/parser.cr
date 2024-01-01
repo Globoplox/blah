@@ -1,3 +1,4 @@
+require "colorize"
 require "./tokenizer"
 require "./ast"
 
@@ -489,25 +490,60 @@ class Stacklang::Parser
     end
 
     unless token.value == expected
-      @index -= 1
       raise syntax_error expected.dump 
     end
 
     token
   end
 
+  class Exception < ::Exception
+  end
+
   # Raise an error stating that the current token is unexpected.
   # The *expected* parameter is used to document the error.
   def syntax_error(expected, context = nil) : Exception
-    token = context || @tokens[@index]?
-    value = token.try(&.value) || "End Of File"
-    line = token.try(&.line) || @tokens[-1].line
-    character = token.try(&.character) || @tokens[-1].character
-    Exception.new <<-STR
-    In #{@filename} line #{line} character #{character}:
-    Unexpected token #{value.dump}
-    Expected: #{expected}
-    STR
+    Exception.new String.build { |io|
+    if filename = @filename
+      io << "In "
+      io << filename
+      io << ":\n"
+    end
+    io << "Syntax Error"
+      token = context || @tokens[@index - 1]? || @tokens[@index]?
+      if token
+        io << " line "
+        io << token.line
+        io << " column "
+        io << token.character
+        if (locs = @locs) && (loc = locs[token.line - 1]?) 
+          io << '\n'
+          io.puts "=" * 40
+          [
+            locs[token.line - 3]?,
+            locs[token.line - 2]?
+          ].compact.each do |before|
+            io.puts before
+          end
+          loc = loc + "  "
+          io.puts [loc[0, token.character - 1].colorize.bold, token.value.colorize.bold.underline, loc[(token.character - 1 + token.value.size)..].colorize.bold].join.gsub("\n", "")
+          io.puts (" " * (token.character - 1)) + ("^" * token.value.size)
+          [
+            locs[token.line]?,
+            locs[token.line + 1]?
+          ].compact.each do |after|
+            io.puts after
+          end
+          io << "=" * 40
+        else 
+          io << ": \""
+          io << token.value.dump
+          io << '"'
+        end
+      end
+      io << '\n'
+      io << "Expected: "
+      io << expected
+    }
   end
 
   # Return true and consume the current token value if it is equal to *token* parameter.
@@ -540,7 +576,13 @@ class Stacklang::Parser
   end
 
   @filename : String?
-  def initialize(io : IO, @filename = nil)
+  # Cache of all line of codes, used for fancy debug.
+  @locs : Array(String)?
+  def initialize(io : IO, @filename = nil, fancy = true)
+    if fancy 
+      @locs = io.gets_to_end.lines
+      io.rewind
+    end
     @tokens = Tokenizer.tokenize io, @filename
     @index = 0
   end

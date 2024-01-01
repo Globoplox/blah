@@ -4,8 +4,8 @@ module Stacklang::Tokenizer
   struct Token
     getter value : String
     getter source : String?
-    getter line : Int32?
-    getter character : Int32?
+    getter line : Int32
+    getter character : Int32
     def initialize(@value, @line, @character, @source)
     end
   end
@@ -51,6 +51,8 @@ module Stacklang::Tokenizer
       elsif comment_stack > 0
         if last == '*' && c == '/'
           comment_stack -= 1 
+        elsif last == '/' && c == '*'
+          comment_stack += 1
         end
       
       elsif last == '/' && c == '*'
@@ -68,8 +70,8 @@ module Stacklang::Tokenizer
           tokens << Token.new token.join, line_at_start, character_at_start, source unless token.empty?
           tokens << Token.new "\n", line, character, source unless tokens[-1]?.try &.value.== "\n"
           token.clear
-          line_at_start = line
-          character_at_start = character
+          line_at_start = line + 1
+          character_at_start = 1
         end
 
       elsif c == ' ' || c == '\t'
@@ -77,8 +79,8 @@ module Stacklang::Tokenizer
           tokens << Token.new token.join, line_at_start, character_at_start, source unless token.empty?
           token.clear
           line_at_start = line
-          character_at_start = character
         end
+        character_at_start = character + 1
       
       elsif c.in? ['[', ']', '{', '}', '(', ')', ':', ',']
         tokens << Token.new token.join, line_at_start, character_at_start, source unless token.empty?

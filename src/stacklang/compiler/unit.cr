@@ -4,8 +4,6 @@ require "./function"
 require "../../assembler/object"
 require "../../assembler/linker"
 
-# We compile ONLY the thing in the current unit, the requirements are for info only (globals and functions are not compiled).
-# If we need them, compile both file and link.
 class Stacklang::Unit
   getter path
 

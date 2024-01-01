@@ -11,7 +11,7 @@ It consists of:
 - A [repositionable object](/wiki/object.md) file format
 - A [linker](/wiki/linker.md)
 - A [virutal-machine](/wiki/vm.md)
-- A [compiler](/wiki/stacklang/index.md) for a minimalistic higher-level programming language
+- A compiler for [stacklang](/wiki/stacklang/index.md), a rudimentary imperative programming language
 - A [debugger](/wiki/debugger.md) curse tool for visualizing binaries and execution
 
 All of which are bundled within a single CLI tool, written in [Crystal](https://crystal-lang.org/).
@@ -19,22 +19,23 @@ All of which are bundled within a single CLI tool, written in [Crystal](https://
 ## TODO
 - [x] Write an assembler able to ouput raw bitcode
   - [ ] Better error output for linker
-  - [ ] UTF-16 strings
+  - [ ] UCS-2 Strings
 - [x] Write a dummy virtual machine that can execute this raw bitcode
   - [x] IO
+  - [ ] IO with both data and control register
   - [x] Hello World
   - [ ] Propose memory paging mechanisms
   - [ ] Propose memory protection mechanisms
 - [x] Design and write a compiler for a small stack language
-  - [x] Fix or don't fix undefined behavior due to cached var (add restricted keyword and disable all caching when not enabled)
-  - [ ] Cache field of struct var when struct is restricted ?
-  - [ ] Optimize for size
-    - [ ] Better register usage 
-  - [ ] Fix line/char hints
+  - [ ] Finish parser refactor to full-featurness
+  - [ ] Single truth source for operators list and behaviors
   - [ ] Add error for stack size exceding small immediate size
-  - [ ] Fix or_equal comparison
+  - [ ] Refactor compiler to make it simpler and dumber
+  - [ ] Fix >= and <= comparisons
   - [ ] && and || should be lazy
-  - [ ] Unsigned and signed arithmetic in stdlib
+- [ ] Stdlib
+  - IO handling
+  - Basic math
 - [ ] Write an OS
   - [ ] Implement a file system
   - [ ] Relocate and load another program
