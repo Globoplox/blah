@@ -28,7 +28,13 @@ All of which are bundled within a single CLI tool, written in [Crystal](https://
   - [ ] Propose memory protection mechanisms
 - [x] Design and write a compiler for a small stack language
   - [ ] Finish parser refactor to full-featurness
-  - [ ] Single truth source for operators list and behaviors
+  - [ ] Detect unterminating functions
+  - [ ] Operators overload on non-word or pointer types
+  - [ ] Implement else, elsif, next, break
+  - [ ] Scoped variables (in statement blocks) allocated as needed
+  - [ ] Smart variable initialization
+  - [ ] Global initialization (and necessary checks)
+  - [ ] Explicit behavior of non-native operators
   - [ ] Add error for stack size exceding small immediate size
   - [ ] Refactor compiler to make it simpler and dumber
   - [ ] Fix >= and <= comparisons

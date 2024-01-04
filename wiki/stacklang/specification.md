@@ -46,9 +46,13 @@ Stacklang has four primitive types / category of types:
 
 ## Defining Functions
 
-Functions definitions starts with the `fun` keyword, followed by the name, parameters and an optionnal return type restriction.   
+Functions definitions starts with the `fun` keyword, followed by the name, parameters and an optionnal return type restriction.  
 When declaring a prototype for a function implemented in a scope that cannot be reached during this compiler run, the `fun` keyword can be followed by `extern`.
 See [Referencing other symbols](Referencing-other-symbols). In this case, the function must not have a body.  
+
+Some identifier are reserved keywords and should not be used for functions:
+- `sizeof`
+- `cast`
 
 Examples:
 ```sl
@@ -178,25 +182,82 @@ A symbol cannot be declared twice, even with the same prototype and no conflicti
 
 ### Conditional
 
-`TODO`
+Blocks of code can be executed conditonally:
+
+```sl
+fun main {
+  if (1)
+  __io_tty = 0x31
+
+  if (0) {
+    __io_tty = 0x32
+  }
+
+  if (0x1337) { __io_tty = 0x33 }
+
+  if (0x1337) __io_tty = 0x34
+
+  return
+}
+```
+
+The condition expression type must be a _ or *. A value of 0 is considered false, any other value is considered true.  
+The statement itself is not an expression and does not have a value, so this is not valid: `a = if (1) { 6 }`  
+There are no `else` nor `elsif` support.  
 
 ### Loops
 
-`TODO`
+Blocks of code can be executed repeatedly:
+
+```sl
+fun main {
+  /* 
+    I have not implemented variables yet 
+    So I will just use the word at address 1337 as my var
+  */
+  
+  *cast(*, 1337) = 4
+  while (*cast(*, 1337)) {
+    __io_tty = 0x30 + *cast(*, 1337)
+    *cast(*, 1337) -= 1
+  }
+
+  return
+}
+```
+
+The condition expression type must be a _ or *. A value of 0 is considered false, any other value is considered true.  
+The statement itself is not an expression and does not have a value.  
+There are no `break` nor `next` support.  
+
 
 ### Operators
 
-#### Struct member access
+`WIP`
 
-`TODO`
+List of all operators, ordered by decreasing precedence:
 
-#### Unary operators
+"<<", ">>", "*", "/"
 
-`TODO`
+| Operator | Name | Arity | Associativity | Implementation | Note |
+| -- | -- | -- | -- | -- | -- |
+| ! | Logical Not | Unary |  | None |  |  
+| ~ | Binary Not | Unary |  Native for _ |  
+| & | Reference | Unary | Native for all types | Left-side must be addressable |
+| * | Dereference | Unary | Native for * |  |
+| - | Opposite | Unary |  | Native for _ |  |
+| . | Struct Member Access | Binary | Left | Native for all struct types | Right-side must be a member identifier |
+| * | Multiplication | Binary | Left | `TODO` |  |
+| / | Multiplication | Binary | Left | `TODO` |  |
+| + | Addition | Binary | Left | Native for _ and * |  |
+| - | Substraction | Binary | Left | Native for _ and * |  |
 
-#### Binary operators
+....
+| && | Logical And | Binary | Left | Native for _ | Currently dysfunctional |
+| \|\| | Logical Or | Binary | Left | Native for _ | Currently dysfunctional |
+| = | Affectation | Binary | Right | Native for all types | Left-side must be addressable |
+| All other affectation operators |  | Binary | Right | Syntaxic-sugar: `a += b` is resolved to `a = a + b` |
 
-`TODO`
 
 #### Operators precedence and associativity
 
@@ -207,7 +268,7 @@ Stacklang operators ordered by decreasing precedence:
 | Kind | Operators  |  Associativity |
 | --- | ------------- | ------------- |
 | Unary | !, ~, &, *, - | None |
-| Multiplicative | *, ~ | Left |
+| Multiplicative | *, /, % | Left |
 | Additive | +, - | Left |
 | Shift | <<, >> | Left |
 | Binary AND | & | Left |
@@ -216,11 +277,22 @@ Stacklang operators ordered by decreasing precedence:
 | Comparison | <, >, <=, >= | Left |
 | Logical And | && | Left |
 | Logical Or | \|\| | Left |
-| Affectation | =, +=, -= | Right |
+| Affectations | = | Right |
 
 ### Call
 
-`TODO`
+Call are performed with the indentifier of the function to call followed by the list of parameters in parenthesis, separated by comma:
+```sl
+fun copy(value, to:*) {
+    *to = value
+}
+
+fun main {
+    var buf
+    copy(5, &buf)
+    return
+}
+```
 
 ### Parenthesis
 
@@ -243,6 +315,7 @@ fun main {
     /* 0x30 is ascii for 0 */
     /* A ptr size is always one word, so a table of 6 word ptr is 6 */
     __io_tty = 0x30 + sizeof([6]*_)
+    return
 }
 ```
 
@@ -250,4 +323,16 @@ Will display 6.
 
 ### Cast
 
-`TODO`
+The type of an expression can be freely changed by use of an explicit cast:  
+```sl
+fun main {
+ /* 
+    Print value stored at address 19, which with current startup code is
+    a hexadecimal char 
+  */
+  __io_tty = *cast(*, 19) 
+  return
+}
+```
+
+This can be practical but can also lead to a variety of undefined behavior. Use with caution.  

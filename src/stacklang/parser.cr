@@ -2,70 +2,18 @@ require "colorize"
 require "./tokenizer"
 require "./ast"
 
+# TODO: WHAT WAS IS DOING:
+# - Function variable
+# - Ensure that initialization happen IN THE ORDER IT APPEAR IN CODE 
+# - Fun ast should store var & statement mixed)
+
 # TODO: 
 # - Structure declaration
-# - Function variables
-# - Statements: if, while
-# - Expression: cast
 # - Array access and affectation operator
+# - Worst operator: <<=
 class Stacklang::Parser
   alias Token = Tokenizer::Token
   
-  # rule def statement_if
-  #   next unless str "if"
-  #   whitespace
-  #   next unless char '('
-  #   multiline_whitespace
-  #   next unless condition = expression
-  #   multiline_whitespace
-  #   next unless char ')'
-  #   multiline_whitespace
-  #   statements : Array(Statement) = if char '{'
-  #     expression_separators
-  #     _statements = zero_or_more ->any_statement, separated_by: ->expression_separators
-  #     expression_separators
-  #     next unless char '}'
-  #     _statements
-  #   else
-  #     next unless stat = any_statement
-  #     [stat]
-  #   end
-  #   If.new condition, statements
-  # end
-
-  # rule def statement_while
-  #   next unless str "while"
-  #   whitespace
-  #   next unless char '('
-  #   multiline_whitespace
-  #   next unless condition = expression
-  #   multiline_whitespace
-  #   next unless char ')'
-  #   multiline_whitespace
-  #   statements = if char '{'
-  #                  expression_separators
-  #                  _statements = zero_or_more ->any_statement, separated_by: ->expression_separators
-  #                  expression_separators
-  #                  next unless char '}'
-  #                  _statements
-  #                else
-  #                  next unless stat = any_statement
-  #                  [stat]
-  #                end
-  #   While.new condition, statements
-  # end
-
-  # rule def cast
-  #   next unless char '('
-  #   whitespace
-  #   next unless constraint = type_constraint false, true
-  #   whitespace
-  #   next unless char ')'
-  #   whitespace
-  #   next unless target = expression
-  #   Cast.new constraint, target
-  # end
-
   # rule def variable
   #   restricted = str "restricted"
   #   next unless whitespace if restricted
@@ -115,7 +63,6 @@ class Stacklang::Parser
 
   alias Component = AST::Expression | {kind: Arity, value: Tokenizer::Token}
   
-
   # Consume greedely all tokens of a single expression.
   # Stop when it reach a ')',  '}', ','.
   # It parse leaf expression as ast node, but keep operators as is in the order they appear.
@@ -143,7 +90,8 @@ class Stacklang::Parser
         allows = Category::UnaryOperator | Category::Operand
         expect_more = true
       
-      when "<", ">", "=", ">=", "<=", "==", "/", "%", "|", "^", "&&", "||", "+", ".", "+=", "-=", "&=", "|=", "^=", "*=", "/=", "%="
+      when "<", ">", "=", ">=", "<=", "==", "/", "%", "|", "^", "&&", "||", "+", ".", ">>", "<<", 
+        "+=", "-=", "&=", "|=", "^=", "*=", "/=", "%="
         raise syntax_error allows.to_s unless allows.binary_operator? 
         chain << {kind: Arity::Binary, value: token}
         allows = Category::UnaryOperator | Category::Operand
@@ -173,8 +121,15 @@ class Stacklang::Parser
           chain << number token
         else
           if consume? "("
-            if token.value == "sizeof"
+            case token.value 
+            when "sizeof"
               chain << AST::Sizeof.new token, type_constraint colon: false, explicit: true, context_token: token
+              consume! ")"
+            when "cast"
+              cast_to = type_constraint colon: false, explicit: true, context_token: token
+              consume! ","
+              target = expression
+              chain << AST::Cast.new token, cast_to, target
               consume! ")"
             else
               call_parameters = [] of AST::Expression
@@ -303,12 +258,29 @@ class Stacklang::Parser
       else
         AST::Return.new token, expression
       end
-    elsif consume? "if"
-      # TODO
-      AST::Identifier.new  token, "placeholder-if"
-    elsif consume? "while"
-      # TODO
-      AST::Identifier.new token, "placeholder-while"
+
+    elsif (is_if = consume? "if") || (is_while = consume? "while")
+      consume! "("
+      cond = expression
+      consume! ")"
+      consume? NEWLINE
+      statements = [] of AST::Statement
+      if consume? "{"
+        consume? NEWLINE
+        loop do
+          break if consume? "}"
+          next if consume? NEWLINE
+          statements << statement
+        end
+      else
+        statements << statement
+      end
+      if is_if
+        AST::If.new token, cond, statements
+      else
+        AST::While.new token, cond, statements
+      end
+
     else
       expression
     end
@@ -392,6 +364,11 @@ class Stacklang::Parser
     root = consume! "fun"
     extern = consume? "extern"
     name = identifier
+
+    if name.in? ["sizeof", "cast"]
+      raise syntax_error "Name '#{name.name}' is not allowed for functions"
+    end
+
     parameters = [] of AST::Function::Parameter
 
     if consume? "("
@@ -434,7 +411,12 @@ class Stacklang::Parser
         token = current
         case token.try &.value
         when "var"
-          # TODO
+          consume? "var"
+          restricted = consume? "restricted"
+          var_name = identifier
+          var_constraint = type_constraint colon: true, explicit: false, context_token: token.not_nil!
+          init = expression if consume? "="
+          variables << AST::Variable.new token.not_nil!, var_name, var_constraint, init, extern: false, restricted: restricted
         else
           statements << statement
         end
