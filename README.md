@@ -32,7 +32,7 @@ All of which are bundled within a single CLI tool, written in [Crystal](https://
   - [ ] Operators overload on non-word or pointer types
   - [ ] Implement else, elsif, next, break
   - [ ] Scoped variables (in statement blocks) allocated as needed
-  - [ ] Smart variable initialization
+  - [ ] Global variable initialization
   - [ ] Global initialization (and necessary checks)
   - [ ] Explicit behavior of non-native operators
   - [ ] Add error for stack size exceding small immediate size

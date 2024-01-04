@@ -14,6 +14,7 @@ class Stacklang::Function
         error "Cannot access field #{access.field} on expression #{access.operand} of type #{constraint}", node: access
       end
     else
+      pp access
       error "Cannot compute lvalue for #{access}", node: access
     end
   end

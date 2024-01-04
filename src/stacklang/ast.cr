@@ -252,8 +252,9 @@ abstract class Stacklang::AST
     class Field
       getter name
       getter constraint
+      getter token
 
-      def initialize(@token, @name : Identifier, @constraint : Type)
+      def initialize(@token : Tokenizer::Token, @name : Identifier, @constraint : Type)
       end
 
       def dump(io, indent = 0)

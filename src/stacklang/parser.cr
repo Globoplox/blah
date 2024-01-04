@@ -3,47 +3,10 @@ require "./tokenizer"
 require "./ast"
 
 # TODO: 
-# - Structure declaration
 # - Array access and affectation operator
-# - Worst operator: <<=
 class Stacklang::Parser
   alias Token = Tokenizer::Token
   
-  # rule def variable
-  #   restricted = str "restricted"
-  #   next unless whitespace if restricted
-  #   next unless str "var"
-  #   next unless whitespace
-  #   next unless name = identifier
-  #   whitespace
-  #   next unless constraint = type_constraint
-  #   whitespace
-  #   char '='
-  #   whitespace
-  #   init = expression
-  #   Variable.new name, constraint, init, restricted: restricted != nil
-  # end
-
-  # rule def struct_field
-  #   next unless name = identifier
-  #   whitespace
-  #   next unless constraint = type_constraint
-  #   Struct::Field.new name, constraint
-  # end
-
-  # rule def struct_def
-  #   next unless str "struct"
-  #   next unless whitespace
-  #   next unless name = type_name
-  #   multiline_whitespace
-  #   next unless char '{'
-  #   expression_separators
-  #   next unless fields = one_or_more ->struct_field, separated_by: ->expression_separators
-  #   expression_separators
-  #   next unless char '}'
-  #   Struct.new name, fields
-  # end
-
   enum Arity
     Unary
     Binary
@@ -159,8 +122,8 @@ class Stacklang::Parser
   # List of operator groups ordered by decreasing precedence.
   # Mostly following crystal lang 
   OPERATORS_PRIORITIES = [
-    {Arity::Unary, nil, ["!", "~", "&", "*", "-"]},
     {Arity::Binary, Associativity::Left, ["."]},
+    {Arity::Unary, nil, ["!", "~", "&", "*", "-"]},
     {Arity::Binary, Associativity::Left, ["/", "*"]},
     {Arity::Binary, Associativity::Left, ["+", "-"]},
     {Arity::Binary, Associativity::Left, [">>", "<<"]},
@@ -437,6 +400,23 @@ class Stacklang::Parser
     AST::Requirement.new root, token.value.strip '"'
   end
 
+  def structure 
+    root = consume! "struct"
+    name = type_name
+    consume? NEWLINE
+    consume! "{"
+    fields = [] of AST::Struct::Field
+    loop do
+      consume? NEWLINE
+      break if consume? "}"
+      token = next_token! "A struct member name" 
+      field_name = identifier token
+      constraint = type_constraint explicit: false, colon: true, context_token: token
+      fields << AST::Struct::Field.new token, field_name, constraint
+    end
+    AST::Struct.new root, name.value, fields
+  end
+
   def unit
     elements = [] of AST::Requirement | AST::Function | AST::Variable | AST::Struct
     loop do
@@ -445,7 +425,7 @@ class Stacklang::Parser
       when "require" then elements << requirement
       when "var" then elements << global
       when "fun" then elements << function
-      #when "struct" then
+      when "struct" then elements << structure
       when nil then break
       else
         raise syntax_error "require or var or fun or struct"

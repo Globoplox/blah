@@ -5,6 +5,12 @@ var another: [0x10]_
 var yet_another: [0x10]*_
 var one_more: [0x10][2]
 
+struct CustomType {
+  foo
+  baz:[0x5]
+  bar:*
+}
+
 /* This is a comment */
 fun main {
   __io_tty = get_default_char()
@@ -47,6 +53,13 @@ fun main {
   foo = 9
   __io_tty = 0x30 + foo
   __io_tty = 0x30 + bar
+
+  var c: CustomType
+
+  c.bar = &c.foo
+  c.foo = 2
+  __io_tty = 0x30 + *c.bar
+  __io_tty = 0x30 + (cast(_, &c.bar) - cast(_, &c.foo)) - 1 /* This will output the size of c.baz */
 
   return
 }
