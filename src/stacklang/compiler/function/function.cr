@@ -136,7 +136,7 @@ class Stacklang::Function
     @extern = @ast.extern
     @symbol = "__function_#{@ast.name.name}"
 
-    local_variables = @ast.variables.map do |variable|
+    local_variables = @ast.body.compact_map(&.as? AST::Variable).map do |variable|
       typeinfo = @unit.typeinfo variable.constraint
       Variable.new(variable.name.name, @frame_size.to_i32, typeinfo, variable.initialization, restricted: variable.restricted).tap do
         @frame_size += typeinfo.size

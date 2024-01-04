@@ -84,13 +84,7 @@ class Stacklang::Function
     # copy the return address on the stack.
     sw RETURN_ADRESS_REGISTER, STACK_REGISTER, @return_address_offset.to_i32
 
-    # Initialize variables
-    @variables.values.each do |variable|
-      if value = variable.initialization
-        compile_assignment AST::Identifier.new(variable.name), value, nil
-      end # We do not zero-initialize variable implicitely.
-      variable.initialized = true
-    end
+     # We do NOT zero-initialize variable implicitely.
 
     @ast.body.each do |statement|
       compile_statement statement

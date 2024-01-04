@@ -2,11 +2,6 @@ require "colorize"
 require "./tokenizer"
 require "./ast"
 
-# TODO: WHAT WAS IS DOING:
-# - Function variable
-# - Ensure that initialization happen IN THE ORDER IT APPEAR IN CODE 
-# - Fun ast should store var & statement mixed)
-
 # TODO: 
 # - Structure declaration
 # - Array access and affectation operator
@@ -398,8 +393,7 @@ class Stacklang::Parser
       ret_type = nil
     end
     
-    variables = [] of AST::Variable
-    statements = [] of AST::Statement
+    body = [] of AST::Statement 
 
     unless extern
       consume? NEWLINE
@@ -416,14 +410,14 @@ class Stacklang::Parser
           var_name = identifier
           var_constraint = type_constraint colon: true, explicit: false, context_token: token.not_nil!
           init = expression if consume? "="
-          variables << AST::Variable.new token.not_nil!, var_name, var_constraint, init, extern: false, restricted: restricted
+          body << AST::Variable.new token.not_nil!, var_name, var_constraint, init, extern: false, restricted: restricted
         else
-          statements << statement
+          body << statement
         end
       end
     end
 
-    AST::Function.new root, name, parameters, ret_type, variables, statements, extern: extern
+    AST::Function.new root, name, parameters, ret_type, body: body, extern: extern
   end
 
   def global

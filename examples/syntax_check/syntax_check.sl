@@ -41,7 +41,7 @@ fun main {
     *cast(*, 1337) -= 1
   }
 
-  var foo
+  var foo = *&bar
   var bar = 4
   __io_tty = 0x30 + foo
   foo = 9

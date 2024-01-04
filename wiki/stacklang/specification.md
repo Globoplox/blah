@@ -105,7 +105,7 @@ Examples:
 - `var extern some_buffer: [0x10]`
 
 > [!NOTE]
-> Globals are initialized to zero.
+> Globals are implicitely initialized to zero.
 
 
 ## Defining Structures
@@ -179,6 +179,41 @@ At link time, it will be necessary to provide implementations.
 A symbol cannot be declared twice, even with the same prototype and no conflicting implementations, in the same compiler run.
 
 ## Statements and Expressions
+
+### Variables
+
+`TODO`
+
+Variable memeory is reserved as soon as the function is called, but the initialization happen as the code go.  
+This means this is allowed:
+```sl
+fun main {
+    var foo
+    var bar = foo
+    return
+}
+```
+
+But this is not:
+```sl
+fun main {
+    var foo = bar
+    var bar
+    return
+}
+```
+
+But this is allowed:
+```sl
+fun main {
+    var foo:* = &bar
+    var bar
+    return
+}
+```
+
+> [!IMPORTANT]
+> Local variables are not implicitely zero-initialized.
 
 ### Conditional
 

@@ -75,6 +75,11 @@ class Stacklang::Function
     when AST::If         then compile_if statement
     when AST::While      then compile_if statement, loop: true
     when AST::Expression then compile_expression statement, nil
+    when AST::Variable
+      if value = statement.initialization
+        compile_assignment statement.name, value, nil
+      end
+    @variables[statement.name.name].initialized = true
     end
   end
 end

@@ -117,7 +117,7 @@ abstract class Stacklang::AST
     end
   end
 
-  class Variable < AST
+  class Variable < Statement
     getter name
     getter constraint
     getter initialization
@@ -213,12 +213,11 @@ abstract class Stacklang::AST
 
     getter name
     getter parameters
-    getter variables
     getter return_type
     getter body
     getter extern
 
-    def initialize(@token, @name : Identifier, @parameters : Array(Parameter), @return_type : Type?, @variables : Array(Variable), @body : Array(Statement), @extern : Bool)
+    def initialize(@token, @name : Identifier, @parameters : Array(Parameter), @return_type : Type?, @body : Array(Statement), @extern : Bool)
     end
 
     def dump(io, indent = 0)
@@ -235,11 +234,6 @@ abstract class Stacklang::AST
       @return_type.try &.dump io, indent
       unless @extern
         io << " {\n"
-        @variables.each do |var|
-          (indent + 1).times { io << "  " }
-          var.dump io, indent
-        end
-        io << "\n" unless @variables.empty?
         @body.each do |expression|
           (indent + 1).times { io << "  " }
           expression.dump io, indent + 1
