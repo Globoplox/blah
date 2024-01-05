@@ -50,7 +50,7 @@ Functions definitions starts with the `fun` keyword, followed by the name, param
 When declaring a prototype for a function implemented in a scope that cannot be reached during this compiler run, the `fun` keyword can be followed by `extern`.
 See [Referencing other symbols](Referencing-other-symbols). In this case, the function must not have a body.  
 
-Some identifier are reserved keywords and should not be used for functions:
+Some identifier are reserved keywords and should not be used for function names:
 - `sizeof`
 - `cast`
 
@@ -90,9 +90,6 @@ And a function unreachable during a compiler run can be prototyped to be linked 
 Function can return with or without value (depending on their return type) through the
 `return` keyword.  
 
-> [!IMPORTANT]
-> Not returning, even from function without a return value, will cause undefined behavior.
-
 ## Defining Globals
 
 Globals definitions starts with the `var` keyword followed by the var name and an optionnal type restriction.   Type restriction are incated by semicolon `:`, and if omitted the restriction default to `_`.  
@@ -110,7 +107,20 @@ Examples:
 
 ## Defining Structures
 
-`TODO`
+Custom types can be defined throught the `struct` keyword:
+```sl
+struct Someone {
+    age
+    friends:[3]*CustomType
+}
+
+struct Gabuzomeuh { cow }
+```
+
+Strucures cannot be directly recursive, this is not allowed:
+```sl
+struct Jk { deep: Jk }
+```
 
 ## Referencing symbols outside the unit
 
@@ -182,9 +192,17 @@ A symbol cannot be declared twice, even with the same prototype and no conflicti
 
 ### Variables
 
-`TODO`
+Vairables can be declared within functions:
+```sl
+fun main {
+    var a = 7
+    a += 5
+    *(&a) += 5
+    return
+}
+```
 
-Variable memeory is reserved as soon as the function is called, but the initialization happen as the code go.  
+ Variable memeory is reserved as soon as the function is called, but the initialization happen as the code go.  
 This means this is allowed:
 ```sl
 fun main {
@@ -211,6 +229,13 @@ fun main {
     return
 }
 ```
+
+Some identifier are reserved keywords and should not be used for variable names:
+- `var`
+- `if`
+- `while`
+- `return`
+- `restricted`
 
 > [!IMPORTANT]
 > Local variables are not implicitely zero-initialized.
@@ -265,54 +290,39 @@ The condition expression type must be a _ or *. A value of 0 is considered false
 The statement itself is not an expression and does not have a value.  
 There are no `break` nor `next` support.  
 
-
 ### Operators
-
-`WIP`
 
 List of all operators, ordered by decreasing precedence:
 
-"<<", ">>", "*", "/"
-
 | Operator | Name | Arity | Associativity | Implementation | Note |
 | -- | -- | -- | -- | -- | -- |
+| . | Struct Member Access | Binary | Left | Native for all struct types | Right-side must be a member identifier |
+| \[ | Array member access | Binary | Left | Native for all array types | Expressed as `a[b]` |
 | ! | Logical Not | Unary |  | None |  |  
 | ~ | Binary Not | Unary |  Native for _ |  
 | & | Reference | Unary | Native for all types | Left-side must be addressable |
 | * | Dereference | Unary | Native for * |  |
 | - | Opposite | Unary |  | Native for _ |  |
-| . | Struct Member Access | Binary | Left | Native for all struct types | Right-side must be a member identifier |
-| * | Multiplication | Binary | Left | `TODO` |  |
-| / | Multiplication | Binary | Left | `TODO` |  |
+| * | Multiplication | Binary | Left | Provided in stdlib for _ | Compiled to call to function `multiply` |
+| / | Divison | Binary | Left | None | Compiled to call to function `divide` |
+| % | Modulo | Binary | Left | None | Compiled to call to function `modulo` |
 | + | Addition | Binary | Left | Native for _ and * |  |
 | - | Substraction | Binary | Left | Native for _ and * |  |
-
-....
+| << | Left bitshift | Binary | Left | Provided in stdlib for _ | Compiled to call to function `left_bitshift` |
+| >> | Right bitshift | Binary | Left | Provided in stdlib for _ | Compiled to call to function `right_bitshift` |
+| & | Binary And | Binary | Left | Native for _  |  |
+| \| | Binary Or | Binary | Left | Native for _  |  |
+| ^ | Xor | Binary | Left | None |  |
+| == | Equality | Binary | Left | Native for _ |  |
+| != | Unequality | Binary | Left | Native for _ |  |
+| < | Inferior | Binary | Left | Native for _ |  |
+| > | Superior | Binary | Left | Native for _ |  |
+| <= | Inferior or Equal | Binary | Left | Native for _ | Disabled and dysfunctional |
+| >= | Superior or Equal | Binary | Left | Native for _ | Disabled and dysfunctional |
 | && | Logical And | Binary | Left | Native for _ | Currently dysfunctional |
 | \|\| | Logical Or | Binary | Left | Native for _ | Currently dysfunctional |
 | = | Affectation | Binary | Right | Native for all types | Left-side must be addressable |
 | All other affectation operators |  | Binary | Right | Syntaxic-sugar: `a += b` is resolved to `a = a + b` |
-
-
-#### Operators precedence and associativity
-
-The operator precedence is based on the [crystal lang operator precedence](https://crystal-lang.org/reference/1.10/syntax_and_semantics/operators.html#operator-precedence).
-
-Stacklang operators ordered by decreasing precedence:
-
-| Kind | Operators  |  Associativity |
-| --- | ------------- | ------------- |
-| Unary | !, ~, &, *, - | None |
-| Multiplicative | *, /, % | Left |
-| Additive | +, - | Left |
-| Shift | <<, >> | Left |
-| Binary AND | & | Left |
-| Binary OR and XOR | \|, ^ | Left |
-| Equality | ==, != | Left |
-| Comparison | <, >, <=, >= | Left |
-| Logical And | && | Left |
-| Logical Or | \|\| | Left |
-| Affectations | = | Right |
 
 ### Call
 

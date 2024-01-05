@@ -54,4 +54,4 @@ mkdir -p build
 It should print a single `@` char then exit.
 
 ## Internal
-See [Specifications](/wiki/stacklang/internal).
+See [Specifications](/wiki/stacklang/compiler.md).

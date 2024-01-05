@@ -2,9 +2,14 @@
 require "../../stdlib/prototypes.sl"
 
 fun load_io(io:*, destination:*, size):_ {
-efzf
-  restricted var i = 0
-  restricted var buffer
+
+  efzfrandom
+  /* 
+    Funny: this is detected as no-op by the compiler and removed before
+     it get checked for existance
+  */
+  var restricted i = 0
+  var restricted buffer
   while ((buffer = *io) != 0xff00 ) {
     if (i == size)
       return 0
@@ -18,10 +23,10 @@ var program: [0x100]
 var ram: [0x100]
 
 fun main:_ {
-  restricted var pc = 0
-  restricted var ptr = 0
-  var program_size = load_io(&__io_brainfuck, &program, 0x1000) // TODO: make sizeof work with vars ?
-  restricted var loop_count = 0
+  var restricted pc = 0
+  var restricted ptr = 0
+  var program_size = load_io(&__io_brainfuck, &program, 0x1000)
+  var restricted loop_count = 0
 
   if (program_size == 0x10)
      return 1

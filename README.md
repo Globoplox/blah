@@ -27,18 +27,19 @@ All of which are bundled within a single CLI tool, written in [Crystal](https://
   - [ ] Propose memory paging mechanisms
   - [ ] Propose memory protection mechanisms
 - [x] Design and write a compiler for a small stack language
-  - [ ] Finish parser refactor to full-featurness
-  - [ ] Detect unterminating functions
+  - [x] Finish parser refactor to full-featurness
+  - [x] Detect unterminating functions
+  - [ ] Rework compiler error handling
+  - [ ] Define a way to debug at link time (A non-loaded section that can contain an index of informations)
   - [ ] Operators overload on non-word or pointer types
   - [ ] Implement else, elsif, next, break
-  - [ ] Scoped variables (in statement blocks) allocated as needed
   - [ ] Global variable initialization
-  - [ ] Global initialization (and necessary checks)
-  - [ ] Explicit behavior of non-native operators
+  - [ ] Scoped variables (in statement blocks) allocated as needed
   - [ ] Add error for stack size exceding small immediate size
-  - [ ] Refactor compiler to make it simpler and dumber
-  - [ ] Fix >= and <= comparisons
-  - [ ] && and || should be lazy
+  - [ ] Fix && and ||
+  - [ ] Fix >= and <=
+  - [ ] Refactor compiler to be simpler
+  - [ ] Inline small functions
 - [ ] Stdlib
   - IO handling
   - Basic math

@@ -151,7 +151,8 @@ class Stacklang::Unit
               # there are no func ptr type yet
               # when Type::Table # do later, need recursive stuff, annoying
               # when Type::Struct # do later, need recursive stuff, annoying
-            else "Intializing global #{local.name} of type #{local.type_info} is not supported yet"
+            else
+              raise "Intializing global #{local.name} of type #{local.type_info} is not supported yet"
             end
           else
             local.type_info.size.times do

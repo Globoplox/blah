@@ -75,10 +75,29 @@ class Stacklang::Function
     selected
   end
 
+  # Check a block to ensure that it terminates.
+  def check_termination(body : Array(AST::Statement))
+    return false if body.empty?
+    last = body[-1]
+    case last
+    when AST::Return then true
+    when AST::If, AST::While then check_termination last.body
+    else false
+    end
+  end
+
   # Generate the section representing the instructions for the compiled functions.
   # TODO: find a way to ensure every path end with a return.
   def compile : RiSC16::Object::Section
-    raise "An extern function should not be compiled" if @extern
+    raise "Function '#{name}' is extern and should not be compiled" if @extern
+    unless check_termination @ast.body
+      if @return_type
+        raise "Function '#{name}'returning #{@return_type} does not always return"
+      else
+        @ast.body << AST::Return.new @ast.token, nil
+      end
+    end
+
     # move the stack UP by the size of the stack frame.
     addi STACK_REGISTER, STACK_REGISTER, -(@frame_size.to_i32)
     # copy the return address on the stack.

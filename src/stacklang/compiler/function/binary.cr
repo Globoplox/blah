@@ -20,7 +20,7 @@ class Stacklang::Function
     ret_type
   end
 
-  def compile_bitwise_and(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST, inv = false) : Type::Any
+  def compile_bitwise_and(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST) : Type::Any
     left_side_register, left_side_type = left_side
     right_side_register, right_side_type = right_side
     ret_type = case {left_side_type, right_side_type}
@@ -29,12 +29,12 @@ class Stacklang::Function
                end
     result_register = grab_register excludes: [left_side_register, right_side_register]
     nand result_register, left_side_register, right_side_register
-    nand result_register, result_register, result_register unless inv
+    nand result_register, result_register, result_register
     move result_register, ret_type, into: into
     ret_type
   end
 
-  def compile_bitwise_or(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST, inv = false) : Type::Any
+  def compile_bitwise_or(left_side : {Registers, Type::Any}, right_side : {Registers, Type::Any}, into : Registers | Memory, node : AST) : Type::Any
     left_side_register, left_side_type = left_side
     right_side_register, right_side_type = right_side
     ret_type = case {left_side_type, right_side_type}
@@ -47,7 +47,6 @@ class Stacklang::Function
     nand result_register_2, right_side_register, right_side_register
     result_register = result_register_1 # Could have been 2, does not matter.
     nand result_register, result_register_1, result_register_2
-    nand result_register, result_register, result_register if inv
     move result_register, ret_type, into: into
     ret_type
   end
@@ -140,6 +139,8 @@ class Stacklang::Function
                 when "<<" then "left_bitshift"
                 when ">>" then "right_bitshift"
                 when "*"  then "multiply"
+                when "/"  then "divide"
+                when "%"  then "modulo"
                 else           error "Usupported binary operator '#{binary.name}'", node: binary
                 end
     call = AST::Call.new(AST::Identifier.new(call_name), [binary.left, binary.right])
@@ -176,9 +177,7 @@ class Stacklang::Function
         when "&"  then compile_bitwise_and left_side, right_side, into: into, node: binary
         when "&&" then compile_logic_and left_side, right_side, into: into, node: binary
         when "||" then compile_logic_or left_side, right_side, into: into, node: binary
-        when "~&" then compile_bitwise_and left_side, right_side, into: into, node: binary, inv: true
         when "|"  then compile_bitwise_or left_side, right_side, into: into, node: binary
-        when "~|" then compile_bitwise_or left_side, right_side, into: into, node: binary, inv: true
         when "==" then compile_equal left_side, right_side, into: into, node: binary
         when "!=" then compile_equal left_side, right_side, into: into, node: binary, neq: true
         when ">"  then compile_comparator left_side, right_side, node: binary, into: into, superior_to: true

@@ -2,8 +2,6 @@ require "colorize"
 require "./tokenizer"
 require "./ast"
 
-# TODO: 
-# - Array access and affectation operator
 class Stacklang::Parser
   alias Token = Tokenizer::Token
   
@@ -22,7 +20,7 @@ class Stacklang::Parser
   alias Component = AST::Expression | {kind: Arity, value: Tokenizer::Token}
   
   # Consume greedely all tokens of a single expression.
-  # Stop when it reach a ')',  '}', ','.
+  # Stop when it reach a ')',  '}', ',', ']'
   # It parse leaf expression as ast node, but keep operators as is in the order they appear.
   # Return an array of all the component of the expression in their original order,
   #  mixing ast node and tuples in the form {kind: Symbol, value: Token} for operators.
@@ -31,10 +29,18 @@ class Stacklang::Parser
     allows = Category::UnaryOperator | Category::Operand
     expect_more = false
     loop do
-      break if current.try &.value.in? [")", "}", ","]
+      break if current.try &.value.in? [")", "}", ",", "]"]
       token = next_token! "Any expression"
       case token.value
-      
+
+      when "["
+        raise syntax_error allows.to_s unless allows.binary_operator?
+        chain << {kind: Arity::Binary, value: token}
+        chain << expression
+        consume! "]"
+        allows = Category::BinaryOperator
+        expect_more = false
+        
       when "("
         raise syntax_error allows.to_s unless allows.operand? 
         chain << expression
@@ -48,7 +54,7 @@ class Stacklang::Parser
         allows = Category::UnaryOperator | Category::Operand
         expect_more = true
       
-      when "<", ">", "=", ">=", "<=", "==", "/", "%", "|", "^", "&&", "||", "+", ".", ">>", "<<", 
+      when "<", ">", "=", ">=", "<=", "==", "!=", "/", "%", "|", "^", "&&", "||", "+", ".", ">>", "<<", 
         "+=", "-=", "&=", "|=", "^=", "*=", "/=", "%="
         raise syntax_error allows.to_s unless allows.binary_operator? 
         chain << {kind: Arity::Binary, value: token}
@@ -123,6 +129,7 @@ class Stacklang::Parser
   # Mostly following crystal lang 
   OPERATORS_PRIORITIES = [
     {Arity::Binary, Associativity::Left, ["."]},
+    {Arity::Binary, Associativity::Left, ["["]},
     {Arity::Unary, nil, ["!", "~", "&", "*", "-"]},
     {Arity::Binary, Associativity::Left, ["/", "*"]},
     {Arity::Binary, Associativity::Left, ["+", "-"]},
@@ -130,7 +137,7 @@ class Stacklang::Parser
     {Arity::Binary, Associativity::Left, ["&"]},
     {Arity::Binary, Associativity::Left, ["|", "^"]},
     {Arity::Binary, Associativity::Left, ["==", "!="]},
-    {Arity::Binary, Associativity::Left, ["<", ">", ">=", "<="]},
+    {Arity::Binary, Associativity::Left, ["<", ">", "<=", ">="]},
     {Arity::Binary, Associativity::Left, ["&&"]},
     {Arity::Binary, Associativity::Left, ["||"]},
     {Arity::Binary, Associativity::Right, ["=", "+=", "-="]},
@@ -289,7 +296,7 @@ class Stacklang::Parser
     if colon
       unless consume? ":"
         if explicit
-          raise syntax_error ":"
+          raise syntax_error "Colon ':'"
         else
           return AST::Word.new context_token
         end
@@ -349,7 +356,12 @@ class Stacklang::Parser
           had_separator = false
         end 
       end
-      ret_type = type_constraint colon: true, explicit: true, context_token: root
+
+      if consume? ":"
+        ret_type = type_constraint colon: false, explicit: true, context_token: root
+      else
+        ret_type = nil
+      end
     elsif consume? ":"
       ret_type = type_constraint colon: false, explicit: true, context_token: root
     else
@@ -388,7 +400,7 @@ class Stacklang::Parser
     extern = consume? "extern"
     name = identifier
     constraint = type_constraint colon: true, explicit: false, context_token: root
-    AST::Variable.new root, name, constraint, nil, extern: extern != nil
+    AST::Variable.new root, name, constraint, nil, extern: extern
   end
 
   def requirement

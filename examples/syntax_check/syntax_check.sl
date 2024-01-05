@@ -11,6 +11,13 @@ struct CustomType {
   bar:*
 }
 
+struct Gabuzomeuh { cow }
+
+struct Someone {
+    age
+    friends:[3]*CustomType
+}
+
 /* This is a comment */
 fun main {
   __io_tty = get_default_char()
@@ -60,6 +67,18 @@ fun main {
   c.foo = 2
   __io_tty = 0x30 + *c.bar
   __io_tty = 0x30 + (cast(_, &c.bar) - cast(_, &c.foo)) - 1 /* This will output the size of c.baz */
+
+  __io_tty = get_default_char()
+
+  var arr: [0xf]
+  arr[0xa] = 7
+  __io_tty = 0x30 + arr[0xa]
+  __io_tty = 0x30 + *(&arr + 0xa)
+
+  var a = 4
+  a += 3
+  *(&a) += 2
+  __io_tty = 0x30 + a
 
   return
 }

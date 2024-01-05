@@ -98,9 +98,7 @@ module Stacklang::Tokenizer
           kind = :operator
         end
 
-        # Multi char operator are allowed only for affectation & comparaison, all ending in '=' or '<>'
-
-        if kind != last_kind || (kind == :operator && (!c.in?(['=', '<', '>'])))
+        if kind != last_kind || (kind == :operator && !(c.in?(['=', '<', '>', '|']) || (c == '&' && last == '&')))
           tokens << Token.new token.join, line_at_start, character_at_start, source unless token.empty?
           token.clear
           line_at_start = line
