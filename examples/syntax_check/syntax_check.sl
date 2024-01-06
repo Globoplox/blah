@@ -1,5 +1,7 @@
 require "utils"
 
+struct A { m }
+
 var test: [0x10]
 var another: [0x10]_
 var yet_another: [0x10]*_

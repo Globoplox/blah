@@ -3,27 +3,54 @@ module Stacklang
     abstract def size
 
     # Solve the constraint of a struct field and map it to the right type.
-    def self.solve_constraint(ast : AST::Type, types : Hash(String, Type::Struct), stack : Array(Type::Struct) = [] of Type::Struct) : Type::Any
+    def self.solve_constraint(ast : AST::Type, types : Hash(String, Type::Struct), stack : Array(Type::Any) = [] of Type::Any) : Type::Any
       case ast
       when AST::Word then Type::Word.new
+      
       when AST::Pointer
         if (target = ast.target).is_a? AST::Custom
-          Type::Pointer.new types[target.name]? || raise "Pointer to unknow struct name: '#{target.name}'"
+          actual_type = types[target.name]?
+          unless actual_type
+            raise Exception.new "Unknown type name: '#{target.name}'", ast: ast
+          end
+          Type::Pointer.new actual_type
         else
           Type::Pointer.new solve_constraint target, types
         end
+
       when AST::Table
         if (target = ast.target).is_a? AST::Custom
-          Type::Table.new (types[target.name]? || raise "Pointer to unknow struct name: '#{target.name}'"), ast.size.number
+          actual_type = types[target.name]?
+          unless actual_type
+            raise Exception.new "Unknown type name: '#{target.name}'", ast: ast
+          end
+          # solve the type as its size is necessary
+          Type::Table.new(actual_type, ast.size.number).tap do |resolved|
+            actual_type.solve types, stack + [actual_type, resolved]          
+          end
         else
           Type::Table.new (solve_constraint target, types), ast.size.number
         end
+
       when AST::Custom
-        actual_type = types[ast.name]? || raise "Unknown struct name: '#{ast.name}'"
-        raise "Type #{actual_type.name} is recursive. This is illegal. Use a pointer to #{actual_type.name} instead." if actual_type.in? stack
+        actual_type = types[ast.name]? || raise Exception.new "Unknown type name: '#{ast.name}'", ast: ast
+
+        if actual_type.in? stack
+          message = String.build do |io|
+            io << "Encountered a recursive type:\n"
+            io << "Type #{actual_type}\n"
+            stack.reverse.each do |parent_type|
+              io << "  used in type #{parent_type}\n"
+              break if parent_type == actual_type
+            end
+            io << "Recursive values are not allowed."
+          end
+          raise Exception.new message, ast: ast 
+        end
+
         actual_type.solve types, stack + [actual_type]
         actual_type
-      else raise "Unknown Type Kind #{typeof(ast)}"
+      else raise InternalError.new "Unknown type category: #{typeof(ast)}"
       end
     end
   end
@@ -96,9 +123,10 @@ module Stacklang
     property name : String
     property fields : Array(Field)
     @size : UInt16? = nil
+    getter ast
 
-    def initialize(@ast_struct : AST::Struct)
-      @name = @ast_struct.name
+    def initialize(@ast : AST::Struct)
+      @name = @ast.name
       @fields = [] of Field
     end
 
@@ -107,15 +135,15 @@ module Stacklang
     end
 
     def size : UInt16
-      @size || raise "Type must be solved before size can be used"
+      @size || raise InternalError.new "Size of type #{@name} required before it is known"
     end
 
     # Compute the size and fields of the structures. It needs all other structure types to be given.
-    def solve(other_types : Hash(String, Type::Struct), stack : Array(Type::Struct) = [] of Type::Struct)
+    def solve(other_types : Hash(String, Type::Struct), stack : Array(Type::Any) = [] of Type::Any)
       @size ||= begin
         offset = 0u16
-        @fields = @ast_struct.fields.map do |ast_field|
-          constraint = Type::Any.solve_constraint ast_field.constraint, other_types, stack + [self]
+        @fields = @ast.fields.map do |ast_field|
+          constraint = Type::Any.solve_constraint ast_field.constraint, other_types, stack # self is already added to the stack
           field = Field.new ast_field.name.name, constraint, offset
           offset += constraint.size
           field

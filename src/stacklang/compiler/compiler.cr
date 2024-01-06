@@ -1,3 +1,4 @@
+require "./error"
 require "./unit"
 require "../parser"
 require "../../assembler/object"
@@ -9,9 +10,6 @@ class Stacklang::Compiler
   # The unit to compile
   @unit : Unit?
   getter spec
-
-  class Exception < ::Exception
-  end
 
   def initialize(path : String, @spec : RiSC16::Spec, @debug = true)
     absolute = Path[path].expand home: true

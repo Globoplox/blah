@@ -8,15 +8,23 @@ class Stacklang::Unit
   getter path
 
   class Global
-    getter name
+    getter name : String
     getter symbol
-    getter type_info
+    getter type_info : Type::Any
     getter initialization
     getter extern
+    getter ast
+    @name : String
+    @type_info : Type::Any
+    @extern : Bool
     @initialization : Stacklang::AST::Expression?
+    @ast : AST::Variable?
 
-    # for now globals are zero initialized
-    def initialize(@name : String, @type_info : Type::Any, @initialization, @extern)
+    def initialize(ast : AST::Variable, @type_info)
+      @ast = ast
+      @name = ast.name.name
+      @initialization = ast.initialization
+      @extern = ast.extern
       @symbol = "__global_#{name}"
     end
 
@@ -77,7 +85,23 @@ class Stacklang::Unit
       (self_functions + externs.flat_map(&.self_functions)).group_by do |function|
         function.name
       end.transform_values do |functions|
-        raise "Name clash for function '#{functions.first.name}'" if functions.size > 1
+        if functions.size > 1
+          message = String.build { |io|
+            io << "Name clash for function name #{functions.first.name.colorize.bold}\n"
+            io << "Defined in:\n"
+            functions.each do |defined|
+              if token = defined.ast.token
+                source = token.source
+                if source
+                  rel = Path[source].relative_to(Dir.current).to_s
+                  source = rel if rel.size < source.size
+                end			
+                io << "- #{source} line #{token.line} column #{token.character}\n"
+              end
+            end
+          }
+          raise Exception.new message, ast: functions.first.ast
+        end
         functions.first
       end
     end
@@ -97,7 +121,23 @@ class Stacklang::Unit
       all_structs = (self_structs + required_structs).group_by do |structure|
         structure.name
       end.transform_values do |structs|
-        raise "Name clash for struct '#{structs.first.name}'" if structs.size > 1
+        if structs.size > 1
+          message = String.build { |io|
+            io << "Name clash for struct type #{structs.first.name.colorize.bold}\n"
+            io << "Defined in:\n"
+            structs.each do |defined|
+              if token = defined.ast.token
+                source = token.source
+                if source
+                  rel = Path[source].relative_to(Dir.current).to_s
+                  source = rel if rel.size < source.size
+                end			
+                io << "- #{source} line #{token.line} column #{token.character}\n"
+              end
+            end
+          }
+          raise Exception.new message, ast: structs.first.ast
+        end
         structs.first
       end
       self_structs.each &.solve all_structs
@@ -112,47 +152,65 @@ class Stacklang::Unit
   def self_globals : Array(Global)
     @self_globals ||= @ast.globals.map do |variable|
       # raise "Initialization of global variable is not implemented" if variable.initialization
-      Global.new variable.name.name, Type::Any.solve_constraint(variable.constraint, structs), initialization: variable.initialization, extern: variable.extern
+      Global.new variable, Type::Any.solve_constraint(variable.constraint, structs)
     end
   end
 
   def globals : Hash(String, Global)
     @globals ||= begin
       required_globals = externs.flat_map(&.self_globals)
-      all_globals = (self_globals + required_globals).group_by do |global|
-        global.name
-      end.transform_values do |globals|
-        raise "Name clash for global '#{globals.first.name}'" if globals.size > 1
-        globals.first
+      linker_globals = RiSC16::Linker.symbols_from_spec(@compiler.spec).map do |(name, _)|
+        Global.new symbol: name
       end
-    end.tap do |globals|
-      RiSC16::Linker.symbols_from_spec(@compiler.spec).each do |(name, _)|
-        globals.not_nil![name] = Global.new symbol: name
+      all_globals = (self_globals + required_globals + linker_globals).group_by(&.name)
+      
+      all_globals.transform_values do |globals|
+        if globals.size > 1
+          message = String.build { |io|
+            io << "Name clash for global name #{globals.first.name.colorize.bold}\n"
+            io << "Defined in:\n"
+            globals.each do |defined|
+              if (ast = defined.ast) && (token = ast.token)
+                source = token.source
+                if source
+                  rel = Path[source].relative_to(Dir.current).to_s
+                  source = rel if rel.size < source.size
+                end			
+                io << "- #{source} line #{token.line} column #{token.character}\n"
+              else 
+                io << "- Compiler generated global from specifications raw symbol: #{defined.symbol}"
+              end
+            end
+          }
+          raise Exception.new message, ast: globals.first.ast
+        else
+          globals.first
+        end
       end
     end
   end
 
   def compile
+    structs
+    globals
+    functions
     RiSC16::Object.new(path.to_s).tap do |object|
       object.sections << RiSC16::Object::Section.new("globals").tap do |section|
         code = [] of RiSC16::Word
         self_globals.each do |local|
-          raise "Duplicate local global #{local.name} in #{path}" if section.definitions[local.symbol]?
           next if local.extern
           section.definitions[local.symbol] = RiSC16::Object::Section::Symbol.new code.size, true
           if local.initialization
-            # we can do _ = word, *_ = &identifier
             case local.type_info
             when Type::Word # There is code duplication here with function var init/typechecking
-              local.initialization.as?(Stacklang::AST::Literal).try &.tap do |literal|
-                code << literal.number.to_u16! # TODO: better error message, resuse function logic ?
-              end || raise "Type does not match affected value initializing global #{local.name} of type #{local.type_info} with value #{local.initialization}"
-              # when Type::Pointer # do later, allows to initialize with dereferenced identifier. Typecheck. Would work only on var since
-              # there are no func ptr type yet
-              # when Type::Table # do later, need recursive stuff, annoying
-              # when Type::Struct # do later, need recursive stuff, annoying
+              case expression = local.initialization
+              when Stacklang::AST::Literal
+                code << expression.number.to_u16!
+              else
+                raise Exception.new "Global #{local.name.colorize.bold} of type _ initialization support literal values only.", ast: local.ast
+              end
             else
-              raise "Intializing global #{local.name} of type #{local.type_info} is not supported yet"
+              raise Exception.new "Global #{local.name.colorize.bold} of type #{local.type_info} initialization not supported", ast: local.ast
             end
           else
             local.type_info.size.times do
@@ -160,6 +218,7 @@ class Stacklang::Unit
             end
           end
         end
+        
         section.text = Slice.new code.size do |i|
           code[i]
         end # TODO ugly, fix

@@ -400,7 +400,8 @@ class Stacklang::Parser
     extern = consume? "extern"
     name = identifier
     constraint = type_constraint colon: true, explicit: false, context_token: root
-    AST::Variable.new root, name, constraint, nil, extern: extern
+    init = expression if consume? "="
+    AST::Variable.new root, name, constraint, init, extern: extern
   end
 
   def requirement

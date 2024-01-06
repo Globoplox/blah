@@ -128,7 +128,7 @@ module RiSC16
           if source.ends_with?(".sl")
             begin
               object = Stacklang::Compiler.new(source, spec, debug).compile
-            rescue ex : Stacklang::Compiler::Exception 
+            rescue ex : Stacklang::Exception
               puts ex.message
               exit 1
             end

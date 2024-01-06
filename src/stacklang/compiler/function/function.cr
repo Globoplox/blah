@@ -45,8 +45,9 @@ class Stacklang::Function
     getter offset
     getter initialization
     getter restricted
+    getter ast
 
-    def initialize(@name, @offset, @constraint, @initialization, @restricted = false)
+    def initialize(@ast : AST?, @name, @offset, @constraint, @initialization, @restricted = false)
       @initialized = @initialization.nil?
     end
   end
@@ -111,6 +112,7 @@ class Stacklang::Function
     @ast.name.name
   end
 
+  getter ast
   # Allow to share the prototype of the function to external symbols.
   getter prototype
   # Allow to skip compilation of prototypes only
@@ -138,14 +140,14 @@ class Stacklang::Function
 
     local_variables = @ast.body.compact_map(&.as? AST::Variable).map do |variable|
       typeinfo = @unit.typeinfo variable.constraint
-      Variable.new(variable.name.name, @frame_size.to_i32, typeinfo, variable.initialization, restricted: variable.restricted).tap do
+      Variable.new(variable, variable.name.name, @frame_size.to_i32, typeinfo, variable.initialization, restricted: variable.restricted).tap do
         @frame_size += typeinfo.size
       end
     end
 
     parameters = @ast.parameters.map do |parameter|
       typeinfo = @unit.typeinfo parameter.constraint
-      Variable.new(parameter.name.name, @frame_size.to_i32, typeinfo, nil, restricted: false).tap do
+      Variable.new(parameter, parameter.name.name, @frame_size.to_i32, typeinfo, nil, restricted: false).tap do
         @frame_size += typeinfo.size
       end
     end
@@ -153,8 +155,20 @@ class Stacklang::Function
     @variables = (parameters + local_variables).group_by do |variable|
       variable.name
     end.transform_values do |variables|
-      raise "Name clash for variable '#{variables.first.name}' in function '#{@ast.name}' in '#{@unit.path}' L #{@ast.line}" if variables.size > 1
-      variables.first
+      if variables.size > 1
+        message = String.build { |io|
+          io << "Name clash for variable name #{variables.first.name.colorize.bold}\n"
+          io << "Defined at:\n"
+          variables.each do |defined|
+            if (ast = defined.ast) && (token = ast.token)
+              io << "- line #{token.line} column #{token.character}\n"
+            end
+          end
+        }
+        raise Exception.new message, ast: variables.first.ast, function: @ast
+      else
+        variables.first
+      end
     end
 
     @return_address_offset = @frame_size
