@@ -1,5 +1,4 @@
 class Parser
-
   # Optional base type for ast node (or anything returned by a rule).
   abstract class Node
     property line : Int32? = nil

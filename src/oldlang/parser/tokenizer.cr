@@ -2,7 +2,7 @@
 module Stacklang::Tokenizer
   struct Token
     getter value : String
-    getter source : String
+    getter source : String?
     getter line : Int32
     getter character : Int32
 
@@ -17,7 +17,7 @@ module Stacklang::Tokenizer
     end
   end
 
-  def self.tokenize(io : IO, source : String) : Array(Token)
+  def self.tokenize(io : IO, source = nil) : Array(Token)
     tokens = [] of Token
     token = [] of Char
     last = '\0'

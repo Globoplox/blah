@@ -5,38 +5,38 @@ module Stacklang::ThreeAddressCode
     property value : Int32
     property ast : AST
 
-    def initialize(@value, @ast) end
+    def initialize(@value, @ast)
+    end
 
     def to_s(io)
       io << "0x"
       io << @value.to_s base: 16
     end
-  
   end
 
   struct Anonymous
     property value : Int32
 
-    def initialize(@value) end
+    def initialize(@value)
+    end
 
     def to_s(io)
       io << "_t#{@value}"
     end
   end
 
-   struct Identifier
-     property name : String
-     property ast : AST
+  struct Identifier
+    property name : String
+    property ast : AST
 
-     def initialize(@name, @ast) end
+    def initialize(@name, @ast)
+    end
 
     def to_s(io)
       io << @name
     end
-  
-   end
+  end
 
-  
   alias Address = Literal | Identifier | Anonymous
 
   struct IfeqGoto # ???
@@ -46,7 +46,6 @@ module Stacklang::ThreeAddressCode
 
     def initialize(@var, @to, @ast)
     end
-
   end
 
   struct Goto # ???
@@ -82,7 +81,6 @@ module Stacklang::ThreeAddressCode
       io << " + "
       @right.to_s io
     end
-
   end
 
   struct Nand # into = left !& right
@@ -108,7 +106,6 @@ module Stacklang::ThreeAddressCode
       io << " = *"
       @address.to_s io
     end
-
   end
 
   struct DereferenceLeft # *into = address
@@ -125,14 +122,13 @@ module Stacklang::ThreeAddressCode
       io << " = "
       @address.to_s io
     end
-
   end
 
   struct Reference # into = &address
     property address : Address
     property into : Address
     property ast : AST
-  
+
     def initialize(@address, @into, @ast)
     end
 
@@ -162,7 +158,6 @@ module Stacklang::ThreeAddressCode
       io << @parameters.map(&.to_s).join ", "
       io << ')'
     end
-
   end
 
   struct Return # return
@@ -174,5 +169,4 @@ module Stacklang::ThreeAddressCode
   end
 
   alias Code = IfeqGoto | Return | Call | DereferenceLeft | DereferenceRight | Reference | Assign | Goto | Add | Nand
-  
 end

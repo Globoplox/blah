@@ -1,10 +1,7 @@
 require "./tokenizer"
 
 abstract class Stacklang::AST
-  abstract def token
-
-  def initialize(@token)
-  end
+  property token : Tokenizer::Token?
 
   def line
     @token.try &.line || "???"
@@ -58,9 +55,8 @@ abstract class Stacklang::AST
 
   class Requirement < AST
     getter target
-    getter token
 
-    def initialize(@token : Tokenizer::Token, @target : String)
+    def initialize(@token, @target : String)
     end
 
     def dump(io, indent = 0)
@@ -75,9 +71,7 @@ abstract class Stacklang::AST
   end
 
   class Word < Type
-    getter token
-
-    def initialize(@token : Tokenizer::Token)
+    def initialize(@token)
     end
 
     def dump(io, indent = 0)
@@ -87,9 +81,8 @@ abstract class Stacklang::AST
 
   class Pointer < Type
     getter target
-    getter token
 
-    def initialize(@token : Tokenizer::Token, @target : Type)
+    def initialize(@token, @target : Type)
     end
 
     def dump(io, indent = 0)
@@ -101,9 +94,8 @@ abstract class Stacklang::AST
   class Table < Type
     getter target
     getter size
-    getter token
 
-    def initialize(@token : Tokenizer::Token, @target : Type, @size : Literal)
+    def initialize(@token, @target : Type, @size : Literal)
     end
 
     def dump(io, indent = 0)
@@ -116,9 +108,8 @@ abstract class Stacklang::AST
 
   class Custom < Type
     getter name
-    getter token
 
-    def initialize(@token : Tokenizer::Token, @name : String)
+    def initialize(@token, @name : String)
     end
 
     def dump(io, indent = 0)
@@ -132,9 +123,8 @@ abstract class Stacklang::AST
     getter initialization
     getter restricted
     getter extern
-    getter token
 
-    def initialize(@token : Tokenizer::Token, @name : Identifier, @constraint : Type, @initialization : Expression?, @restricted = false, @extern = false)
+    def initialize(@token, @name : Identifier, @constraint : Type, @initialization : Expression?, @restricted = false, @extern = false)
     end
 
     def dump(io, indent = 0)
@@ -155,9 +145,8 @@ abstract class Stacklang::AST
   class If < Statement
     getter condition
     getter body
-    getter token
 
-    def initialize(@token : Tokenizer::Token, @condition : Expression, @body : Array(Statement))
+    def initialize(@token, @condition : Expression, @body : Array(Statement))
     end
 
     def dump(io, indent = 0)
@@ -177,9 +166,8 @@ abstract class Stacklang::AST
   class While < Statement
     getter condition
     getter body
-    getter token
 
-    def initialize(@token : Tokenizer::Token, @condition : Expression, @body : Array(Statement))
+    def initialize(@token, @condition : Expression, @body : Array(Statement))
     end
 
     def dump(io, indent = 0)
@@ -198,9 +186,8 @@ abstract class Stacklang::AST
 
   class Return < Statement
     getter value
-    getter token
 
-    def initialize(@token : Tokenizer::Token, @value : Expression?)
+    def initialize(@token, @value : Expression?)
     end
 
     def dump(io, indent = 0)
@@ -213,9 +200,8 @@ abstract class Stacklang::AST
     class Parameter < AST
       getter name
       getter constraint
-      getter token
 
-      def initialize(@token : Tokenizer::Token, @name : Identifier, @constraint : Type)
+      def initialize(@token, @name : Identifier, @constraint : Type)
       end
 
       def dump(io, indent = 0)
@@ -230,9 +216,8 @@ abstract class Stacklang::AST
     getter return_type
     getter body
     getter extern
-    getter token
 
-    def initialize(@token : Tokenizer::Token, @name : Identifier, @parameters : Array(Parameter), @return_type : Type?, @body : Array(Statement), @extern : Bool)
+    def initialize(@token, @name : Identifier, @parameters : Array(Parameter), @return_type : Type?, @body : Array(Statement), @extern : Bool)
     end
 
     def dump(io, indent = 0)
@@ -263,7 +248,6 @@ abstract class Stacklang::AST
   class Struct < AST
     getter name
     getter fields
-    getter token
 
     class Field
       getter name
@@ -282,7 +266,7 @@ abstract class Stacklang::AST
       end
     end
 
-    def initialize(@token : Tokenizer::Token, @name : String, @fields : Array(Field))
+    def initialize(@token, @name : String, @fields : Array(Field))
     end
 
     def dump(io, indent = 0)
@@ -297,9 +281,12 @@ abstract class Stacklang::AST
 
   class Literal < Expression
     getter number
-    getter token
 
-    def initialize(@token : Tokenizer::Token, @number : Int32)
+    def initialize(@token, @number : Int32)
+    end
+
+    # For codegen / syntaxic sugar. TODO: track origin
+    def initialize(@number : Int32)
     end
 
     def dump(io, indent = 0)
@@ -310,9 +297,8 @@ abstract class Stacklang::AST
 
   class Sizeof < Expression
     getter constraint
-    getter token
 
-    def initialize(@token : Tokenizer::Token, @constraint : Type)
+    def initialize(@token, @constraint : Type)
     end
 
     def dump(io, indent = 0)
@@ -325,9 +311,8 @@ abstract class Stacklang::AST
   class Cast < Expression
     getter constraint
     getter target
-    getter token
 
-    def initialize(@token : Tokenizer::Token, @constraint : Type, @target : Expression)
+    def initialize(@token, @constraint : Type, @target : Expression)
     end
 
     def dump(io, indent = 0)
@@ -340,9 +325,12 @@ abstract class Stacklang::AST
 
   class Identifier < Expression
     getter name
-    getter token
 
-    def initialize(@token : Tokenizer::Token, @name : String)
+    def initialize(@token, @name : String)
+    end
+
+    # For codegen / syntaxic sugar. TODO: track origin
+    def initialize(@name : String)
     end
 
     def dump(io, indent = 0)
@@ -353,9 +341,12 @@ abstract class Stacklang::AST
   class Call < Expression
     getter name
     getter parameters
-    getter token
 
-    def initialize(@token : Tokenizer::Token, @name : Identifier, @parameters : Array(Expression))
+    def initialize(@token, @name : Identifier, @parameters : Array(Expression))
+    end
+
+    # For codegen / syntaxic sugar. TODO: track origin
+    def initialize(@name : Identifier, @parameters : Array(Expression))
     end
 
     def dump(io, indent = 0)
@@ -375,9 +366,8 @@ abstract class Stacklang::AST
   class Access < Operator
     getter operand
     getter field
-    getter token
 
-    def initialize(@token : Tokenizer::Token, @operand : Expression, @field : Identifier)
+    def initialize(@token, @operand : Expression, @field : Identifier)
     end
 
     def dump(io, indent = 0)
@@ -390,9 +380,12 @@ abstract class Stacklang::AST
   class Unary < Operator
     getter operand
     getter name
-    getter token
 
-    def initialize(@token : Tokenizer::Token, @operand : Expression, @name : String)
+    def initialize(@token, @operand : Expression, @name : String)
+    end
+
+    # For codegen / syntaxic sugar. TODO: track origin
+    def initialize(@operand : Expression, @name : String)
     end
 
     def dump(io, indent = 0)
@@ -405,9 +398,12 @@ abstract class Stacklang::AST
     getter name
     getter left
     getter right
-    getter token
 
-    def initialize(@token : Tokenizer::Token, @left : Expression, @name : String, @right : Expression)
+    def initialize(@token, @left : Expression, @name : String, @right : Expression)
+    end
+
+    # For codegen / syntaxic sugar. TODO: track origin
+    def initialize(@left : Expression, @name : String, @right : Expression)
     end
 
     def dump(io, indent = 0)

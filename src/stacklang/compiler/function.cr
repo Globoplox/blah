@@ -1,5 +1,4 @@
 class Stacklang::Function
-  
   class Parameter
     property ast : AST::Function::Parameter
     # Before calling the function, the parameter must be wrote in the stack at offset:
@@ -10,7 +9,7 @@ class Stacklang::Function
     def initialize(@ast, @name, @constraint, @offset)
     end
   end
-  
+
   property parameters : Array(Parameter)
   property return_type : Type?
   # After calling this function, the return value can be found in the staskat offset:
@@ -30,11 +29,11 @@ class Stacklang::Function
     @parameters = @ast.parameters.map do |parameter|
       typeinfo = @unit.typeinfo(parameter.constraint)
       Parameter.new(
-        ast: parameter, 
-        name: parameter.name.name, 
-        constraint: typeinfo, 
+        ast: parameter,
+        name: parameter.name.name,
+        constraint: typeinfo,
         offset: (offset -= typeinfo.size)
-      ) 
+      )
     end
   end
 end

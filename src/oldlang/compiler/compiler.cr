@@ -3,14 +3,7 @@ require "./unit"
 require "../parser"
 require "../../assembler/object"
 require "../../spec"
-require "./codegen/three_address_code"
 
-# Stacklang compiler.
-# This particular class does the following:
-# - parse stacklang files
-# - solve requirements
-# - extract and build cache of units
-# TODO: allow to use a single compiler instance for compiling several files
 class Stacklang::Compiler
   # Cache of all units opened
   @units = {} of Path => Unit
@@ -21,7 +14,7 @@ class Stacklang::Compiler
   def initialize(path : String, @spec : RiSC16::Spec, @debug = true)
     absolute = Path[path].expand home: true
     begin
-      ast = Stacklang::Parser.open path, &.unit
+      ast = Stacklang::Parser.open(path).unit
     rescue syntax_error : Parser::Exception
       raise Exception.new syntax_error.message, cause: syntax_error
     end
@@ -29,24 +22,8 @@ class Stacklang::Compiler
     @units[absolute] = @unit.not_nil!
   end
 
-  # This is a test of the three address code generation
-  def compile
-    u = @unit.not_nil!
-
-    globals = @unit.not_nil!.self_globals.compact_map do |global|
-      ({global.name, global.typeinfo}) unless global.extern
-    end
-
-    u.self_functions.each do |f|
-      next if f.ast.extern
-      pp "FUNCTION: #{f.name}"
-      codes = ThreeAddressCode.translate f.ast.body, u, f, globals.to_h
-      codes.each do |(code, type)|
-        puts "#{code} (#{type})"
-      end
-    end
-
-    exit 0
+  def compile : RiSC16::Object
+    @unit.not_nil!.compile
   end
 
   # Fetch a required unit from cache or parse it.
@@ -55,7 +32,7 @@ class Stacklang::Compiler
     path += ".sl" unless path.includes? '.'
     absolute = Path[path].expand home: true, base: from.path.dirname
     @units[absolute]? || begin
-      @units[absolute] = Unit.new Stacklang::Parser.open(absolute.to_s, &.unit), absolute, self
+      @units[absolute] = Unit.new Stacklang::Parser.open(absolute.to_s).unit, absolute, self
     rescue syntax_error : Parser::Exception
       raise Exception.new syntax_error.message, cause: syntax_error
     end

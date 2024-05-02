@@ -26,4 +26,3 @@ struct Stacklang::ThreeAddressCode::Translator
     @tacs
   end
 end
-
