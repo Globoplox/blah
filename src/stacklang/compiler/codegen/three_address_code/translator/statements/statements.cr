@@ -9,7 +9,7 @@ struct Stacklang::ThreeAddressCode::Translator
     in AST::Return
     in AST::Expression then translate_expression statement
     in AST::Statement
-      raise "Unexpected AST Statement node type: #{expression.class.name}"
+      raise "Unexpected AST Statement node type: #{statement.class.name}"
     end
   end
 end
