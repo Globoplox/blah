@@ -17,9 +17,16 @@ It consists of:
 All of which are bundled within a single CLI tool, written in [Crystal](https://crystal-lang.org/).
 
 ## TODO
+- [ ] Full refactor
+  - [ ] Rewrite assembler parser 
+  - [ ] Improve assembler/stacklang lexers to stream and parsers to have a fixed low look-ahead
+  - [ ] Full compiler refactor
+     - [ ] Three address code intermediary
+     - [ ] Various simples optimizations
+     - [ ] Smarter register handling
+  - [ ] Consider switching to a custom 20 bits words ISA
 - [x] Write an assembler able to ouput raw bitcode
   - [ ] Better error output for linker
-  - [ ] UCS-2 Strings
 - [x] Write a dummy virtual machine that can execute this raw bitcode
   - [x] IO
   - [ ] IO with both data and control register

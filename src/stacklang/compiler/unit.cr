@@ -1,40 +1,16 @@
 require "./compiler"
-require "./types"
+require "./type"
 require "./function"
+require "./global"
 require "../../assembler/object"
 require "../../assembler/linker"
 
+# Represent a single unit / source file.
+# It has a compiler backreference, that is used to solve requirements
+# and grab symbol and types definition from elsewhere.
+# 
 class Stacklang::Unit
   getter path
-
-  class Global
-    getter name : String
-    getter symbol
-    getter type_info : Type::Any
-    getter initialization
-    getter extern
-    getter ast
-    @name : String
-    @type_info : Type::Any
-    @extern : Bool
-    @initialization : Stacklang::AST::Expression?
-    @ast : AST::Variable?
-
-    def initialize(ast : AST::Variable, @type_info)
-      @ast = ast
-      @name = ast.name.name
-      @initialization = ast.initialization
-      @extern = ast.extern
-      @symbol = "__global_#{name}"
-    end
-
-    # Used to define globals for value defined by the linker, those are raw symbols
-    def initialize(@symbol : String)
-      @name = @symbol
-      @extern = true
-      @type_info = Type::Word.new
-    end
-  end
 
   @requirements : Array(Unit)? = nil
   @self_structs : Array(Type::Struct)? = nil
@@ -146,13 +122,13 @@ class Stacklang::Unit
   end
 
   def typeinfo(constraint)
-    Type::Any.solve_constraint constraint, structs
+    Type.solve_constraint constraint, structs
   end
 
   def self_globals : Array(Global)
     @self_globals ||= @ast.globals.map do |variable|
       # raise "Initialization of global variable is not implemented" if variable.initialization
-      Global.new variable, Type::Any.solve_constraint(variable.constraint, structs)
+      Global.new variable, Type.solve_constraint(variable.constraint, structs)
     end
   end
 
@@ -186,45 +162,6 @@ class Stacklang::Unit
         else
           globals.first
         end
-      end
-    end
-  end
-
-  def compile
-    structs
-    globals
-    functions
-    RiSC16::Object.new(path.to_s).tap do |object|
-      object.sections << RiSC16::Object::Section.new("globals").tap do |section|
-        code = [] of RiSC16::Word
-        self_globals.each do |local|
-          next if local.extern
-          section.definitions[local.symbol] = RiSC16::Object::Section::Symbol.new code.size, true
-          if local.initialization
-            case local.type_info
-            when Type::Word # There is code duplication here with function var init/typechecking
-              case expression = local.initialization
-              when Stacklang::AST::Literal
-                code << expression.number.to_u16!
-              else
-                raise Exception.new "Global #{local.name.colorize.bold} of type _ initialization support literal values only.", ast: local.ast
-              end
-            else
-              raise Exception.new "Global #{local.name.colorize.bold} of type #{local.type_info} initialization not supported", ast: local.ast
-            end
-          else
-            local.type_info.size.times do
-              code << 0u16
-            end
-          end
-        end
-        
-        section.text = Slice.new code.size do |i|
-          code[i]
-        end # TODO ugly, fix
-      end
-      self_functions.each do |function|
-        object.sections << function.compile unless function.extern
       end
     end
   end

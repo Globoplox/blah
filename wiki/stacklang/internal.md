@@ -1,4 +1,4 @@
-# Compiler
+# Internal
 
 ## ABI
 Stacklang use a simple ABI, a convention on how we are going to handle various thing such as calling functions with parameters. Knowing the ABI allows interoperability (like defining or calling functions from/to another language, or from/to assembly).

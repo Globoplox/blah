@@ -1,4 +1,4 @@
-# Stacklang specifications
+# Stacklang language specifications
 
 Stacklang is a rudimentory C-like imperative langage. 
 The top level of a stacklang file can contain:

@@ -1,3 +1,0 @@
-class Stacklang::Function
-
-end

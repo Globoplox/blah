@@ -1,9 +1,11 @@
 module Stacklang
-  abstract class Type::Any
+  
+  # Represent a type in a practical way
+  abstract class Type
     abstract def size
 
     # Solve the constraint of a struct field and map it to the right type.
-    def self.solve_constraint(ast : AST::Type, types : Hash(String, Type::Struct), stack : Array(Type::Any) = [] of Type::Any) : Type::Any
+    def self.solve_constraint(ast : AST::Type, types : Hash(String, Type::Struct), stack : Array(Type) = [] of Type) : Type
       case ast
       when AST::Word then Type::Word.new
       
@@ -55,7 +57,7 @@ module Stacklang
     end
   end
 
-  class Type::Word < Type::Any
+  class Type::Word < Type
     getter size = 1u16
 
     def self.new
@@ -70,11 +72,11 @@ module Stacklang
     end
   end
 
-  class Type::Pointer < Type::Any
+  class Type::Pointer < Type
     getter size = 1u16
     getter pointer_of
 
-    def initialize(@pointer_of : Type::Any)
+    def initialize(@pointer_of : Type)
     end
 
     def to_s(io)
@@ -82,12 +84,12 @@ module Stacklang
       @pointer_of.to_s io
     end
 
-    def ==(other : Type::Any)
+    def ==(other : Type)
       other.is_a?(Pointer) && other.pointer_of == @pointer_of
     end
   end
 
-  class Type::Table < Type::Any
+  class Type::Table < Type
     getter quantity
     getter table_of
 
@@ -95,7 +97,7 @@ module Stacklang
       @quantity * @table_of.size
     end
 
-    def initialize(@table_of : Type::Any, @quantity : Int32)
+    def initialize(@table_of : Type, @quantity : Int32)
     end
 
     def to_s(io)
@@ -105,18 +107,18 @@ module Stacklang
       @table_of.to_s io
     end
 
-    def ==(other : Type::Any)
+    def ==(other : Type)
       other.is_a?(Table) && other.table_of == @table_of && other.quantity == @quantity
     end
   end
 
-  class Type::Struct < Type::Any
+  class Type::Struct < Type
     class Field
       property name
       property offset
       property constraint
 
-      def initialize(@name : String, @constraint : Type::Any, @offset : UInt16)
+      def initialize(@name : String, @constraint : Type, @offset : UInt16)
       end
     end
 
@@ -139,11 +141,11 @@ module Stacklang
     end
 
     # Compute the size and fields of the structures. It needs all other structure types to be given.
-    def solve(other_types : Hash(String, Type::Struct), stack : Array(Type::Any) = [] of Type::Any)
+    def solve(other_types : Hash(String, Type::Struct), stack : Array(Type) = [] of Type)
       @size ||= begin
         offset = 0u16
         @fields = @ast.fields.map do |ast_field|
-          constraint = Type::Any.solve_constraint ast_field.constraint, other_types, stack # self is already added to the stack
+          constraint = Type.solve_constraint ast_field.constraint, other_types, stack # self is already added to the stack
           field = Field.new ast_field.name.name, constraint, offset
           offset += constraint.size
           field

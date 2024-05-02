@@ -18,7 +18,7 @@ While being more practical to use than assembly, it is not very efficient.
 It is not feature complete, can be buggy, has specification hole and pretty much a constant WIP.
 But outside of heavy refactoring time it does works.  
 
-## Specification 
+## Language specification 
 See [Specifications](/wiki/stacklang/specification.md).
 
 ## Usage 
@@ -54,4 +54,4 @@ mkdir -p build
 It should print a single `@` char then exit.
 
 ## Internal
-See [Specifications](/wiki/stacklang/compiler.md).
+See [Internal](/wiki/stacklang/internal.md) for ABI and implementation details.

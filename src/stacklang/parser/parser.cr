@@ -216,7 +216,7 @@ class Stacklang::Parser
   end
   
   def statement
-    token = current
+    token = current!
     if consume? "return"
       if consume? NEWLINE
         AST::Return.new token, nil
@@ -531,6 +531,11 @@ class Stacklang::Parser
     @tokens[@index]?
   end
 
+  # Return the current token
+  def current!
+    @tokens[@index]
+  end
+
   # True if End Of File is reached.
   def eof?
     @index >= @tokens.size
@@ -544,11 +549,11 @@ class Stacklang::Parser
     end
   end
 
-  @filename : String?
+  @filename : String
   # Cache of all line of codes, used for fancy debug.
   @locs : Array(String)?
-  def initialize(io : IO, @filename = nil, fancy = true)
-    if fancy 
+  def initialize(io : IO, @filename, debug = true)
+    if debug
       @locs = io.gets_to_end.lines
       io.rewind
     end
@@ -556,9 +561,9 @@ class Stacklang::Parser
     @index = 0
   end
 
-  def self.open(path)
+  def self.open(path, debug = true)
     File.open path do |io| 
-      new io, path
+      yield new io, path, debug
     end
   end
 end
