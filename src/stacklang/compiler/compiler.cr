@@ -40,7 +40,7 @@ class Stacklang::Compiler
     u.self_functions.each do |f|
       next if f.ast.extern
       pp "FUNCTION: #{f.name}"
-      codes = ThreeAddressCode.translate f.ast.body, u, f, globals.to_h
+      codes = ThreeAddressCode.translate f
       codes.each do |(code, type)|
         puts "#{code} (#{type})"
       end

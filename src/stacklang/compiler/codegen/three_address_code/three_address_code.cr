@@ -8,7 +8,7 @@ module Stacklang::ThreeAddressCode
   #   providing additional context in case of error
   # *context* is a mapping of all reachable named address and there type.
   # Usually this mean globals, parameters and variables declared within the block.
-  def self.translate(statements, unit, function, context)
-    Translator.new(statements, unit, function, context).translate
+  def self.translate(function)
+    Translator.new(function).translate
   end
 end
