@@ -3,8 +3,9 @@
 module Stacklang::ThreeAddressCode
   struct Anonymous
     property uid : Int32
+    property size : Int32
 
-    def initialize(@uid)
+    def initialize(@uid, @size)
     end
 
     def to_s(io)
@@ -14,15 +15,12 @@ module Stacklang::ThreeAddressCode
 
   struct Immediate
     property value : Int32
-    property into : Anonymous
     property ast : AST
 
-    def initialize(@value, @into, @ast)
+    def initialize(@value, @ast)
     end
 
     def to_s(io)
-      io << @into
-      io << " = "
       io << "0x"
       io << @value.to_s base: 16, precision: 4
     end
@@ -36,6 +34,7 @@ module Stacklang::ThreeAddressCode
     # if b { var bar }
     property index : Int32
     property offset : Int32
+    property size : Int32
 
     property ast : AST
 
@@ -44,7 +43,7 @@ module Stacklang::ThreeAddressCode
     # This value is muted during the initial three addresses code generation
     property aliased : Bool
     
-    def initialize(@index, @offset, @ast)
+    def initialize(@index, @offset, @size, @ast)
       @aliased = false
     end
 
@@ -59,8 +58,9 @@ module Stacklang::ThreeAddressCode
     property name : String
     property offset : Int32
     property ast : AST?
+    property size : Int32
 
-    def initialize(@name, @offset, @ast)
+    def initialize(@name, @offset, @size, @ast)
     end
 
     def to_s(io)
@@ -68,10 +68,14 @@ module Stacklang::ThreeAddressCode
     end
   end
 
+  alias Address =  Anonymous | Local | Global | Immediate
+
+  ########
+
   struct Add
-    property left : Anonymous
-    property right : Anonymous
-    property into : Anonymous
+    property left : Address
+    property right : Address
+    property into : Address
     property ast : AST
 
     def initialize(@left, @right, @into, @ast)
@@ -87,40 +91,24 @@ module Stacklang::ThreeAddressCode
   end
 
   struct Nand
-    property left : Anonymous
-    property right : Anonymous
-    property into : Anonymous
+    property left : Address
+    property right : Address
+    property into : Address
     property ast : AST
 
     def initialize(@left, @right, @into, @ast)
     end
   end
 
-  struct Load
-    property address : Anonymous
-    property into : Anonymous
+  struct Move
+    property address : Address
+    property into : Address
     property ast : AST
 
     def initialize(@address, @into, @ast)
     end
 
     def to_s(io)
-      @into.to_s io
-      io << " = *"
-      @address.to_s io
-    end
-  end
-
-  struct Store
-    property address : Anonymous
-    property into : Anonymous
-    property ast : AST
-
-    def initialize(@address, @into, @ast)
-    end
-
-    def to_s(io)
-      io << '*'
       @into.to_s io
       io << " = "
       @address.to_s io
@@ -128,8 +116,8 @@ module Stacklang::ThreeAddressCode
   end
 
   struct Reference
-    property address : Local | Global
-    property into : Anonymous
+    property address : Address
+    property into : Address
     property ast : AST
 
     def initialize(@address, @into, @ast)
@@ -142,5 +130,5 @@ module Stacklang::ThreeAddressCode
     end
   end
 
-  alias Code = Add | Nand | Store | Load | Reference | Immediate
+  alias Code = Add | Nand | Reference | Move
 end

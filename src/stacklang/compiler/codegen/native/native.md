@@ -14,6 +14,8 @@ Each edge represent that this node output is dependent on other node output
 Each node can declare itself as Constant:
 - A  Reference node is always constant
 - An Add or Nand node is constant if its dependecies are constant
+- A node that is affected several time CANNOT be constant.
+  (happen if we generate code that reuse a temporary , such as an inlined loop for moving large memory areas)
 
 Each node can declare itself as Aliased:
 - Reference node is Aliased if it hold a Global
@@ -32,11 +34,15 @@ When several nodes are similar (different output name but same righthand express
   the node is constant (if one is, they should all be)
   then all the nodes but one can be removed and all the outputs of removed nodes
   are replaced with the output of the node that is kept (the first to be assigned).
+  => allow reuse of cache => is that really usefull anyway? => address dont really need to be cahed;
+   constexpr are pre-optimized.
 
 An Add node can flatten it's dependencies deeply as long as thay are also Add node, and
  all children that are Immediate can be merged into one Immediate child.
+ => pre optimize
 
 An Add node whose children are a Immediate and a Reference node can be merged into a Reference node
+=> pre optimize
 
 A Load node dependent on a Store node storing into an unaliased can replaced by the value stored:
 *t1 = t0
@@ -44,20 +50,31 @@ t2 = *t1
 t3 = t2 + t2
 If t1 is unaliased, it can be rewrote:
 t3 = t0 + t0
+=> Yeah ok
 
 An node that has no other node dependent on it, (unless its a aliased Store node or other side effect node), can be removed. 
 (TODO: need a way to also flag a Load node to be kept (when we want to read an IO but do not care about the value read)).
 This handle trimming node orphaned by other optimizations
 
+DRAFT, branch selection:
+For Add and Nand, choose the order (right, left) to codegen:
+- Right then Left IF the left branch is shorter than right branch AND they have no common aliased node
+- else left then right, which is the logical intuitive order.
+
+Look into this case:
+a = [1, 10]
+b = &a
+c = (a = a + 1) + *b
+The order of the evaluation of the parameters impact the result of the operation (+) which is supposed to be commutative.
+
+Same for Load an Store: the into address is loaded first, then the value
+unless the value branch is shorter and they don't conflict.
+
 ------ 
-DRAFT:
-Once nothing optimize anymore,
-For each Immediate or Reference node that are being reference by only one other Node,
-the reference is directly replaced by the Immediate or Reference:
-t2[add t0 t1]  -- Dep on --> t0[Ref varname+0]
-                         --> t1[Imm 5]
-Becomes t2[add (Ref varname+0) (Imm 5)]
-The point is that this way during codegen it does not load a literal address, store it, then reload it to never use it again, but only load it on the instant it is required.
+Once nothing optimize anymore:
+
+Constant immediate nodes whose value fit in a small risc immediate are replaced by the immediate itself
+
 
 ------
 
@@ -65,12 +82,6 @@ Codegeneration:
 Each anonymous can be stored into a register/a register can store an anonymous.
 Take the roots of the graphs, in order, and generate the node recursively depth first.
 
-DRAFT, branch selection:
-For Add and Nand, choose the order (right, left) to codegen:
-- Right then Left IF the left branch is shorter than right branch AND they have no common aliased node
-- else left then right, which is the logical intuitive order.
-Same for Load an Store: the into address is loaded first, then the value
-unless the value branch is shorter and they don't conflict.
 
 When generating code for a TAC:
 - Take all the anonymous (or Literal / Local / Global in some case) it needs
@@ -91,7 +102,11 @@ When generating code for a TAC:
 Handling Jump, Goto:
 
 Before a Call:
-  spill temporaries / free register
+  spill temporaries / free register, no question.
+
+About call/push:
+if pushing is a code in itself, it mean the stack size (and so temporaries) should be fixed for the duration of the function <= unless TAC always generate the push just before the call.
+if call include its parameters it does only requiere the current stack size. 
 
 If and while:
   At the label of the beginning of the computation of the condition:
@@ -99,3 +114,13 @@ If and while:
   When jumping to a label:
     - Spill all variable that were not spilled at the beginning og the label
     - Load all variables that were cached at the beginning of the label
+
+BTW: 
+assigning literal 0 to a CONSTANT temporary will noop and assign r0 to the tmeporary
+
+A non initialized local is considred to be stored in r0.
+
+
+
+
+Most important optimization would be reusing common subexpressio, but this requires to detect that there have been no write to dependable stuff, which is hard.

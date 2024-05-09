@@ -373,7 +373,12 @@ class Stacklang::Parser
           restricted = consume? "restricted"
           var_name = identifier
           var_constraint = type_constraint colon: true, explicit: false, context_token: token.not_nil!
-          init = expression if consume? "="
+          assign = current
+          if assign && assign.value == "="
+            consume? "="
+            init_expr = expression if assign
+            init = AST::Binary.new(assign, var_name, "=", init_expr) if init_expr
+          end
           body << AST::Variable.new token.not_nil!, var_name, var_constraint, init, extern: false, restricted: restricted
         else
           body << statement

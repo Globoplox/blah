@@ -1,5 +1,5 @@
 struct Stacklang::ThreeAddressCode::Translator
-  def translate_call(expression : AST::Call) : {Anonymous, Type}?
+  def translate_call(expression : AST::Call) : {Address, Type}?
     #called_function = @function.unit.functions[expression.name]?
     #unless called_function
     #  raise Exception.new "Identifier: '#{expression.name}' does not refer to any known function name", expression, @function

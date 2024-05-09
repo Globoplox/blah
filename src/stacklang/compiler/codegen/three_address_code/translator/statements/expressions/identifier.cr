@@ -1,8 +1,6 @@
 struct Stacklang::ThreeAddressCode::Translator
-  def translate_identifier(expression : AST::Identifier) : {Anonymous, Type}
-    address, typeinfo = translate_lvalue expression
-    t0 = anonymous
-    @tacs << {Load.new(address, t0, expression), typeinfo.pointer_of}
-    {t0, typeinfo.pointer_of}
+  def translate_identifier(expression : AST::Identifier) : {Address, Type}
+  address, typeinfo = @scope.search(expression.name) || @globals[expression.name]? || raise Exception.new "Identifier #{expression.name} not found in scope", expression, @function
+  {address, typeinfo}
   end
 end

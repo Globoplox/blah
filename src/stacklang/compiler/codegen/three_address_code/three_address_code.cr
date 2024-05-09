@@ -12,3 +12,13 @@ module Stacklang::ThreeAddressCode
     Translator.new(function).translate
   end
 end
+# TODO: remove types from tacs array
+# Label, BEQ, B, Call
+# Automatically be smart about nand and add when possible
+# 
+# Local load (local() = t0) (usually we do  *t0 = t1) => require Move
+#     and so lvalue can return local/global 
+# 
+# Complex assignment
+# 
+# TODO: io type & function type

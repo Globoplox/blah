@@ -1,5 +1,5 @@
 struct Stacklang::ThreeAddressCode::Translator
-  def translate_add(expression : AST::Binary) : {Anonymous, Type}
+  def translate_add(expression : AST::Binary) : {Address, Type}
     left = translate_expression expression.left
     if left.nil?
       raise Exception.new "Expression has no type", expression.left, @function
@@ -20,7 +20,9 @@ struct Stacklang::ThreeAddressCode::Translator
       else raise Exception.new "Cannot add values of types #{left_typeinfo} and #{right_typeinfo}", expression, @function
     end
 
-    t0 = anonymous
+    # OPTIMIZE IT 
+
+    t0 = anonymous 1
     @tacs << {Add.new(left_address, right_address, t0, expression), typeinfo}
     {t0, typeinfo}
   end

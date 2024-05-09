@@ -3,7 +3,7 @@ require "./unary/*"
 require "./binary/*"
 
 struct Stacklang::ThreeAddressCode::Translator
-  def translate_expression(expression : AST::Expression) : {Anonymous, Type}?
+  def translate_expression(expression : AST::Expression) : {Address, Type}?
     case expression
     in AST::Literal    then translate_literal expression
     in AST::Sizeof     then translate_sizeof expression
