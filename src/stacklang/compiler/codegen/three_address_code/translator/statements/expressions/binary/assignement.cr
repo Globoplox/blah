@@ -17,7 +17,7 @@ struct Stacklang::ThreeAddressCode::Translator
       raise Exception.new "Assignment of complex types is not supported yet", expression, @function
     end
 
-    @tacs << {Move.new(right_address, left_address, expression), right_typeinfo}
+    @tacs << Move.new right_address, left_address, expression
 
     {right_address, right_typeinfo}
   end

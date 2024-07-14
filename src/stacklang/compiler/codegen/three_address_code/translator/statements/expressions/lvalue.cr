@@ -1,17 +1,14 @@
 struct Stacklang::ThreeAddressCode::Translator
   def translate_lvalue(expression : AST::Expression) : {Address, Type}
-    # If identifier => global, symbol, take ref.
-    # If access: lvalue left, + offset
-    # If *: value right, must be pointer
-
-    # TODO: return either a anonymous and ptr OR (local OR global) + real type
-
     case expression
     when AST::Identifier
-      
-      address, typeinfo = @scope.search(expression.name) || @globals[expression.name]? || raise Exception.new "Identifier #{expression.name} not found in scope", expression, @function
-      {address, typeinfo}
+      local = @scope.search(expression.name)
+      if local
+        address, typeinfo = local 
+        return {address, typeinfo}
+      end
 
+      @globals[expression.name]? || raise Exception.new "Identifier #{expression.name} not found in scope", expression, @function
     when AST::Access
       
       address, typeinfo = translate_lvalue expression.operand
@@ -22,13 +19,12 @@ struct Stacklang::ThreeAddressCode::Translator
         unless field
           raise Exception.new "No field named #{expression.field.name} in structure #{typeinfo}", expression, @function
         end
-        if address.is_a? (Local) || address.is_a?(Global)
-          address.offset += field.offset.to_i
-          address.size = field.constraint.size.to_i
+        if address.is_a? (Local)
+          address = Local.new address.uid, address.offset += field.offset.to_i, field.constraint.size.to_i, expression
           {address, field.constraint}
         else
           t0 = anonymous field.constraint.size.to_i
-          @tacs << {Add.new(address, Immediate.new(field.offset.to_i, expression.field), t0, expression), Type::Pointer.new(field.constraint)}
+          @tacs << Add.new address, Immediate.new(field.offset.to_i, expression.field), t0, expression
           {t0, field.constraint}
         end
       end

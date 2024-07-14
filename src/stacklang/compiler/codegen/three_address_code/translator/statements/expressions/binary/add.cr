@@ -20,10 +20,8 @@ struct Stacklang::ThreeAddressCode::Translator
       else raise Exception.new "Cannot add values of types #{left_typeinfo} and #{right_typeinfo}", expression, @function
     end
 
-    # OPTIMIZE IT 
-
     t0 = anonymous 1
-    @tacs << {Add.new(left_address, right_address, t0, expression), typeinfo}
+    @tacs << Add.new left_address, right_address, t0, expression
     {t0, typeinfo}
   end
 end

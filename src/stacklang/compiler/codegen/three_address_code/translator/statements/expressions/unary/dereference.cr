@@ -9,7 +9,7 @@ struct Stacklang::ThreeAddressCode::Translator
       raise Exception.new "Cannot dereference non-pointer type #{typeinfo}", expression.operand, @function
     end
     t0 = anonymous typeinfo.pointer_of.size.to_i
-    @tacs << {Move.new(address, t0, expression), typeinfo.pointer_of}
+    @tacs << Move.new address, t0, expression
     {t0, typeinfo.pointer_of}
   end
 end

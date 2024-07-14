@@ -16,6 +16,7 @@ module Stacklang::ThreeAddressCode
   struct Immediate
     property value : Int32
     property ast : AST
+    property size : Int32 = 1
 
     def initialize(@value, @ast)
     end
@@ -27,48 +28,48 @@ module Stacklang::ThreeAddressCode
   end
 
   struct Local
-    # Not an offset, but an index.
-    # Higher index mean declared after lower index.
-    # Index can be reused among several different local if they are declared in different blocks not interscting:
-    # if a { var bar }
-    # if b { var bar }
-    property index : Int32
+    property uid : Int32 # unique name
     property offset : Int32
     property size : Int32
 
     property ast : AST
-
-    # If the address of this var is ever read, assumed that it is not safe to ever attempt to cache
-    # the value in a register.
-    # This value is muted during the initial three addresses code generation
-    property aliased : Bool
     
-    def initialize(@index, @offset, @size, @ast)
+    def initialize(@uid, @offset, @size, @ast)
       @aliased = false
     end
 
     def to_s(io)
-      io << "Local(#{@index}+0x#{@offset.to_s base: 16, precision: 4}"
-      io << ", aliased)" if @aliased
-      io << ')'
+      io << "Local(0x#{@offset.to_s base: 16, precision: 4})"
     end
   end
 
   struct Global
     property name : String
-    property offset : Int32
     property ast : AST?
     property size : Int32
 
-    def initialize(@name, @offset, @size, @ast)
+    def initialize(@name, @size, @ast)
     end
 
     def to_s(io)
-      io << "global(#{@name}+0x#{@offset.to_s base: 16, precision: 4})"
+      io << "global(#{@name})"
     end
   end
 
-  alias Address =  Anonymous | Local | Global | Immediate
+  struct Function
+    property name : String
+    property ast : AST?
+    property size : Int32 = 1
+
+    def initialize(@name, @ast)
+    end
+
+    def to_s(io)
+      io << "function(#{@name})"
+    end
+  end
+
+  alias Address =  Anonymous | Local | Global | Immediate | Function
 
   ########
 
@@ -130,5 +131,60 @@ module Stacklang::ThreeAddressCode
     end
   end
 
-  alias Code = Add | Nand | Reference | Move
+  # Spill all (but load address if already loaded)
+  # Copy parameters
+  # Set load address as NOT cached (but no need to spill)
+  # load address
+  # Move stack
+  # Jump
+  # Move stack back
+  # If needed, copy return value
+  struct Call
+    property address : Address
+    property into : Address?
+    property parameters : Array(Address)
+    property ast : AST
+
+    def initialize(@address, @into, @parameters, @ast)
+    end
+
+    def to_s(io)
+      @into.try do |into|
+        into.to_s io
+        io << " = "
+      end
+      @address.to_s io
+      io << '('
+      io << @parameters.join ", "
+      io << ')'
+    end
+  end
+
+  struct Start
+    property address : Address
+    property ast : AST
+
+    def initialize(@address, @ast)
+    end  
+
+    def to_s(io)
+      @address.to_s io
+      io << " = Return address"
+    end
+  end
+
+  struct Return
+    property address : Address
+    property ast : AST
+
+    def initialize(@address, @ast)
+    end  
+
+    def to_s(io)
+      io << "Return to "
+      @address.to_s io
+    end
+  end
+
+  alias Code = Add | Nand | Reference | Move | Call | Return | Start
 end

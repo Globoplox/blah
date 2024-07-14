@@ -6,7 +6,7 @@ struct Stacklang::ThreeAddressCode::Translator
     in AST::Variable then statement.initialization.try { |expression| translate_expression expression } 
     in AST::If
     in AST::While
-    in AST::Return
+    in AST::Return then translate_return statement
     in AST::Expression then translate_expression statement
     in AST::Statement
       raise "Unexpected AST Statement node type: #{statement.class.name}"

@@ -5,7 +5,7 @@ struct Stacklang::ThreeAddressCode::Translator
       {address, typeinfo}
     else
       t0 = anonymous typeinfo.size.to_i
-      @tacs << {Move.new(address, t0, expression), typeinfo}
+      @tacs << Move.new address, t0, expression
       {t0, typeinfo}
     end
   end

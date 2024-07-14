@@ -9,7 +9,7 @@ struct Stacklang::ThreeAddressCode::Translator
       raise Exception.new "Cannot apply unary operand #{expression.name} on non word type #{typeinfo}", expression.operand, @function
     end
     t0 = anonymous 1.to_i
-    @tacs << {Nand.new(address, address, t0, expression), Type::Word.new}
+    @tacs << Nand.new address, address, t0, expression
     {t0, Type::Word.new}
   end
 end

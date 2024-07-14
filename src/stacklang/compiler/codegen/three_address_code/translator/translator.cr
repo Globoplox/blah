@@ -1,11 +1,20 @@
 # Translate AST to three address code.
 # This does handle type checks.
 struct Stacklang::ThreeAddressCode::Translator
-  @tacs = [] of {Code, Type?}
+  @tacs = [] of Code
   @anonymous = 0
   @function : Stacklang::Function
   @scope : Scope
+  @return_address : Local
+  @return_value : Local?
   @globals : Hash(String, {Global, Type})
+
+  @@local_uid = 0
+  def self.next_uid
+    id = @@local_uid
+    @@local_uid += 1
+    id
+  end
 
   # Scope of local variables.
   # This handles nested scopes.
@@ -13,29 +22,31 @@ struct Stacklang::ThreeAddressCode::Translator
   class Scope
     @previous : Scope?
     @entries = {} of String => {Local, Type}
-    @index : Int32
+    @offset : Int32
 
     # Build a scope from a body of statements.
-    def initialize(@previous, statements : Array(AST::Statement), function : Stacklang::Function)
-      @index = @previous.try(&.index) || 0
+    def initialize(prev : Scope, statements : Array(AST::Statement), function : Stacklang::Function)
+      @previous = prev
+      @offset = prev.offset
       statements.each do |statement|
         next unless statement.is_a? AST::Variable
         raise Exception.new "Redeclaration of variable #{statement.name}", statement, function if search(statement.name.name) != nil
         typeinfo = function.unit.typeinfo(statement.constraint)
         @entries[statement.name.name] = {
-          Local.new(@index, 0, typeinfo.size.to_i, statement), typeinfo}
-        @index += 1
+          Local.new(Translator.next_uid, @offset, typeinfo.size.to_i, statement), 
+          typeinfo
+        }
+        @offset += typeinfo.size.to_i
       end
     end
 
     # Build a scope from the root scope of a function including it's parameters only.
-    def initialize(function : Stacklang::Function)
+    def initialize(function : Stacklang::Function , @offset)
       @previous = nil
-      @index = 0
       function.parameters.each do |parameter| 
         raise Exception.new "Parameter name conflict '#{parameter.name}'", parameter.ast, function if @entries[parameter.name]? != nil
-        @entries[parameter.name] = {Local.new(@index, 0, parameter.constraint.size.to_i, parameter.ast), parameter.constraint}
-        @index += 1
+        @entries[parameter.name] = {Local.new(Translator.next_uid, @offset, parameter.constraint.size.to_i, parameter.ast), parameter.constraint}
+        @offset += parameter.constraint.size.to_i
       end
     end
 
@@ -47,27 +58,38 @@ struct Stacklang::ThreeAddressCode::Translator
       @previous
     end
 
-    def index : Int32
-      @index
+    def offset : Int32
+      @offset
     end
   end
 
-  def anonymous(size)
+  def anonymous(size : Int32)
     Anonymous.new(@anonymous += 1, size)
   end
 
   def initialize(@function)
     @globals = @function.unit.globals.map do |(name, global)|
-      {name, {Global.new(name, 0, global.typeinfo.size.to_i, global.ast), global.typeinfo}}
+      {name, {Global.new(name, global.typeinfo.size.to_i, global.ast), global.typeinfo}}
     end.to_h
-    @scope = Scope.new(Scope.new(@function), @function.ast.body, @function)
+    offset = 0
+    # Local offset to store the return value if any
+    @return_value = @function.return_type.try do |typeinfo|
+      local = Local.new(Translator.next_uid, offset, typeinfo.size.to_i, @function.ast)
+      offset +=  typeinfo.size.to_i
+      local
+    end
+    # local offset used to store the return address
+    @return_address = Local.new(Translator.next_uid, offset, 1, @function.ast)
+    offset += 1
+    @scope = Scope.new(Scope.new(@function, offset), @function.ast.body, @function)
   end
 end
 
 require "./statements"
 
 struct Stacklang::ThreeAddressCode::Translator
-  def translate : Array({Code, Type?})
+  def translate : Array(Code)
+    @tacs << Start.new @return_address, @function.ast
     @function.ast.body.each do |statement|
       translate_statement statement
     end

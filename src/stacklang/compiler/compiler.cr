@@ -3,7 +3,7 @@ require "./unit"
 require "../parser"
 require "../../assembler/object"
 require "../../spec"
-require "./codegen/three_address_code"
+require "./codegen/native"
 
 # Stacklang compiler.
 # This particular class does the following:
@@ -33,17 +33,14 @@ class Stacklang::Compiler
   def compile
     u = @unit.not_nil!
 
+
     globals = @unit.not_nil!.self_globals.compact_map do |global|
       ({global.name, global.typeinfo}) unless global.extern
     end
 
     u.self_functions.each do |f|
       next if f.ast.extern
-      pp "FUNCTION: #{f.name}"
-      codes = ThreeAddressCode.translate f
-      codes.each do |(code, type)|
-        puts "#{code} (#{type})"
-      end
+      section = Stacklang::Native.generate f
     end
 
     exit 0
