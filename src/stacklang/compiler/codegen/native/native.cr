@@ -62,6 +62,65 @@ module Stacklang::Native
       Register::R4, Register::R5, Register::R6
     ]
 
+    # Represents the stack at any time.
+    # Item are added to the stack when they are used the first time
+    # Item are removed from the stack when they are used the last time.
+    # They keep their position in stack while spilled.
+    struct Stack
+      alias Index = Int32
+      @slots = [] of {ThreeAddressCode::Address | Int32, Int32}
+      
+      def offset_at(index : Index) : Int32
+        @slots[index][1]
+      end
+      
+      def allocate(address : ThreeAddressCode::Address) : Index
+        @slots.each_with_index do |(entry, offset), index|
+          case address
+          in ThreeAddressCode::Address then next
+          in Int32
+            if entry == address.size
+              @slots[index] = {address, offset}
+              return index
+            elsif entry > address.size
+              @slots[index] = [{address, offset}, {entry - address.size, offset + address.size}]
+              return index
+            else next
+            end
+          end
+        end
+
+        @slots << {address, @slots.last?.try(&.[1].+(address.size)) || 0}
+        @slots.size - 1
+      end
+
+      def free(index : Index)
+        current = @slots[index].as ThreeAddressCode::Address
+        start = index
+        count = 1
+        total_size = current.size
+        base_address = current[1]
+
+        before = @slots[index - 1]?.try do |entry, base|
+          entry.as?(Int32).try do |free_size|
+            count += 1
+            base_address = base
+            start = index - 1
+            total_size += free_size
+          end
+        end
+
+        @slots[index + 1]?.try do |entry, base|
+          entry.as?(Int32).try do |free_size|
+            count += 1
+            total_size += free_size
+          end
+        end
+
+        @slots[start: start, count: count] = [{total_size, base_address}]
+      end
+    end
+
     struct Metadata
 
       enum Spillable
@@ -70,9 +129,17 @@ module Stacklang::Native
         Never
       end
 
+      # If the address is currently in a register:
       property live_in_register : Register?
-      property spilled_at : Int32?
+
+      # If the address is stored in the stack:
+      property spilled_at : Stack::Index?
+
+      # Address codes indexes, used to determine when an address is not used anymore
       property used_at : Array(Int32)
+
+      # Determine if this address can, must or must not be cached in a register or written to 
+      # the stack.
       property spillable : Spillable
       
       def initialize(address : ThreeAddressCode::Address, first_found_at)
@@ -92,7 +159,7 @@ module Stacklang::Native
           
 
         in ThreeAddressCode::Local
-          # Optimizer could detect that it may be reused
+          # Optimizer could detect that it may be aliased
           # then it can be cached (and so: spillable::Yes)
           @spillable = Spillable::Always
 
@@ -100,6 +167,7 @@ module Stacklang::Native
           # Never put in cache (and so never read from cache)
           # It is loaded everytime it is read
           @spillable = Spillable::Always
+
         in ThreeAddressCode::Function
           # Function address: can be cached, but never spilled.
           # However since it will usually be used to call after being loaded
@@ -147,24 +215,39 @@ module Stacklang::Native
 
     def load_raw(address : ThreeAddressCode::Address, into : Register)
       case address
-      when ThreeAddressCode::Anonymous 
+      in ThreeAddressCode::Anonymous
+      in ThreeAddressCode::Local
+        # Locals do have their 'offset', but anonymous don't (they are treated as a stack)
+        # Also, why not interweaving var and temporaries ?
+        # => it make reading address of var before assigning them harder (which is legal) => not really
+        # => also annoying because of parameters which requires real offset to stack => parameters are fixed then, simple as that 
+        # to be known without compiling
+        # 
+        # SO: it's annoying. 
+        # For tmp var, need to know at which real offset they start,
+   
+        # TODO:
+        # if <= 0x3f: rw into r7 offset
+        # if >
+        # movi into offset
+        # add into into r7
+        # rw into into
+        # This mean big stacks are YIKES, or put large stuff at the end
+        # and keep an early variable that hold a pointer ?
 
-      when ThreeAddressCode::Local 
+        #offset = address.offset
+        #if offset > 0x3f
+        #  addi into, into, offset
+        #  offset = 0
+        #end
       
-      when ThreeAddressCode::Global
-        # Address 
+      in ThreeAddressCode::Global
         movi into, address.name
-        offset = address.offset
-          if offset > 0x3f
-            addi into, into, offset
-            offset = 0
-        end
-        # if there is an offset that is higher, need a tmp register:
       
-      when ThreeAddressCode::Immediate 
+      in ThreeAddressCode::Immediate
         movi into, address.value
 
-      when ThreeAddressCode::Function
+      in ThreeAddressCode::Function
         movi into, address.name
       end
     end
@@ -183,19 +266,23 @@ module Stacklang::Native
     # Spill if needed/desirable
     # Clean register/var from being in use
     def unload(address)
+      #
+      # 
     end
 
     # In the non free register other than avoid, 
     # find the one hosting the value that wont be used in the most time
     # unload that
     def grab_free(avoid : Array(Register)) : Register
-      
+      #
+      # 
     end
 
     # Same as grab free, but if address is alraedy loaded in a register
     # then return this register
     def grab_free_for(address : ThreeAddressCode::Address, avoid : Array(Register)) : Register
-      
+      #
+      # 
     end
 
     def clear
@@ -224,7 +311,30 @@ module Stacklang::Native
       @section
     end
 
+    @addresses : Hash(ThreeAddressCode::Address, Metadata)
+    @stack : Stack
+    @registers : Hash(Register, ThreeAddressCode::Address)
+
+    # Helper func that ensure state is coherent
+    def stack_allocate(address)
+      meta = @addresses[address]
+      raise "Already on stack: #{address} #{meta}" if meta.spilled_at
+      meta.spilled_at = @stack.allocate address
+    end
+
+    # Helper func that ensure state is coherent
+    def stack_free(address)
+      meta = @addresses[address]
+      raise "Already free #{address} #{meta}" unless meta.spilled_at
+      meta.spilled_at.try do |index|      
+        @stack.free index
+      end
+      meta.spilled_at = nil      
+    end
+
     def initialize(@function : Function)
+      @section = RiSC16::Object::Section.new @function.symbol, options: RiSC16::Object::Section::Options::Weak
+      @text = [] of UInt16
       @codes = ThreeAddressCode.translate @function
       puts @function.name
       @codes.each do |code|
@@ -232,25 +342,45 @@ module Stacklang::Native
       end
       puts
 
-      # Optimize
+       
+      # Reverse index of registers to address
+      @registers = {} of Register => ThreeAddressCode::Address
+      # Stack state
+      @stack = Stack.new
 
-      @addresses = [] of {ThreeAddressCode::Address, Metadata}
-      @registers = {} of Register => Metadata
-
+      # Find all uniq addresses and assign metadata
+      uniq_addresses = [] of {ThreeAddressCode::Address, Metadata}
+      # All local addresses
+      reserved_addresses = [] of ThreeAddressCode::Local
       @codes.each_with_index do |code, index|
         addresses_of(code).each do |address|
-          metadata = @addresses.find { |it| address_eq(it[0], address) }
+          metadata = uniq_addresses.find { |it| address_eq(it[0], address) }
           if metadata
             metadata[1].used_at << index
           else
             metadata = Metadata.new address, index
-            @addresses << {address, metadata}
+            uniq_addresses << {address, metadata}
+            address.as?(ThreeAddressCode::Local).try do |address|
+            reserved_addresses << address if address.abi_expected
+            end
           end
         end
       end
 
-      @section = RiSC16::Object::Section.new @function.symbol, options: RiSC16::Object::Section::Options::Weak
-      @text = [] of UInt16
+      @addresses  = uniq_addresses.to_h
+
+      # Some stuff MUST be reserved on the stack immediately (if they exists):
+      # return value (as it WILL be used and it is EXPECTED to be at a given place)
+      # parameters (are they are actually already here, )
+      reserved_addresses.sort_by(&.offset).each do |reserved_local_address|
+        stack_allocate reserved_local_address
+      end
+
+      pp @stack
+
+      # This support growing / shrinking the stacl as needed and reusing stack slot
+      # when variables dies/are declared late.
+      # This pair nicely with scoped vars so they dont pollute the stack
     end
   end
 end

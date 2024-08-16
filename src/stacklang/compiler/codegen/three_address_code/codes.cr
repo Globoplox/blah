@@ -31,10 +31,13 @@ module Stacklang::ThreeAddressCode
     property uid : Int32 # unique name
     property offset : Int32
     property size : Int32
+    # Designate locals that might be externally read/written per abi.
+    # This ensure they behave as expected
+    property abi_expected : Bool
 
     property ast : AST
     
-    def initialize(@uid, @offset, @size, @ast)
+    def initialize(@uid, @offset, @size, @ast, @abi_expected = false)
       @aliased = false
     end
 

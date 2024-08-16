@@ -45,7 +45,8 @@ struct Stacklang::ThreeAddressCode::Translator
       @previous = nil
       function.parameters.each do |parameter| 
         raise Exception.new "Parameter name conflict '#{parameter.name}'", parameter.ast, function if @entries[parameter.name]? != nil
-        @entries[parameter.name] = {Local.new(Translator.next_uid, @offset, parameter.constraint.size.to_i, parameter.ast), parameter.constraint}
+        # Shadowing is allowed
+        @entries[parameter.name] = {Local.new(Translator.next_uid, @offset, parameter.constraint.size.to_i, parameter.ast, abi_expected: true), parameter.constraint}
         @offset += parameter.constraint.size.to_i
       end
     end
@@ -74,7 +75,7 @@ struct Stacklang::ThreeAddressCode::Translator
     offset = 0
     # Local offset to store the return value if any
     @return_value = @function.return_type.try do |typeinfo|
-      local = Local.new(Translator.next_uid, offset, typeinfo.size.to_i, @function.ast)
+      local = Local.new(Translator.next_uid, offset, typeinfo.size.to_i, @function.ast, abi_expected: true)
       offset +=  typeinfo.size.to_i
       local
     end

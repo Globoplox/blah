@@ -19,6 +19,7 @@ struct Stacklang::ThreeAddressCode::Translator
         unless field
           raise Exception.new "No field named #{expression.field.name} in structure #{typeinfo}", expression, @function
         end
+
         if address.is_a? (Local)
           address = Local.new address.uid, address.offset += field.offset.to_i, field.constraint.size.to_i, expression
           {address, field.constraint}
