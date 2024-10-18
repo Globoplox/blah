@@ -1,4 +1,23 @@
+
+alias Kind = RiSC16::Object::Section::Reference::Kind
+alias ISA = RiSC16::ISA
+alias Instruction = RiSC16::Instruction
+
 class Stacklang::Native::Generator
+
+    def load_immediate(into : Register, imm : Int32 | String)
+      case imm
+      in String then movi into, imm
+      in Int32
+        if imm < 0x40
+          addi into, into, imm
+        elsif imm % 0x40 == 0
+          lui into, imm
+        else
+          movi into, imm
+        end
+      end 
+    end
 
     def add(a : Register, b : Register, c : Register)
       @text << Instruction.new(ISA::Add, a.value, b.value, c.value).encode
@@ -18,7 +37,7 @@ class Stacklang::Native::Generator
   
     def movi(a : Register, imm : Int32 | String)
       if imm.is_a? Int32 && imm <= 0x3f
-        addi a, Registers::R0, imm & 0x3f
+        addi a, Register::R0, imm & 0x3f
       else
         lui a, imm
         lli a, imm
@@ -49,8 +68,8 @@ class Stacklang::Native::Generator
     # It provide a value for the immediate, or store the reference for linking if the value is a symbol.
     def assemble_immediate(immediate : Int32 | String, kind : Kind)
       if immediate.is_a? String
-        references = @section.references[immediate] ||= [] of Object::Section::Reference
-        references << Object::Section::Reference.new @text.size.to_u16, 0, kind
+        references = @section.references[immediate] ||= [] of RiSC16::Object::Section::Reference
+        references << RiSC16::Object::Section::Reference.new @text.size.to_u16, 0, kind
         0u16
       else
         immediate = immediate.as?(Int32).not_nil!
