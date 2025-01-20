@@ -1,5 +1,6 @@
 struct Stacklang::ThreeAddressCode::Translator
   def translate_access(expression : AST::Access) : {Address, Type}
+    # TODO: we want more than the lvalue, must compute it actually
     address, typeinfo = translate_lvalue expression
     if address.is_a?(Local) || address.is_a?(Global)
       {address, typeinfo}

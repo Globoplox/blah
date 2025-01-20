@@ -3,7 +3,7 @@ require "./unit"
 require "../parser"
 require "../../assembler/object"
 require "../../spec"
-require "./codegen/native"
+require "./codegen/native/generator"
 
 # Stacklang compiler.
 # This particular class does the following:
@@ -30,20 +30,26 @@ class Stacklang::Compiler
   end
 
   # This is a test of the three address code generation
-  def compile
-    u = @unit.not_nil!
+  def compile : RiSC16::Object
+    unit = @unit.not_nil!
 
+    object = RiSC16::Object.new unit.path.to_s
+    object.sections << Stacklang::Native.generate_global_section unit.self_globals.reject &.extern
 
-    globals = @unit.not_nil!.self_globals.compact_map do |global|
+    globals = unit.self_globals.compact_map do |global|
       ({global.name, global.typeinfo}) unless global.extern
     end
 
-    u.self_functions.each do |f|
-      next if f.ast.extern
-      section = Stacklang::Native.generate f
+    unit.self_functions.each do |func|
+      next if func.ast.extern
+      func.check_fix_termination
+      codes = ThreeAddressCode.translate func
+      object.sections << Stacklang::Native.generate_function_section func, codes
     end
 
-    exit 0
+    pp object
+
+    return object
   end
 
   # Fetch a required unit from cache or parse it.

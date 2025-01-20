@@ -1,6 +1,7 @@
 require "../vm"
 require "../spec"
 require "./curses"
+require "../assembler/linker"
 
 # NOTE: this is broken because reading the ram from vm cause IO side effects.
 
@@ -28,6 +29,14 @@ module RiSC16
     @references : Hash(UInt16, String)
 
     def initialize(io, @spec, @object = nil, at = 0)
+      @section_stack_symbol_value = 0
+
+      Linker.symbols_from_spec(@spec).each do |(name, symbol)|
+        if name == "__section_stack"
+          @section_stack_symbol_value = symbol.address
+        end
+      end
+
       @vm = VM.from_spec(@spec, io_override: {"tty" => {@input, @output}}).tap &.load io, at: at
       @references = {} of UInt16 => String
       @object.try do |object|
@@ -88,7 +97,7 @@ module RiSC16
         window_cursor = 0
         windows = [] of Window
 
-        rem = (NCurses.maxx // 2) - (8 + 3 + 20 + 3 + 2 + 8)
+        rem = (NCurses.maxx // 2) - (8 + 3 + 20 + 3 + 2 + 8 + 1)
         code = Table.new(
           x: 0, y: 0,
           height: NCurses.maxy, width: NCurses.maxx // 2,
@@ -116,24 +125,22 @@ module RiSC16
         # windows << Scroll.new x: 0, y: (NCurses.maxy / 2).floor, height: NCurses.maxy // 2, width: NCurses.maxx // 2, title: "SOURCE" do |line|
         # end
 
-        windows << Scroll.new x: (NCurses.maxx / 2).ceil, y: 0, height: 6, width: NCurses.maxx // 6, range: 0..3, title: "REGISTERS" do |line|
+        windows << Scroll.new x: (NCurses.maxx / 2).ceil, y: 0, height: 10, width: NCurses.maxx // 6, range: 0..7, title: "REGISTERS" do |line|
           case line
-          when 0         then "PC: 0x#{@vm.pc.to_w} R1: 0x#{@vm.registers[1].to_w}"
-          when .in? 1..3 then "R#{line * 2}: 0x#{@vm.registers[line * 2].to_w} R#{line * 2 + 1}: 0x#{@vm.registers[line * 2 + 1].to_w}"
+          when 0         then "PC: 0x#{@vm.pc.to_w}"
+          else "R#{line}: 0x#{@vm.registers[line].to_w}"
           end
         end
 
         windows << Table.new(
-          x: (NCurses.maxx / 6 * 4).ceil, y: 0, height: (NCurses.maxy / 2).floor, width: NCurses.maxx // 3,
-          columns: [3, 30], range: ((0)..(UInt16::MAX.to_i)), title: "STACK") do |address|
-          # Reading cause side effects in vm
-          # [(address == @vm.registers[7] ? ">" : " "),"0x#{address.to_u16.to_w}: 0x#{@vm.read(address.to_u16).to_w}"]
-          [(address == @vm.registers[7] ? ">" : " "), "0x#{address.to_u16.to_w}: 0x????"]
-        end.tap(&.scroll_end)
+          x: (NCurses.maxx / 6 * 4).ceil, y: 0, height: (NCurses.maxy).floor, width: NCurses.maxx // 6,
+          columns: [3, 16], range: ((0)..(UInt16::MAX.to_i)), title: "STACK") do |address|
+          [(address == @vm.registers[7] ? ">" : " "),"0x#{address.to_u16.to_w}: 0x#{@vm.read_noio(address.to_u16).try(&.to_w) || "?IO?"}"]
+        end.tap(&.center @section_stack_symbol_value)
 
-        windows << CustomWindow.new x: (NCurses.maxx / 2).ceil, y: (NCurses.maxy / 2).floor, height: (NCurses.maxy / 2).ceil, width: NCurses.maxx // 2, title: "TTY" do |window|
-          window.mvaddstr(@output.tap(&.rewind).gets_to_end, x: 1, y: 1)
-        end
+        #windows << CustomWindow.new x: (NCurses.maxx / 2).ceil, y: (NCurses.maxy / 2).floor, height: (NCurses.maxy / 2).ceil, width: NCurses.maxx // 2, title: "TTY" do |window|
+        #  window.mvaddstr(@output.tap(&.rewind).gets_to_end, x: 1, y: 1)
+        #end
 
         windows.first.focus = true
         loop do

@@ -156,6 +156,13 @@ class RiSC16::VM
     segment(address).read(address)
   end
 
+  def read_noio(address : Word) : Word?
+    seg = segment(address)
+    case seg
+    when Addressable::Rom, Addressable::Ram then seg.read(address)
+    end
+  end
+
   def write(address : Word, value : Word)
     segment(address).write(address, value)
   end

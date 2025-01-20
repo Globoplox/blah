@@ -22,32 +22,29 @@ struct Stacklang::ThreeAddressCode::Translator
   class Scope
     @previous : Scope?
     @entries = {} of String => {Local, Type}
-    @offset : Int32
 
     # Build a scope from a body of statements.
     def initialize(prev : Scope, statements : Array(AST::Statement), function : Stacklang::Function)
       @previous = prev
-      @offset = prev.offset
       statements.each do |statement|
         next unless statement.is_a? AST::Variable
         raise Exception.new "Redeclaration of variable #{statement.name}", statement, function if search(statement.name.name) != nil
         typeinfo = function.unit.typeinfo(statement.constraint)
         @entries[statement.name.name] = {
-          Local.new(Translator.next_uid, @offset, typeinfo.size.to_i, statement), 
+          Local.new(Translator.next_uid, 0, typeinfo.size.to_i, statement, restricted: statement.restricted), 
           typeinfo
         }
-        @offset += typeinfo.size.to_i
       end
     end
 
     # Build a scope from the root scope of a function including it's parameters only.
-    def initialize(function : Stacklang::Function , @offset)
+    def initialize(function : Stacklang::Function , offset)
       @previous = nil
       function.parameters.each do |parameter| 
         raise Exception.new "Parameter name conflict '#{parameter.name}'", parameter.ast, function if @entries[parameter.name]? != nil
         # Shadowing is allowed
-        @entries[parameter.name] = {Local.new(Translator.next_uid, @offset, parameter.constraint.size.to_i, parameter.ast, abi_expected: true), parameter.constraint}
-        @offset += parameter.constraint.size.to_i
+        @entries[parameter.name] = {Local.new(Translator.next_uid, 0, parameter.constraint.size.to_i, parameter.ast, abi_expected_stack_offset: offset), parameter.constraint}
+        offset += parameter.constraint.size.to_i
       end
     end
 
@@ -73,16 +70,16 @@ struct Stacklang::ThreeAddressCode::Translator
       {name, {Global.new(name, global.typeinfo.size.to_i, global.ast), global.typeinfo}}
     end.to_h
     offset = 0
-    # Local offset to store the return value if any
+    # Local offset to store the return value if any (at ABI enforced location)
     @return_value = @function.return_type.try do |typeinfo|
-      local = Local.new(Translator.next_uid, offset, typeinfo.size.to_i, @function.ast, abi_expected: true)
+      local = Local.new(Translator.next_uid, 0, typeinfo.size.to_i, @function.ast, abi_expected_stack_offset: offset)
       offset +=  typeinfo.size.to_i
       local
     end
-    # local offset used to store the return address
-    @return_address = Local.new(Translator.next_uid, offset, 1, @function.ast)
-    offset += 1
+    # Top Level var and parameters (parameters with ABI enforced location)
     @scope = Scope.new(Scope.new(@function, offset), @function.ast.body, @function)
+    # local offset used to store the return address
+    @return_address = Local.new(Translator.next_uid, 0, 1, @function.ast)
   end
 end
 

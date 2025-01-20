@@ -71,6 +71,11 @@ module RiSC16
       @line_cursor = (@line_cursor + 1).clamp(1, @height - 2)
     end
 
+    def center(n)
+      @content_cursor = n - @height // 2 + 1
+      @line_cursor = @height // 2
+    end
+
     def cursor
       @range.begin + @content_cursor + @line_cursor - 1
     end

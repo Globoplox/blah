@@ -19,6 +19,27 @@ class Stacklang::Function
   property ast : AST::Function
   property unit : Unit
 
+   # Check a block to ensure that it terminates.
+   def deep_check_termination(body)
+    return false if body.empty?
+    last = body[-1]
+    case last
+    when AST::Return then true
+    when AST::If, AST::While then deep_check_termination last.body
+    else false
+    end
+  end
+
+  def check_fix_termination
+    unless deep_check_termination @ast.body
+      if @return_type
+        raise "Function '#{name}'returning #{@return_type} does not always return"
+      else
+        @ast.body << AST::Return.new @ast.token, nil
+      end
+    end
+  end
+  
   def initialize(@ast, @unit)
     @name = @ast.name.name
     @symbol = "__function_#{name}"

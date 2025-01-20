@@ -21,9 +21,17 @@ struct Stacklang::ThreeAddressCode::Translator
         end
 
         if address.is_a? (Local)
-          address = Local.new address.uid, address.offset += field.offset.to_i, field.constraint.size.to_i, expression
+          address = Local.new address.uid, address.offset + field.offset.to_i, field.constraint.size.to_i, expression, restricted: address.restricted
+          {address, field.constraint}
+        elsif address.is_a? (Global)
+          address = Global.new address.name, field.constraint.size.to_i, expression, address.offset + field.offset.to_i
+          {address, field.constraint}
+        elsif address.is_a? (Anonymous)
+          address = Anonymous.new address.uid, field.constraint.size.to_i, address.offset + field.offset.to_i
           {address, field.constraint}
         else
+          # TODO:
+          #  NOT CORRECT, must dereference, add, re-reference. 
           t0 = anonymous field.constraint.size.to_i
           @tacs << Add.new address, Immediate.new(field.offset.to_i, expression.field), t0, expression
           {t0, field.constraint}
