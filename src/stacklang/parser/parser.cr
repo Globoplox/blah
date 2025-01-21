@@ -472,7 +472,8 @@ class Stacklang::Parser
         io << ":\n"
       end
       io << "Syntax Error"
-      token = context || @tokens[@index - 1]? || @tokens[@index]?
+      # TODO: fix it by making it explicitely passed as much as possile
+      token = context || @tokens[@index]? || @tokens[@index - 1]?
       if token
         io << " line "
         io << token.line

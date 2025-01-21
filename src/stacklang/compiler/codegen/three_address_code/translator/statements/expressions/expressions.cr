@@ -22,12 +22,12 @@ struct Stacklang::ThreeAddressCode::Translator
         else raise Exception.new "Unsupported unary operator '#{expression.name}'", expression, @function
         end      
       in AST::Binary
-      case expression.name
-      when "+" then translate_add expression
-      when "=" then translate_assignment expression
-      else raise Exception.new "Unsupported binary operator '#{expression.name}'", expression, @function
-      end      
-    in AST::Operator
+        case expression.name
+        when "+" then translate_add expression
+        when "=" then translate_assignment expression
+        else raise Exception.new "Unsupported binary operator '#{expression.name}'", expression, @function
+        end      
+      in AST::Operator
         raise "Unexpected AST Operator node type: #{expression.class.name}"
       end
     in AST::Expression

@@ -1,6 +1,9 @@
 require "../three_address_code"
 require "./assembly"
 
+# TODO
+# - test all &*/[] stuff !
+# TODO nice errors
 module Stacklang::Native
   # TODO: global initialization
   def self.generate_global_section(globals) : RiSC16::Object::Section
@@ -23,45 +26,6 @@ module Stacklang::Native
   end
 
   class Generator  
-    # GP registers => hosted
-    # Vars => Symbol OR stack offset
-    # Temporaries => hosted into registers
-    #                index in code of all usages (identify if they are live)
-    #                (added as they appear, removed when dead)
-    # 
-    # Register 0 is always free
-    # Temporaries hosted in register 0 are never spilled, and they have a size in stack of 0
-    #                  or even actually: temporaries only have a real stack offset
-    #                  when they are not being held by a register.
-    #                  ALSO: reaching a temporary stack offset higher than the immediate size could raise an error/warning
-    #                  ALSO: rollback the fact that all local var become *&a, and replace with a. Load / store is always instruction 
-    #                    (unless stack is too high, then its more optimal to cache the address, but it would likely be too high)
-    #                    but anyway it wont matter, when we assign like a[300] = 5, the lvalue is extracted.
-    #                    so even if we keep a = b + 1 as t0 = 1; t1 = b; t2 = t0 + t1.... 
-    # Special case for assigning literal 0 to constant temporary does that.
-
-    # Codes can be: constant (default to false), aliased (default to true)
-    # These would be figured out by optimizer. 
-    # Constant is used internaly by optimizer and here also to use reg0
-    # Aliased is used to avoid unexpectde behavior in optimizer and to force spilling.
-
-
-    # CODES TO ADD: 
-    # - function (start of function)
-    # - return
-    # - call & push (hum. How to handle the copy ?
-    # 
-    # Push: act as a literal in which the address of the param is written
-    #       like: t0 = Push  (push is going to be a unique label) the actual value will be given later  
-    # Call: spill all, move stack. It also define the symbol of the last PUSH value as a literal that correspond to
-    # the right offset to write the parameter to the stack.
-    # 
-    # Why ? the objective is to have the actual stack fluctuate with currentl live/dead temporaries
-    # 
-    # 
-
-    # IDEA: in object file relocation, allows ti include an offset. Thats one add call less in a lot of place
-
     enum Register : UInt16
       R0 = 0u16
       R1 = 1u16
@@ -98,10 +62,6 @@ module Stacklang::Native
     # Represents the stack at any time.
     # Item are added to the stack when they are used the first time
     # Item are removed from the stack when they are used the last time.
-    # 
-    # TODO: its fucked, index used as block index are invalid after a free/allocate that split/join blocks
-    # SOLUTION: return real offsets as index.
-    # 
     struct Stack
       alias Index = Int32
       @slots = [] of {ThreeAddressCode::Address | Int32, Int32} # {address | free size, real stack offset}
@@ -198,6 +158,10 @@ module Stacklang::Native
       property offsets : Hash(Int32, Register) = {} of Int32 => Register
 
       def live_in_register(for address) : Register?
+        if address.as?(ThreeAddressCode::Immediate).try(&.value.== 0)
+          return ZERO_REGISTER
+        end
+
         case address
         when ThreeAddressCode::Anonymous, ThreeAddressCode::Local, ThreeAddressCode::Global
           @offsets[address.offset]?
@@ -245,9 +209,6 @@ module Stacklang::Native
           # Common subexpression that dont read globals/aliased nodes/call return values
           # could be made reusable by optimizer as logn as the var they read
           # are not reassigned between usage. 
-          # 
-          # If it is larger than 1, it will always be spilled.
-          # This is true for local, globals and immediate too
 
         in ThreeAddressCode::Local
           if address.restricted || address.abi_expected_stack_offset != nil
@@ -271,9 +232,12 @@ module Stacklang::Native
           # It can be cached, but it is never spilled, and it is reloaded fully 
           # if reused and not cached. 
           @spillable = Spillable::Never
-          @offsets[0] = ZERO_REGISTER if address.value == 0
         end
       end
+    end
+
+    def overflow_immediate_offset?(value)
+      value > 0x3F || value < -0x40
     end
 
     # List the address referenced by a code.
@@ -286,31 +250,52 @@ module Stacklang::Native
       in ThreeAddressCode::Call then code.parameters + [code.address, code.into].compact
       in ThreeAddressCode::Start then {code.address}
       in ThreeAddressCode::Return then {code.address}
+      in ThreeAddressCode::Store then {code.address, code.value}
+      in ThreeAddressCode::Load then {code.address, code.into}
       end
     end
 
-    # # TODO: not redone, must be corrected
-    # # Load address without attempt at being smart.
-    # # Load ADDRESS, not value.
-    # # Used for lvalues ?
-    # def load_raw_address(address : ThreeAddressCode::Address, into : Register)
-    #   raise "Cannot load wide address into register" if address.size > 1
-    #   case address
-    #   in ThreeAddressCode::Local, ThreeAddressCode::Anonymous
-    #     stack_offset = @stack.offset_at @addresses[root_id address].spilled_at || raise "Local has not been alocated yet #{address}" 
-    #     load_immediate into, -stack_offset
-    #     add into, Register::R7, into
+    # Load ADDRESS, not values.
+    def load_raw_address(address : ThreeAddressCode::Address, into : Register)
+      case address
+      in ThreeAddressCode::Local
+        # If no stack address yet, give it one.
+        # Note that the address will be valid but extra step may be required before reading/writing at the required address
+        # as "address" may be cached. If so, Reading wont read the right value and Writing may be overwritten with previous value.
+        meta = @addresses[root_id address]
+        pp "Address #{address} address must be known but it does not have a stack index"
+        stack_allocate address
+        stack_offset = @stack.offset_at meta.spilled_at.not_nil!
+        stack_offset += address.offset
+        if !overflow_immediate_offset? stack_offset
+          addi into, Register::R7, stack_offset
+        else
+          load_immediate into, stack_offset
+          add into, Register::R7, into
+        end
       
-    #   in ThreeAddressCode::Global
-    #     movi into, address.name
+      in ThreeAddressCode::Global
+        movi into, address.name
+        if address.offset != 0
+          if !overflow_immediate_offset? address.offset
+            addi into, into, address.offset
+          else
+            load_immediate FILL_SPILL_REGISTER, address.offset
+            add into, into, FILL_SPILL_REGISTER
+          end
+        end
       
-    #   in ThreeAddressCode::Immediate
-    #     movi into, address.value
+      in ThreeAddressCode::Function
+        movi into, address.name
 
-    #   in ThreeAddressCode::Function
-    #     movi into, address.name
-    #   end
-    # end
+      in ThreeAddressCode::Immediate
+        raise "Cannot evaluate address of immediate value #{address}"
+      
+      in ThreeAddressCode::Anonymous
+        raise "Cannot evaluate address of temporary value #{address}"
+
+      end
+    end
 
     def load(address : ThreeAddressCode::Address, avoid : Indedxable(Register)? = nil) : Register
       pp "LOAD #{address}"
@@ -323,10 +308,10 @@ module Stacklang::Native
 
         stack_offset = @stack.offset_at meta.spilled_at || raise "Local has not been allocated yet #{address}" 
         stack_offset += address.offset
-        if stack_offset < 0x39
-          lw into, Register::R7, -stack_offset
+        if !overflow_immediate_offset? stack_offset
+          lw into, Register::R7, stack_offset
         else
-          load_immediate into, -stack_offset
+          load_immediate into, stack_offset
           add into, Register::R7, into
           lw into, into, 0
         end
@@ -335,10 +320,10 @@ module Stacklang::Native
         movi into, address.name
         offset = 0
         if address.offset != 0
-          if address.offset < 0x39
-            offset = -address.offset
+          if !overflow_immediate_offset? address.offset
+            offset = address.offset
           else
-            load_immediate FILL_SPILL_REGISTER, -address.offset
+            load_immediate FILL_SPILL_REGISTER, address.offset
             add into, into, FILL_SPILL_REGISTER
           end
         end
@@ -346,6 +331,7 @@ module Stacklang::Native
 
       in ThreeAddressCode::Immediate
         movi into, address.value
+
       in ThreeAddressCode::Function
         movi into, address.name
       end
@@ -378,12 +364,12 @@ module Stacklang::Native
             stack_offset += address.offset
           end
 
-          if stack_offset < 0x39
-            sw register, Register::R7, -stack_offset
+          if !overflow_immediate_offset? stack_offset
+            sw register, Register::R7, stack_offset
           else
             # TODO: couldn't we only load the upper part of -stack_offset, and use the lower part in the sw offset ?
             # This could make movi one instruction lighter
-            load_immediate FILL_SPILL_REGISTER, -stack_offset
+            load_immediate FILL_SPILL_REGISTER, stack_offset
             add FILL_SPILL_REGISTER, STACK_REGISTER, FILL_SPILL_REGISTER
             sw register, FILL_SPILL_REGISTER, 0
           end
@@ -392,6 +378,44 @@ module Stacklang::Native
 
       meta.set_live_in_register for: address, register: nil
       @registers[register] = nil
+    end
+
+    # Unload all address related to a specific local variable.
+    # This is usefull when there is aliasing of this variable.
+    # Attempt to do so efficiently and using only the FILL_SPILL_REGISTER.
+    def unload_all_offset(address : ThreeAddressCode::Local)
+      meta = @addresses[root_id address]
+      return if meta.offsets.empty?
+      return if meta.spilled_at.nil?
+
+      stack_offset = @stack.offset_at meta.spilled_at.not_nil!
+
+      current_value = nil
+      meta.offsets.to_a.sort_by(&.[0]).each do |(value_offset, register)|
+        if !overflow_immediate_offset?(stack_offset + value_offset)
+          sw register, STACK_REGISTER, stack_offset + value_offset
+        else
+          if current_value.nil?
+            current_value = stack_offset + value_offset
+            load_immediate FILL_SPILL_REGISTER, current_value
+            add FILL_SPILL_REGISTER, STACK_REGISTER, FILL_SPILL_REGISTER
+            sw register, FILL_SPILL_REGISTER, 0
+          else
+            diff = (stack_offset + value_offset) - current_value
+            if !overflow_immediate_offset? diff
+              sw register, FILL_SPILL_REGISTER, diff
+            else
+              current_value = stack_offset + value_offset
+              load_immediate FILL_SPILL_REGISTER, current_value
+              add FILL_SPILL_REGISTER, STACK_REGISTER, FILL_SPILL_REGISTER
+              sw register, FILL_SPILL_REGISTER, 0
+            end
+          end
+        end
+        @registers[register] = nil
+      end
+     
+      meta.offsets.clear
     end
 
     # In the non free register other than avoid, 
@@ -489,6 +513,15 @@ module Stacklang::Native
       end
     end
 
+    # Make an address restricted.
+    def restrict(address : ThreeAddressCode::Local)
+      pp "RESTRICTING #{address}"
+      meta = @addresses[root_id address]
+      return if meta.spillable.always?
+      meta.spillable = Metadata::Spillable::Always
+      unload_all_offset address
+    end
+
     def compile_move(code : ThreeAddressCode::Move)
       # This is the BIG one
       if code.address.size != code.into.size
@@ -512,10 +545,39 @@ module Stacklang::Native
           add into, right, ZERO_REGISTER
         end
 
-
         clear({code.address}, {code.into})
       else 
+        # TODO
         raise "Multi word move is unsupported yet"
+      end
+    end
+
+    def compile_load(code : ThreeAddressCode::Load)
+      if code.address.size != code.into.size
+        raise "Size mismatch in load #{code}"
+      elsif code.into.size == 1
+        address = load code.address
+        into = grab_for code.into
+        lw into, address, 0
+        clear(read: {code.address}, written: {code.into})
+      else
+        # TODO
+        # must get the address of into, so intead of grab_for into, we use R6 and put the address in it (fail for Immediate address)
+        raise "Multi word load is unsupported yet"
+      end
+    end
+
+    def compile_store(code : ThreeAddressCode::Store)
+      if code.address.size != code.value.size
+        raise "Size mismatch in store #{code}"
+      elsif code.value.size == 1
+        address = load code.address
+        value = load code.value
+        sw value, address, 0
+        clear(read: {code.address, code.value}, written: Tuple().new)
+      else 
+        # TODO
+        raise "Multi word store is unsupported yet"
       end
     end
 
@@ -528,6 +590,27 @@ module Stacklang::Native
       clear(read: {code.left, code.right}, written: {code.into})
     end
 
+    def compile_nand(code : ThreeAddressCode::Nand)
+      raise "Bad operand size for value in nand: #{code}" if code.into.size > 1 || code.left.size > 1 || code.right.size > 1
+      left = load code.left
+      right = load code.right
+      into = grab_for code.into
+      add into, left, right
+      clear(read: {code.left, code.right}, written: {code.into})
+    end
+
+    def compile_ref(code : ThreeAddressCode::Reference)
+      raise "Bad operand size for value in ref: #{code}" if code.address.size > 1 || code.into.size > 1
+      into = grab_for code.into
+      load_raw_address code.address, into
+      # If we took the address of a local variable, consider that it is unsafe to keep cache of it
+      # or of any of it fields as their memory location might now be accessed in other ways.
+      if local = code.address.as?(ThreeAddressCode::Local)
+        restrict local
+      end
+      clear(read: Tuple().new, written: {code.into})
+    end
+    
     # NOTE: if all generla purposes register are hosting values that need an extra register to be spilled,
     # this will fail to spill R6.
     # TODO: remove the start TAC and make it implicit, would be cleaner
@@ -541,8 +624,6 @@ module Stacklang::Native
 
     def compile_return(code : ThreeAddressCode::Return)
       meta = @addresses[root_id code.address]
-      pp meta
-
       jump_address_register = load code.address
       jalr Register::R0, jump_address_register
     end
@@ -550,8 +631,10 @@ module Stacklang::Native
     def compile_code(code : ThreeAddressCode::Code)
       case code
       in ThreeAddressCode::Add then compile_add code
-      in ThreeAddressCode::Nand then raise "Unsupported yet"
-      in ThreeAddressCode::Reference then raise "Unsupported yet"
+      in ThreeAddressCode::Nand then compile_nand code
+      in ThreeAddressCode::Load then compile_load code
+      in ThreeAddressCode::Store then compile_store code
+      in ThreeAddressCode::Reference then compile_ref code
       in ThreeAddressCode::Move then compile_move code
       in ThreeAddressCode::Call then raise "Unsupported yet"
       in ThreeAddressCode::Return then compile_return code
@@ -587,13 +670,11 @@ module Stacklang::Native
       meta.spilled_at = @stack.allocate address
 
       pp "ALLOCATED AT #{meta.spilled_at}"
-
     end
 
     # Helper func that ensure state is coherent
     def stack_free(address)
       pp "FREEING #{address} FROM STACK"
-
 
       meta = @addresses[root_id address]
       raise "Already free #{address} #{meta}" unless meta.spilled_at

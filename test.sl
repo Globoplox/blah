@@ -18,7 +18,7 @@ fun main:_ {
   return a
 }*/
 
-// Works well and is pretty smart about reusing literal values and rotating registers
+/* Works well and is pretty smart about reusing literal values and rotating registers */
 fun main:_ {
   return 1 + 1 + 1 + 1 + 1 +1 +1 +1 +1 +2 +3 +4 +5 +6 +1 +6
 }
