@@ -469,12 +469,14 @@ module Stacklang::Native
     end
 
     def clear(read, written)
-      addresses = read.map { |a| {a, false} } + written.map { |a| {a, true} }
+      addresses = written.map { |a| {a, true} } + read.map { |a| {a, false} }
+      
       pp "CLEAR: #{addresses.map(&.[0]).join ", "}"
 
       addresses.each do |(address, written)|
         id = root_id address
-        meta = @addresses[id]
+        meta = @addresses[id]?
+        next unless meta # Happen if the address has already been cleared, like if it is read twice
 
         # If it has been wrote and must be spilled, spill it
         if written && meta.spillable.always?
@@ -523,6 +525,13 @@ module Stacklang::Native
     end
 
     def compile_move(code : ThreeAddressCode::Move)
+      source_meta = @addresses[root_id code.address]
+      into_meta =  @addresses[root_id code.into]
+
+      if into_meta.spillable.never?
+        raise "Cannot move to unspillable address #{code.into}, not a valid LValue"
+      end
+
       # This is the BIG one
       if code.address.size != code.into.size
         raise "Size mismatch in allocation #{code}"
@@ -533,10 +542,8 @@ module Stacklang::Native
         # If source is spillable never or spillable always, it is safe to steal the cache 
         # because it wont be used and will be deleted anyway
         # If source is spillable yes but will not be used after this, it is safe to steal the cache 
-        source_meta = @addresses[root_id code.address]
         if source_meta.spillable.never?  || source_meta.spillable.always? || source_meta.used_at.max <= @index          
           source_meta.set_live_in_register for: code.address, register: nil
-          into_meta =  @addresses[root_id code.into]
           into_meta.set_live_in_register for: code.into, register: right
           @registers[right] = code.into
         # Standard way, grab and copy
@@ -595,7 +602,7 @@ module Stacklang::Native
       left = load code.left
       right = load code.right
       into = grab_for code.into
-      add into, left, right
+      nand into, left, right
       clear(read: {code.left, code.right}, written: {code.into})
     end
 

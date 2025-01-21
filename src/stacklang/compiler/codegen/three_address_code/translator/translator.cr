@@ -67,7 +67,7 @@ struct Stacklang::ThreeAddressCode::Translator
 
   def initialize(@function)
     @globals = @function.unit.globals.map do |(name, global)|
-      {name, {Global.new(name, global.typeinfo.size.to_i, global.ast), global.typeinfo}}
+      {name, {Global.new(global.symbol, global.typeinfo.size.to_i, global.ast), global.typeinfo}}
     end.to_h
     offset = 0
     # Local offset to store the return value if any (at ABI enforced location)

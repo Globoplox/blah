@@ -2,13 +2,21 @@ struct Stacklang::ThreeAddressCode::Translator
   def translate_lvalue(expression : AST::Expression) : {Address, Type}
     case expression
     when AST::Identifier
+      t0 = anonymous 1
+
       local = @scope.search(expression.name)
       if local
         address, typeinfo = local 
-        return {address, typeinfo}
+        @tacs << Reference.new address, t0, expression
+        return {t0, Type::Pointer.new typeinfo}
       end
 
-      @globals[expression.name]? || raise Exception.new "Identifier #{expression.name} not found in scope", expression, @function
+      global = @globals[expression.name]?
+      global || raise Exception.new "Identifier #{expression.name} not found in scope", expression, @function
+      address, typeinfo = global 
+      @tacs << Reference.new address, t0, expression
+      return {t0, Type::Pointer.new typeinfo}
+      
     when AST::Access
       
       address, typeinfo = translate_lvalue expression.operand
@@ -32,6 +40,7 @@ struct Stacklang::ThreeAddressCode::Translator
         else
           # TODO:
           #  NOT CORRECT, must dereference, add, re-reference. 
+          # TODO: nonsense, not allowed, remove
           t0 = anonymous field.constraint.size.to_i
           @tacs << Add.new address, Immediate.new(field.offset.to_i, expression.field), t0, expression
           {t0, field.constraint}
@@ -41,6 +50,7 @@ struct Stacklang::ThreeAddressCode::Translator
     when AST::Unary
       case expression.name
       when "*"
+        # TODO nonsense ?
         
         target = translate_expression expression.operand
         unless target
