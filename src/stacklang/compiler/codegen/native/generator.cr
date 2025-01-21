@@ -66,7 +66,6 @@ module Stacklang::Native
       @slots = [] of {ThreeAddressCode::Address | Int32, Int32} # {address | free size, real stack offset}
 
       def to_s(io)
-        io.puts "STACK:"
         @slots.each_with_index do |(entry, offset), index|
           case entry
           in ThreeAddressCode::Address then io.puts "Slot #{index}: #{entry} (real stack offset: #{offset})"
@@ -77,8 +76,6 @@ module Stacklang::Native
       
       # Legacy stuff, TODO remove it and its usage
       def offset_at(index : Index) : Int32
-        puts self
-        pp index
         #@slots[index][1]
         index
       end
@@ -559,7 +556,10 @@ module Stacklang::Native
         # If source is spillable never or spillable always, it is safe to steal the cache 
         # because it wont be used and will be deleted anyway
         # If source is spillable yes but will not be used after this, it is safe to steal the cache 
-        if source_meta.spillable.never?  || source_meta.spillable.always? || source_meta.used_at.max <= @index          
+
+        # If source is spillable never it's safe to steal the cache, but this may be detrimental if the value is reused
+        # in which case, it's better to take a new register and let future grab_free decide on which is best to unload
+        if source_meta.spillable.always? || source_meta.used_at.max <= @index    
           source_meta.set_live_in_register for: code.address, register: nil
           into_meta.set_live_in_register for: code.into, register: right
           @registers[right] = code.into
@@ -675,7 +675,6 @@ module Stacklang::Native
         compile_code code
       end
 
-      pp @text
       @section.text = Slice(UInt16).new @text.to_unsafe, @text.size
 
       @section

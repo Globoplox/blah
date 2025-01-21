@@ -80,7 +80,6 @@ class Stacklang::Native::Generator
         value = (immediate < 0 ? (2 ** bits) + immediate.bits(0...(bits - 1)) : immediate).to_u16
         value = value >> 6 if kind.lui?
         value = value & 0x3fu16 if kind.lli?
-        pp "ASSEMBLING IMMEDIATE #{immediate.to_s base: 16} (#{kind}) => #{value.to_s base: 2}"
         value
       end
     end
