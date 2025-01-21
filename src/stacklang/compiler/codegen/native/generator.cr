@@ -1,9 +1,8 @@
 require "../three_address_code"
 require "./assembly"
 
-# TODO
-# - test all &*/[] stuff !
-# TODO nice errors
+# TODO: nice errors
+# TODO: creating immediate address hosting global / function address, so they can be hosted in registers 
 module Stacklang::Native
   # TODO: global initialization
   def self.generate_global_section(globals) : RiSC16::Object::Section
@@ -306,7 +305,7 @@ module Stacklang::Native
       case address
       in ThreeAddressCode::Local, ThreeAddressCode::Anonymous
 
-        stack_offset = @stack.offset_at meta.spilled_at || raise "Local has not been allocated yet #{address}" 
+        stack_offset = @stack.offset_at meta.spilled_at || raise "Local has not been allocated yet #{address}. This may happen when accessin uninitialized variales." 
         stack_offset += address.offset
         if !overflow_immediate_offset? stack_offset
           lw into, Register::R7, stack_offset
@@ -343,8 +342,6 @@ module Stacklang::Native
 
     # Spill if needed/desirable
     # Clean register/var from being in use
-    # TODO this only work for local/anonymous values, it does not handle acutally unloading globals bak to ram 
-    #      But it should
     def unload(address)
       pp "UNLOAD #{address}"
       meta = @addresses[root_id address]
@@ -353,25 +350,41 @@ module Stacklang::Native
       
       case meta.spillable
       when Metadata::Spillable::Always, Metadata::Spillable::Yes
-        if meta.spilled_at.nil?
-          pp "Address #{address} must be spilled but does not have a stack index"
-          stack_allocate address
-        end
-
-        meta.spilled_at.try do |spill_index|
-          stack_offset = @stack.offset_at spill_index
-          if address.is_a?(ThreeAddressCode::Local) || address.is_a?(ThreeAddressCode::Global) || address.is_a?(ThreeAddressCode::Anonymous)
-            stack_offset += address.offset
+        case address
+        when ThreeAddressCode::Global
+          if !overflow_immediate_offset? address.offset
+            load_immediate FILL_SPILL_REGISTER, address.name
+            sw register, FILL_SPILL_REGISTER, address.offset
+          else
+            # We need to load the address AND another immediate, while keeping the value
+            # So we need an additional register
+            offset = grab_free avoid: [register]
+            load_immediate FILL_SPILL_REGISTER, address.name
+            add FILL_SPILL_REGISTER, FILL_SPILL_REGISTER, offset
+            sw register, FILL_SPILL_REGISTER, address.offset
           end
 
-          if !overflow_immediate_offset? stack_offset
-            sw register, Register::R7, stack_offset
-          else
-            # TODO: couldn't we only load the upper part of -stack_offset, and use the lower part in the sw offset ?
-            # This could make movi one instruction lighter
-            load_immediate FILL_SPILL_REGISTER, stack_offset
-            add FILL_SPILL_REGISTER, STACK_REGISTER, FILL_SPILL_REGISTER
-            sw register, FILL_SPILL_REGISTER, 0
+        else
+          if meta.spilled_at.nil?
+            pp "Address #{address} must be spilled but does not have a stack index"
+            stack_allocate address
+          end
+
+          meta.spilled_at.try do |spill_index|
+            stack_offset = @stack.offset_at spill_index
+            if address.is_a?(ThreeAddressCode::Local) || address.is_a?(ThreeAddressCode::Global) || address.is_a?(ThreeAddressCode::Anonymous)
+              stack_offset += address.offset
+            end
+
+            if !overflow_immediate_offset? stack_offset
+              sw register, Register::R7, stack_offset
+            else
+              # TODO: couldn't we only load the upper part of -stack_offset, and use the lower part in the sw offset ?
+              # This could make movi one instruction lighter
+              load_immediate FILL_SPILL_REGISTER, stack_offset
+              add FILL_SPILL_REGISTER, STACK_REGISTER, FILL_SPILL_REGISTER
+              sw register, FILL_SPILL_REGISTER, 0
+            end
           end
         end
       end
@@ -434,6 +447,8 @@ module Stacklang::Native
         return register unless took_for
 
         # Else find the one which is the less likely to be used soon
+        pp "GRAB FREE TOOK FOR #{took_for}"
+        pp "ALL USED: #{@registers.values.compact.map(&.to_s).join "," }"
         meta = @addresses[root_id took_for]
         next_usage = meta.used_at.select { |index| index >= @index }.min
         distance = next_usage - @index
@@ -503,11 +518,13 @@ module Stacklang::Native
             meta.spilled_at = nil
           end
 
+          # Since the used_at is uid wide, if we can delete the id, all register hosting any offset
+          # must be freed, not just the offset that triggered the clear (the last used offset)
           # free register
-          meta.live_in_register(for: address).try do |register|
+          meta.offsets.each do |(_, register)|
             @registers[register] = nil
-            meta.set_live_in_register for: address, register: nil
           end
+          meta.offsets.clear # just in case
           
           # Remove from the addresses list
           @addresses.delete id
@@ -607,7 +624,7 @@ module Stacklang::Native
     end
 
     def compile_ref(code : ThreeAddressCode::Reference)
-      raise "Bad operand size for value in ref: #{code}" if code.address.size > 1 || code.into.size > 1
+      raise "Bad operand size for value in ref: #{code}" if code.into.size > 1
       into = grab_for code.into
       load_raw_address code.address, into
       # If we took the address of a local variable, consider that it is unsafe to keep cache of it

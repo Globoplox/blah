@@ -7,11 +7,12 @@
   - dereferenced assignement (*a = b)
 
   To check: 
-  - unloading globals
   - struct field access and lvalues (and cache coherence)
 */
 
 var glob
+
+struct Stuff { foo bar }
 
 /* 
   Works well and is pretty smart about reusing literal values and rotating registers 
@@ -27,8 +28,9 @@ var glob
   allocated memory location value having changed
 */
 fun main:_ {
-  var a
-  var b:* = &a
-  *b = 0x0FF0
-  return a
+  var a:Stuff
+  *&a.bar = 0x7878
+
+  /* *(&(a.bar)) = 0x7878 */
+  return a.bar
 }

@@ -1,4 +1,5 @@
 struct Stacklang::ThreeAddressCode::Translator
+  
   def translate_lvalue(expression : AST::Expression) : {Address, Type}
     case expression
     when AST::Identifier
@@ -18,8 +19,14 @@ struct Stacklang::ThreeAddressCode::Translator
       return {t0, Type::Pointer.new typeinfo}
       
     when AST::Access
+      # TODO maybe:
+      # instead of, Ref then Add, 
+      # We can actually produce the offset address (local, global, whatever) and make a ref of it.
+
       
       address, typeinfo = translate_lvalue expression.operand
+      typeinfo = typeinfo.pointer_of
+
       unless typeinfo.is_a? Type::Struct
         raise Exception.new "Cannot access field #{expression.field.name} of type #{typeinfo}", expression, @function
       else
@@ -28,30 +35,14 @@ struct Stacklang::ThreeAddressCode::Translator
           raise Exception.new "No field named #{expression.field.name} in structure #{typeinfo}", expression, @function
         end
 
-        if address.is_a? (Local)
-          address = Local.new address.uid, address.offset + field.offset.to_i, field.constraint.size.to_i, expression, restricted: address.restricted
-          {address, field.constraint}
-        elsif address.is_a? (Global)
-          address = Global.new address.name, field.constraint.size.to_i, expression, address.offset + field.offset.to_i
-          {address, field.constraint}
-        elsif address.is_a? (Anonymous)
-          address = Anonymous.new address.uid, field.constraint.size.to_i, address.offset + field.offset.to_i
-          {address, field.constraint}
-        else
-          # TODO:
-          #  NOT CORRECT, must dereference, add, re-reference. 
-          # TODO: nonsense, not allowed, remove
-          t0 = anonymous field.constraint.size.to_i
-          @tacs << Add.new address, Immediate.new(field.offset.to_i, expression.field), t0, expression
-          {t0, field.constraint}
-        end
+        t0 = anonymous 1
+        @tacs << Add.new address, Immediate.new(field.offset.to_i,  expression), t0, expression
+        {t0, Type::Pointer.new field.constraint}
       end
       
     when AST::Unary
       case expression.name
-      when "*"
-        # TODO nonsense ?
-        
+      when "*"        
         target = translate_expression expression.operand
         unless target
           raise Exception.new "Expression has no type", expression.operand, @function
