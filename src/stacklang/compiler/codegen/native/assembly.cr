@@ -10,9 +10,9 @@ class Stacklang::Native::Generator
     value > 0x3F || value < -0x40
   end
 
-  def load_immediate(into : Register, imm : Int32 | String)
+  def load_immediate(into : Register, imm : Int32 | String, offset = 0)
     case imm
-    in String then movi into, imm
+    in String then movi into, imm, offset
     in Int32
       if !overflow_immediate_offset? imm
         addi into, into, imm
@@ -32,17 +32,17 @@ class Stacklang::Native::Generator
     @text << Instruction.new(ISA::Nand, a.value, b.value, c.value).encode
   end
 
-  def lui(a : Register, imm : Int32 | String)
-    @text << Instruction.new(ISA::Lui, a.value, immediate: assemble_immediate imm, Kind::Lui).encode
+  def lui(a : Register, imm : Int32 | String, offset = 0)
+    @text << Instruction.new(ISA::Lui, a.value, immediate: assemble_immediate imm, Kind::Lui, offset).encode
   end
 
-  def lli(a : Register, imm : Int32 | String)
-    @text << Instruction.new(ISA::Addi, a.value, a.value, immediate: assemble_immediate imm, Kind::Lli).encode
+  def lli(a : Register, imm : Int32 | String, offset = 0)
+    @text << Instruction.new(ISA::Addi, a.value, a.value, immediate: assemble_immediate imm, Kind::Lli, offset).encode
   end
 
-  def movi(a : Register, imm : Int32 | String)
-    lui a, imm
-    lli a, imm
+  def movi(a : Register, imm : Int32 | String, offset = 0)
+    lui a, imm, offset
+    lli a, imm, offset
   end
 
   def addi(a : Register, b : Register, imm : Int32 | String)
@@ -67,10 +67,10 @@ class Stacklang::Native::Generator
 
   # Helper function for assembling immediate value.
   # It provide a value for the immediate, or store the reference for linking if the value is a symbol.
-  def assemble_immediate(immediate : Int32 | String, kind : Kind)
+  def assemble_immediate(immediate : Int32 | String, kind : Kind, offset = 0)
     if immediate.is_a? String
       references = @section.references[immediate] ||= [] of RiSC16::Object::Section::Reference
-      references << RiSC16::Object::Section::Reference.new @text.size.to_u16, 0, kind
+      references << RiSC16::Object::Section::Reference.new @text.size.to_u16, offset, kind
       0u16
     else
       immediate = immediate.as?(Int32).not_nil!

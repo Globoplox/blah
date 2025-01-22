@@ -322,15 +322,7 @@ module Stacklang::Native
         end
       
       in ThreeAddressCode::Global
-      load_immediate into, address.name
-        if address.offset != 0
-          if !overflow_immediate_offset? address.offset
-            addi into, into, address.offset
-          else
-            load_immediate FILL_SPILL_REGISTER, address.offset
-            add into, into, FILL_SPILL_REGISTER
-          end
-        end
+        load_immediate into, address.name, address.offset
       
       in ThreeAddressCode::Function
       load_immediate into, address.name
@@ -364,17 +356,8 @@ module Stacklang::Native
         end
 
       in ThreeAddressCode::Global
-        load_immediate into, address.name
-        offset = 0
-        if address.offset != 0
-          if !overflow_immediate_offset? address.offset
-            offset = address.offset
-          else
-            load_immediate FILL_SPILL_REGISTER, address.offset
-            add into, into, FILL_SPILL_REGISTER
-          end
-        end
-        lw into, into, offset
+        load_immediate into, address.name, address.offset
+        lw into, into, 0
 
       in ThreeAddressCode::Immediate
         load_immediate into, address.value
@@ -400,17 +383,8 @@ module Stacklang::Native
       when Metadata::Spillable::Always, Metadata::Spillable::Yes
         case address
         when ThreeAddressCode::Global
-          if !overflow_immediate_offset? address.offset
-            load_immediate FILL_SPILL_REGISTER, address.name
-            sw register, FILL_SPILL_REGISTER, address.offset
-          else
-            # We need to load the address AND another immediate, while keeping the value
-            # So we need an additional register
-            offset = grab_free avoid: [register]
-            load_immediate FILL_SPILL_REGISTER, address.name
-            add FILL_SPILL_REGISTER, FILL_SPILL_REGISTER, offset
-            sw register, FILL_SPILL_REGISTER, address.offset
-          end
+          load_immediate FILL_SPILL_REGISTER, address.name, address.offset
+          sw register, FILL_SPILL_REGISTER, 0
 
         else
           if meta.spilled_at.nil?

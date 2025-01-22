@@ -17,14 +17,13 @@
   - All non-word sized address handling
 */
 
-var glob
+struct Test { foo bar baz }
 
-fun foo(ptr:*, a, b, c, d, e, f, g, h, i, j) {
-  *ptr = a + b + c + d + e + f + g + h + i + j
-}
+var glob: Test
 
 fun main:_ {
-  var a
-  foo(&a, 1, 1, 1, 1, 5, 1, 1, 1, 1, 1)
-  return a
+  glob.foo = 0x0FF0
+  glob.baz = glob.foo
+  glob.bar = 0x1111
+  return glob.baz
 }

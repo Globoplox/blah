@@ -43,7 +43,14 @@ module RiSC16
         object.sections.each do |section|
           section.references.each do |(name, locations)|
             locations.each do |location|
-              @references[location.address + section.absolute.not_nil!] = name # assuming we are debugging a binary loaded at 0
+              local_name = name#.gsub("__function_", "").gsub("__global_", "")
+               if location.offset != 0
+                 if location.offset > 0
+                   local_name += "+" 
+                 end
+                 local_name += "#{location.offset}"
+               end
+              @references[location.address + section.absolute.not_nil!] = local_name # assuming we are debugging a binary loaded at 0
             end
           end
         end
@@ -104,7 +111,6 @@ module RiSC16
           columns: [8, 3, 20, 8, rem], title: "CODE",
           range: (0..((UInt16::MAX).to_i))
         ) do |address|
-          labels = "" # (@locs[address]?.try(&.map &.label).try &.compact.join ", ") || " "
           word = @vm.read address.to_u16
           dis = disassemble word, address
           dis = dis.ljust rem - 2
