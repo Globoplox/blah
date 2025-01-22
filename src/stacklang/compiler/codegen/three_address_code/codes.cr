@@ -194,21 +194,14 @@ module Stacklang::ThreeAddressCode
     end
   end
 
-  # Spill all (but load address if already loaded)
-  # Copy parameters
-  # Set load address as NOT cached (but no need to spill)
-  # load address
-  # Move stack
-  # Jump
-  # Move stack back
-  # If needed, copy return value
   struct Call
     property address : Address
     property into : Address?
-    property parameters : Array(Address)
+    property return_value_offset : Int32?
+    property parameters : Array({Address, Int32})
     property ast : AST
 
-    def initialize(@address, @into, @parameters, @ast)
+    def initialize(@address, @into, @parameters, @ast, @return_value_offset)
     end
 
     def to_s(io)

@@ -9,7 +9,7 @@ struct Stacklang::ThreeAddressCode::Translator
       raise Exception.new "Function #{expression.name} require #{called_function.parameters.size} parameters but has been given #{expression.parameters.size} parameters", expression, @function
     end
 
-    parameters = expression.parameters.zip(called_function.parameters).map do |parameter, definition|
+    parameters_and_offsets = expression.parameters.zip(called_function.parameters).map do |parameter, definition|
       target = translate_expression parameter
       unless target
         raise Exception.new "Expression has no type", parameter, @function
@@ -18,12 +18,13 @@ struct Stacklang::ThreeAddressCode::Translator
       if actual_typeinfo != definition.constraint
         raise Exception.new "Parameter #{definition.name} of #{expression.name} should be #{definition.constraint} but is a #{actual_typeinfo}", expression, @function
       end
-      address
+      
+      {address, definition.offset}
     end
 
-    function_address = Function.new expression.name.name, expression
+    function_address = Function.new called_function.symbol, expression
     into = called_function.return_type.try { |typeinfo| {anonymous(typeinfo.size.to_i), typeinfo} }
-    @tacs << Call.new function_address, into.try(&.[0]), parameters, expression
+    @tacs << Call.new function_address, into.try(&.[0]), parameters_and_offsets, expression, called_function.return_value_offset
     into
   end
 end

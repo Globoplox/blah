@@ -1,28 +1,30 @@
 /*
   Tested:
-  - additions (a + b + 6 + 7 + 7)
-  - binary not (~0x0FF0, ~a)
-  - reference of simple local or gloal identifier (&a, &glob)
-  - dereference (*&b)
-  - dereferenced assignement (*a = b)
+  - additions
+  - binary not
+  - reference of simple local or gloal identifier
+  - dereferencement
+  - dereferenced assignement
   - struct field access
   - assignement, chained assignements
+  - call with return value and parameters
   TODO:
   - All binary operators: & | ^ && || == != - < > <= >=
   - Sugar assignments
-  - call
   - binary to call
   - table access
   - Conditional statement
+  - All non-word sized address handling
 */
 
 var glob
 
+fun foo(ptr:*, a, b, c, d, e, f, g, h, i, j) {
+  *ptr = a + b + c + d + e + f + g + h + i + j
+}
+
 fun main:_ {
   var a
-  var b
-  var c
-  var d
-  a = b = c = d = 0x5643
-  return c
+  foo(&a, 1, 1, 1, 1, 5, 1, 1, 1, 1, 1)
+  return a
 }

@@ -38,13 +38,12 @@ struct Stacklang::ThreeAddressCode::Translator
     end
 
     # Build a scope from the root scope of a function including it's parameters only.
-    def initialize(function : Stacklang::Function , offset)
+    def initialize(function : Stacklang::Function)
       @previous = nil
       function.parameters.each do |parameter| 
         raise Exception.new "Parameter name conflict '#{parameter.name}'", parameter.ast, function if @entries[parameter.name]? != nil
         # Shadowing is allowed
-        @entries[parameter.name] = {Local.new(Translator.next_uid, 0, parameter.constraint.size.to_i, parameter.ast, abi_expected_stack_offset: offset), parameter.constraint}
-        offset += parameter.constraint.size.to_i
+        @entries[parameter.name] = {Local.new(Translator.next_uid, 0, parameter.constraint.size.to_i, parameter.ast, abi_expected_stack_offset: parameter.offset), parameter.constraint}
       end
     end
 
@@ -56,7 +55,7 @@ struct Stacklang::ThreeAddressCode::Translator
       @previous
     end
 
-    def offset : Int32
+    def offset : Int32q
       @offset
     end
   end
@@ -69,15 +68,13 @@ struct Stacklang::ThreeAddressCode::Translator
     @globals = @function.unit.globals.map do |(name, global)|
       {name, {Global.new(global.symbol, global.typeinfo.size.to_i, global.ast), global.typeinfo}}
     end.to_h
-    offset = 0
+
     # Local offset to store the return value if any (at ABI enforced location)
     @return_value = @function.return_type.try do |typeinfo|
-      local = Local.new(Translator.next_uid, 0, typeinfo.size.to_i, @function.ast, abi_expected_stack_offset: offset)
-      offset +=  typeinfo.size.to_i
-      local
+      Local.new(Translator.next_uid, 0, typeinfo.size.to_i, @function.ast, abi_expected_stack_offset: @function.return_value_offset.not_nil!, restricted: true)
     end
     # Top Level var and parameters (parameters with ABI enforced location)
-    @scope = Scope.new(Scope.new(@function, offset), @function.ast.body, @function)
+    @scope = Scope.new(Scope.new(@function), @function.ast.body, @function)
     # local offset used to store the return address
     @return_address = Local.new(Translator.next_uid, 0, 1, @function.ast)
   end
