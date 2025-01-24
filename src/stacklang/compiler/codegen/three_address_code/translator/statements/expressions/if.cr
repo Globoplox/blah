@@ -1,25 +1,21 @@
 struct Stacklang::ThreeAddressCode::Translator
   def translate_if(expression : AST::If)
-    condition = translate_expression expression.condition
-    if condition.nil?
-      raise Exception.new "Expression has no type", expression.condition, @function
-    end
-    condition_address, condition_typeinfo = condition
-
-    label = "end_of_if_#{next_uid}"
-    zero = Immediate.new 0, expression
-    @tacs << JumpEq.new(label, {condition_address, zero}, expression)
-
+    uid = next_uid
+    label_start = "__if_#{uid}_start"
+    label_end = "__if_#{uid}_end"
+    
+    translate_conditional expression.condition, ConditionalJumps.new if_true: label_start, if_false: label_end
+    
+    @tacs << Label.new label_start, expression
+    
     current_scope = @scope
     @scope = Scope.new(@scope, expression.body, @function, @next_uid)
-
     expression.body.each do |statement|
       translate_statement statement
     end
-
     @scope = current_scope
-    @tacs << Label.new label, expression
-
+    
+    @tacs << Label.new label_end, expression
   end
 end
 
@@ -54,6 +50,7 @@ end
 #    and compress the movi jalr to a beq (move defined symbols too !)
 #    run this loop until no result
 # - then add a loop that detect when a A: beq +-n lead a B: beq r0 r0 sym and if the sym + B - A, idk u got it
+# also, optimize beq that end up jumping to 0 (they can be removed entierly)
 #
 #
 # A beq n

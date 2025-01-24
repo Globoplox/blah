@@ -18,7 +18,7 @@ struct Stacklang::ThreeAddressCode::Translator
         when "&" then translate_reference expression
         when "*" then translate_dereference expression
         when "-" then translate_integer_opposite expression
-        when "~" then translate_binary_not expression
+        when "~" then translate_bitwise_not expression
         else raise Exception.new "Unsupported unary operator '#{expression.name}'", expression, @function
         end      
       in AST::Binary

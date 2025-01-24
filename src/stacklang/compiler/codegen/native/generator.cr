@@ -863,16 +863,14 @@ module Stacklang::Native
       right_register ||= operands.try { |operands| load operands[1] }
       
       # LOAD THE LABEL (name in code.location)
-      load_immediate FILL_SPILL_REGISTER, code.location
 
       if left_register && right_register
-
-       
+        load_immediate FILL_SPILL_REGISTER, code.location
         beq left_register, right_register, 1 # If equal, jump (goto jalr)
         beq ZERO_REGISTER, ZERO_REGISTER, 1 # Else, do not jump (skip jalr)
         jalr ZERO_REGISTER, FILL_SPILL_REGISTER
-
       else
+        load_immediate FILL_SPILL_REGISTER, code.location
         jalr ZERO_REGISTER, FILL_SPILL_REGISTER
       end
     end

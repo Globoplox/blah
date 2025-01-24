@@ -1,28 +1,27 @@
 /*
   Tested:
-  - additions
-  - binary not
-  - reference of simple local or gloal identifier
-  - dereferencement
-  - dereferenced assignement
+  - binary operators: +
+  - assignment and chained assignement
+  - binary operator: ~, &, *
+  - dereferenced assignement: n* = x
   - struct field access
-  - assignement, chained assignements
   - call with return value and parameters
   - if statement
+  - conditional operators: ==, !=, !, &&, ||
   TODO:
-  - All binary operators: & | ^ && || == != - < > <= >=
-  - Sugar assignments
-  - binary to call
+  - other conditonals statements: < <= > >=
+  - while statement
+  - conditonal statement values (a = 1 || 0)
+  - bitwise binary operators: & | ^
+  - sugar assignments
+  - mutating unsupported operators to call
   - table access
-  - Conditional statements
   - All non-word sized address handling
 */
 
 fun main:_ {
-  var a = 0
-  var b = 0xFFFF
-
-  if (a)
+  var b = 0
+  if (!0 || (1 && (0 || !1)))
     b = 0x1111
   return b
 }

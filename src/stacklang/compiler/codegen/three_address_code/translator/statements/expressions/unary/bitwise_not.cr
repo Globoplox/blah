@@ -1,5 +1,5 @@
 struct Stacklang::ThreeAddressCode::Translator
-  def translate_binary_not(expression : AST::Unary) : {Address, Type}
+  def translate_bitwise_not(expression : AST::Unary) : {Address, Type}
     target = translate_expression expression.operand
     unless target
       raise Exception.new "Expression has no type", expression.operand, @function
