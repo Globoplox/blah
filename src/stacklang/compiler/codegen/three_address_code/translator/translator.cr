@@ -9,11 +9,19 @@ struct Stacklang::ThreeAddressCode::Translator
   @return_value : Local?
   @globals : Hash(String, {Global, Type})
 
-  @@local_uid = 0
-  def self.next_uid
-    id = @@local_uid
-    @@local_uid += 1
-    id
+
+  # Don't ask
+  @next_uid = NextUID.new
+  class NextUID
+    @local_uid = 0
+    def next_uid
+      id = @local_uid
+      @local_uid += 1
+      id
+    end
+  end
+  def next_uid
+    @next_uid.next_uid
   end
 
   # Scope of local variables.
@@ -24,26 +32,26 @@ struct Stacklang::ThreeAddressCode::Translator
     @entries = {} of String => {Local, Type}
 
     # Build a scope from a body of statements.
-    def initialize(prev : Scope, statements : Array(AST::Statement), function : Stacklang::Function)
+    def initialize(prev : Scope, statements : Array(AST::Statement), function : Stacklang::Function, uid : NextUID)
       @previous = prev
       statements.each do |statement|
         next unless statement.is_a? AST::Variable
         raise Exception.new "Redeclaration of variable #{statement.name}", statement, function if search(statement.name.name) != nil
         typeinfo = function.unit.typeinfo(statement.constraint)
         @entries[statement.name.name] = {
-          Local.new(Translator.next_uid, 0, typeinfo.size.to_i, statement, restricted: statement.restricted), 
+          Local.new(uid.next_uid, 0, typeinfo.size.to_i, statement, restricted: statement.restricted), 
           typeinfo
         }
       end
     end
 
     # Build a scope from the root scope of a function including it's parameters only.
-    def initialize(function : Stacklang::Function)
+    def initialize(function : Stacklang::Function, uid : NextUID)
       @previous = nil
       function.parameters.each do |parameter| 
         raise Exception.new "Parameter name conflict '#{parameter.name}'", parameter.ast, function if @entries[parameter.name]? != nil
         # Shadowing is allowed
-        @entries[parameter.name] = {Local.new(Translator.next_uid, 0, parameter.constraint.size.to_i, parameter.ast, abi_expected_stack_offset: parameter.offset), parameter.constraint}
+        @entries[parameter.name] = {Local.new(uid.next_uid, 0, parameter.constraint.size.to_i, parameter.ast, abi_expected_stack_offset: parameter.offset), parameter.constraint}
       end
     end
 
@@ -71,12 +79,12 @@ struct Stacklang::ThreeAddressCode::Translator
 
     # Local offset to store the return value if any (at ABI enforced location)
     @return_value = @function.return_type.try do |typeinfo|
-      Local.new(Translator.next_uid, 0, typeinfo.size.to_i, @function.ast, abi_expected_stack_offset: @function.return_value_offset.not_nil!, restricted: true)
+      Local.new(next_uid, 0, typeinfo.size.to_i, @function.ast, abi_expected_stack_offset: @function.return_value_offset.not_nil!, restricted: true)
     end
     # Top Level var and parameters (parameters with ABI enforced location)
-    @scope = Scope.new(Scope.new(@function), @function.ast.body, @function)
+    @scope = Scope.new(Scope.new(@function, @next_uid), @function.ast.body, @function, @next_uid)
     # local offset used to store the return address
-    @return_address = Local.new(Translator.next_uid, 0, 1, @function.ast)
+    @return_address = Local.new(next_uid, 0, 1, @function.ast)
   end
 end
 

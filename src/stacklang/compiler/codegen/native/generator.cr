@@ -1,6 +1,8 @@
 require "../three_address_code"
 require "./assembly"
 
+
+
 # TODO: nice errors
 # TODO: creating immediate address hosting global / function address, so they can be hosted in registers 
 # TODO: Full rewrite the redoc
@@ -153,7 +155,7 @@ module Stacklang::Native
   
           offset = size
           @slots << {address, offset}
-          offset  
+          offset
         end
       end
 
@@ -299,6 +301,8 @@ module Stacklang::Native
       in ThreeAddressCode::Return then {code.address}
       in ThreeAddressCode::Store then {code.address, code.value}
       in ThreeAddressCode::Load then {code.address, code.into}
+      in ThreeAddressCode::Label then Array(ThreeAddressCode::Address).new
+      in ThreeAddressCode::JumpEq then code.operands.try(&.to_a) || [] of ThreeAddressCode::Address
       end
     end
 
@@ -656,9 +660,6 @@ module Stacklang::Native
       clear(read: {code.left, code.right}, written: {code.into})
     end
 
-    #property address : Address
-    #property into : Address?
-    #property parameters : Array(Address)
     def compile_call(code : ThreeAddressCode::Call)
       # Must fix the stack size before copying all parameters
       # this mean all parameters and the call address must have a stack location (if they are spilled or not does not matter yet)
@@ -795,6 +796,87 @@ module Stacklang::Native
       jalr ZERO_REGISTER, jump_address_register
     end
 
+    def compile_label(code : ThreeAddressCode::Label)
+      if @section.definitions.has_key? code.name
+        raise "Duplicate label declaration #{code.name} is declared at 0x#{@section.definitions[code.name].address.to_s base: 16} and 0x#{@text.size.to_s base: 16}"
+      end 
+
+      # Must unload ALL because we cant garantee that the value cached will be the same when something jump here.
+      # We must have no cache before creating the label, and before jumping to it so we can ensure
+      # everytime we reach this label (normally or through jump), the state is the same.
+      unload_all
+
+      @section.definitions[code.name] = RiSC16::Object::Section::Symbol.new @text.size, false
+    end
+
+    # HOW TO jump 
+# TAC: if t1 == t2 goto n
+# ALSO: need a LABEL tac
+# with t1 & t2 being optionnal.
+#
+# If t are set and n is short: simple beq t1 t2 n
+# if t are set and n is long: 
+#   fill_spill = nand t2 t2 
+#   beq t1 fill_spill 1
+#   jalr n
+# (if t1 != t2 it will skip the jump, aka, it reach the jalr jump only if t1 == t2)
+# without t1 t1: if short, beq r0 r0 n, else jalr n
+#
+# In any way, it must spill all, keep cache of t1, t2 and n if already set, load them if they are not and unload all
+# So there is nothing improperly cached but we dont have to spill/load t1 t2 n useless (same behavior as call, but without the fixed stack constraint)
+# Must add a new addres type for label OR make immediate allow symbols
+
+    def compile_jump_eq(code : ThreeAddressCode::JumpEq)
+      # TODO maybe ignore this and just make a pass on compiled text
+      # is_short = !overflow_immediate_offset?(@section.definitions[code.location]?.try(&.address)) || false
+
+      operands = code.operands
+      if operands
+        if operands[0].size != operands[1].size
+          raise "Size mismatch in allocation #{code}"
+        end
+      end
+
+      if operands && operands[0].size != 1
+        raise "Size mismatch in allocation #{code}"
+      end
+      # TODO: it is WHOLY HARDER if not size 1 :(
+    
+      # We will jump to a label. 
+      # At label location, no value is assumed as being cached.
+      # So before jumping, any value not written to ram must be spilled before.
+
+      # Before unloading potential usefull addresses, save where they are cached
+      left_register = right_register = nil
+      if operands
+        left_register = @addresses[root_id operands.not_nil![0]].live_in_register(operands.not_nil![0])
+        right_register = @addresses[root_id operands.not_nil![1]].live_in_register(operands.not_nil![1])
+      end
+
+      # Unload them.
+      # Unloading never use any registers that is susceptible of hosting something so the registers
+      # we saved before still have the value we want them to after unloading
+      unload_all
+    
+      # Now, if they wern't loaded, we load them because we actually NEED them
+      left_register ||= operands.try { |operands| load operands[0] }
+      right_register ||= operands.try { |operands| load operands[1] }
+      
+      # LOAD THE LABEL (name in code.location)
+      load_immediate FILL_SPILL_REGISTER, code.location
+
+      if left_register && right_register
+
+       
+        beq left_register, right_register, 1 # If equal, jump (goto jalr)
+        beq ZERO_REGISTER, ZERO_REGISTER, 1 # Else, do not jump (skip jalr)
+        jalr ZERO_REGISTER, FILL_SPILL_REGISTER
+
+      else
+        jalr ZERO_REGISTER, FILL_SPILL_REGISTER
+      end
+    end
+
     def compile_code(code : ThreeAddressCode::Code)
       case code
       in ThreeAddressCode::Add then compile_add code
@@ -806,10 +888,9 @@ module Stacklang::Native
       in ThreeAddressCode::Call then compile_call code
       in ThreeAddressCode::Return then compile_return code
       in ThreeAddressCode::Start then compile_start code
+      in ThreeAddressCode::Label then compile_label code
+      in ThreeAddressCode::JumpEq then compile_jump_eq code
       end
-    rescue ex
-      pp ex
-      raise ex
     end
 
     def generate : RiSC16::Object::Section
@@ -847,7 +928,7 @@ module Stacklang::Native
       meta.spilled_at.try do |index|      
         @stack.free index
       end
-      meta.spilled_at = nil      
+      meta.spilled_at = nil
     end
 
     # Address metadata holding, among other things, a stack location if any is needed, 
@@ -866,7 +947,11 @@ module Stacklang::Native
       in ThreeAddressCode::Global
         address.name
       in ThreeAddressCode::Immediate 
-        0b10 << 30 | address.value          
+        val = address.value
+        case val
+          in String then val
+          in Int32 then 0b10 << 30 | val
+        end
       in ThreeAddressCode::Function  
         address.name
       end
@@ -892,20 +977,65 @@ module Stacklang::Native
       # All local addresses
       reserved_addresses = [] of ThreeAddressCode::Local
 
+      labels = [] of String
+      last_ref_to_label = {} of String => Int32
+      address_used_after_label_index = {} of AddressRootId => Int32
+
+      # Scann whole program to register addresses and compute last usage location (taking jump into account)
+      # If a variable is used AFTER a label is declared, then it must stay alive (in stack) until the LAST jump to this label
+      # to avoid their stack block from being freed, reused and overwritten before a jump back happen
+      # (they always have a stack address before and it is spilled when reaching a label so no need to pre-allocate)
       @codes.each_with_index do |code, index|
+        # Stack existing labels
+        if code.is_a?(ThreeAddressCode::Label)
+          labels << code.name
+        end
+
         addresses_of(code).each do |address|
+          # Note where the last jump to a label happen
+          code.as?(ThreeAddressCode::JumpEq).try do |jump|
+            last_ref_to_label[jump.location] = index
+          end
+
           id = root_id address
+
           metadata = @addresses[id]?
           if metadata
             metadata.used_at << index
           else
             metadata = Metadata.new address, index
             @addresses[id] = metadata
+ 
+            # Note the furthest labels declaration that this address is used after (only for spillable stuff)
+            if !metadata.spillable.never?
+              address_used_after_label_index[id] = labels.size
+            end
+ 
+            # Note abi expected address
             address.as?(ThreeAddressCode::Local).try do |address|
               reserved_addresses << address if address.abi_expected_stack_offset
             end
           end
         end
+      end
+
+      # For each variable, take the biggest of all the last of usages of the jump of the labels its used after, and add it to the used_at of the var
+      address_used_after_label_index.each do |(address_id, last_labels_defined_before_usage)|
+        # Each label defined before this variable last usage 
+        # (AKA, all labels at which a jump may cause issues if the variable has lost it's stack offset between the label and the jump)
+        furthest_jump = nil
+        last_labels_defined_before_usage.downto(0) do |label_defined_before_usage|
+          last_jump_to_this_label = last_ref_to_label[label_defined_before_usage]?
+          next unless last_jump_to_this_label
+          if furthest_jump.nil? || furthest_jump < last_jump_to_this_label
+            furthest_jump = last_jump_to_this_label
+          end
+        end
+        # This var is defined after some labels, the last jump to those labels is at furthest_jump
+        # the var must keep its stack allocated address until at least furthest_jump
+        # else it may be overwritten before the jump, and the code after the label will load at a location that may have been used by another var
+        # because the var has been cleared due to not being used anymore (in the order of instruction in code, but not in the order of the execution)
+        @addresses[address_id].used_at << furthest_jump if furthest_jump
       end
 
       pp "RESERVED ADDRESSES"

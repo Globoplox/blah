@@ -94,24 +94,30 @@ module RiSC16::Linker
     end
   end
 
-  # Remove local beq
-  def link_local_beq(object)
-    object.sections.each do |section|
-      section.references.each do |name, references|
-        next unless symbol = section.definitions[name]?
-        rem = [] of RiSC16::Object::Section::Reference
-        references.each do |reference|
-          next unless reference.kind.beq?
-          value = symbol.address + reference.offset - reference.address - 1
-          if value > 0b111111 || value < -0b1111111
-            raise "Reference to #{name} = #{value} overflow from allowed 7 bits for symbol of type #{reference.kind}"
-          end
-          section.text[reference.address] = section.text[reference.address] & ~0b0111_1111 | (value < 0 ? (2 ** 7) + value.bits(0...6) : value).to_u16
-          rem << reference
+  # If a section contain a BEQ reference to a symbol defined in the same section,
+  # it can be linked without knowing the absolute section location
+  # because BEQ symbol are relative to definition
+  def link_local_beq(section : RiSC16::Object::Section)
+    section.references.each do |name, references|
+      next unless symbol = section.definitions[name]?
+      rem = [] of RiSC16::Object::Section::Reference
+      references.each do |reference|
+        next unless reference.kind.beq?
+        value = symbol.address + reference.offset - reference.address - 1
+        if value > 0b111111 || value < -0b1111111
+          raise "Reference to #{name} = #{value} overflow from allowed 7 bits for symbol of type #{reference.kind}"
         end
-        references.reject! &.in? rem
+        section.text[reference.address] = section.text[reference.address] & ~0b0111_1111 | (value < 0 ? (2 ** 7) + value.bits(0...6) : value).to_u16
+        rem << reference
       end
-      section.references.reject! { |_, v| v.empty? }
+      references.reject! &.in? rem
+    end
+    section.references.reject! { |_, v| v.empty? }
+  end
+
+  def link_local_beq(object : RiSC16::Object)
+    object.sections.each do |section|
+      link_local_beq section
     end
   end
 

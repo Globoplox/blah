@@ -5,8 +5,8 @@ alias Instruction = RiSC16::Instruction
 
 class Stacklang::Native::Generator
 
-
   def overflow_immediate_offset?(value)
+    return true if value.is_a? String
     value > 0x3F || value < -0x40
   end
 
@@ -61,7 +61,7 @@ class Stacklang::Native::Generator
     @text << Instruction.new(ISA::Jalr, a.value, b.value).encode
   end
 
-  def beq(a : Register, b : Register, imm : Int32 | String | Memory)
+  def beq(a : Register, b : Register, imm : Int32 | String)
     @text << Instruction.new(ISA::Beq, a.value, b.value, immediate: assemble_immediate imm, Kind::Beq).encode
   end
 

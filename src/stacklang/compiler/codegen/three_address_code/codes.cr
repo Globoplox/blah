@@ -20,7 +20,7 @@ module Stacklang::ThreeAddressCode
   end
 
   struct Immediate
-    property value : Int32
+    property value : Int32 | String
     property ast : AST
     property size : Int32 = 1
 
@@ -28,8 +28,13 @@ module Stacklang::ThreeAddressCode
     end
 
     def to_s(io)
-      io << "0x"
-      io << @value.to_s base: 16, precision: 4
+      val = @value
+      case val
+      in String then val
+      in Int32
+        io << "0x"
+        io << val.to_s base: 16, precision: 4
+      end
     end
   end
 
@@ -111,6 +116,35 @@ module Stacklang::ThreeAddressCode
       @left.to_s io
       io << " + "
       @right.to_s io
+    end
+  end
+
+  struct Label
+    property name : String
+    property ast : AST
+
+    def initialize(@name, @ast)
+    end
+
+    def to_s(io)
+      io << @name
+      io << ":"
+    end
+  end
+
+  struct JumpEq
+    property operands : {Address, Address}?
+    property location : String
+    property ast : AST
+
+    def initialize(@location, @operands, @ast)
+    end
+
+    def to_s(io)
+      @operands.try do |(left, right)|
+        io << "if #{left} == #{right} "
+      end
+      io << "goto #{@location}"
     end
   end
 
@@ -242,5 +276,5 @@ module Stacklang::ThreeAddressCode
     end
   end
 
-  alias Code = Add | Nand | Reference | Move | Call | Return | Start | Load | Store
+  alias Code = Add | Nand | Reference | Move | Call | Return | Start | Load | Store | Label | JumpEq
 end

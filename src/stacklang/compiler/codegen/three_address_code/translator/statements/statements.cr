@@ -4,7 +4,7 @@ struct Stacklang::ThreeAddressCode::Translator
   def translate_statement(statement : AST::Statement)
     case statement
     in AST::Variable then statement.initialization.try { |expression| translate_expression expression } 
-    in AST::If
+    in AST::If then translate_if statement
     in AST::While
     in AST::Return then translate_return statement
     in AST::Expression then translate_expression statement
