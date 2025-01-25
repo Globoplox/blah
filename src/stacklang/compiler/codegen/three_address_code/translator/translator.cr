@@ -9,7 +9,6 @@ struct Stacklang::ThreeAddressCode::Translator
   @return_value : Local?
   @globals : Hash(String, {Global, Type})
 
-
   # Don't ask
   @next_uid = NextUID.new
   class NextUID

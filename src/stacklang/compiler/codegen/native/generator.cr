@@ -426,8 +426,6 @@ module Stacklang::Native
       end
     end
 
-
-
     # Unload all address related to a specific local variable.
     # This is usefull when there is aliasing of this variable.
     # Attempt to do so efficiently and using only the FILL_SPILL_REGISTER.

@@ -1,10 +1,11 @@
 require "option_parser"
+
+require "./risc16"
 require "./spec"
-require "./assembler/parser"
 require "./assembler/assembler"
-require "./assembler/linker"
-require "./assembler/lib"
-require "./assembler/dce"
+require "./linker"
+require "./linker/lib"
+require "./linker/dce"
 require "./vm"
 require "./stacklang/compiler"
 require "./debugger"
@@ -144,11 +145,7 @@ module RiSC16
               RiSC16::Lib.from_io input, name: source
             end.objects
           elsif source.ends_with?(".blah")
-            unit = File.open source do |input|
-              parser = RiSC16::Assembler::Parser.new input
-              parser.unit(name: source) || raise "Parse error in input file #{source}"
-            end
-            object = RiSC16::Assembler.assemble(unit)
+            object = RiSC16::Assembler.assemble(source)
             name = source.gsub(".blah", ".ro")
             if create_intermediary
               File.open Path[(intermediary_dir || Dir.current).not_nil!, Path[name].basename], "w" do |output|

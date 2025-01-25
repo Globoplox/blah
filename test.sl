@@ -10,8 +10,8 @@
   - conditional operators: == != ! && || < <= > >=
   - while statement
   - conditonal statement values (a = 1 || 0)
-  TODO:
   - sugar assignments
+  TODO:
   - mutating unsupported operators to call
   - table access
   - All non-word sized address handling
@@ -19,5 +19,6 @@
 */
 
 fun main:_ {
+  var a = 0x8765
   return a
 }

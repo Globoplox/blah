@@ -1,16 +1,13 @@
 require "./error"
 require "./unit"
 require "../parser"
-require "../../assembler/object"
-require "../../spec"
 require "./codegen/native/generator"
 
 # Stacklang compiler.
 # This particular class does the following:
-# - parse stacklang files
+# - parse a stacklang file
 # - solve requirements
 # - extract and build cache of units
-# TODO: allow to use a single compiler instance for compiling several files
 class Stacklang::Compiler
   # Cache of all units opened
   @units = {} of Path => Unit
@@ -46,8 +43,6 @@ class Stacklang::Compiler
       codes = ThreeAddressCode.translate func
       object.sections << Stacklang::Native.generate_function_section func, codes
     end
-
-    pp object
 
     return object
   end

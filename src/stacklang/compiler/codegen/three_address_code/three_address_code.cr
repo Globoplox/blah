@@ -1,7 +1,12 @@
+require "./addresses"
 require "./codes"
 require "./translator"
 
+# Three Address Code is a low level intermediary language.
+# It consists of a variety of 'codes' that represent assembly like instructions
+# and 'addresses' that represent different kind of values that can be manipulated.
 module Stacklang::ThreeAddressCode
+
   # Given block of code and the context, produce an array of three address code.
   # *unit* is used to pull type and function definitions,
   # *function* is the optional function being translated and is provided for
@@ -12,13 +17,3 @@ module Stacklang::ThreeAddressCode
     Translator.new(function).translate
   end
 end
-# TODO: remove types from tacs array
-# Label, BEQ, B, Call
-# Automatically be smart about nand and add when possible
-# 
-# Local load (local() = t0) (usually we do  *t0 = t1) => require Move
-#     and so lvalue can return local/global 
-# 
-# Complex assignment
-# 
-# TODO: io type & function type

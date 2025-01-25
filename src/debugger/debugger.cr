@@ -1,7 +1,7 @@
 require "../vm"
 require "../spec"
 require "./curses"
-require "../assembler/linker"
+require "../linker/linker"
 
 # NOTE: this is broken because reading the ram from vm cause IO side effects.
 

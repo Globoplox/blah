@@ -1,4 +1,4 @@
-require "../parsing/primitive"
+require "./parser_primitive"
 
 module RiSC16::Assembler::AST
   alias Node = Parser::Node

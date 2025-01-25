@@ -2,13 +2,10 @@ require "./compiler"
 require "./type"
 require "./function"
 require "./global"
-require "../../assembler/object"
-require "../../assembler/linker"
 
 # Represent a single unit / source file.
 # It has a compiler backreference, that is used to solve requirements
 # and grab symbol and types definition from elsewhere.
-#
 class Stacklang::Unit
   getter path
 

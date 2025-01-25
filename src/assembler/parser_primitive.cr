@@ -1,3 +1,4 @@
+# Base class for a simple recursive descent parser.
 class Parser
   # Optional base type for ast node (or anything returned by a rule).
   abstract class Node

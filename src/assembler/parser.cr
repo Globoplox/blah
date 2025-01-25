@@ -1,4 +1,4 @@
-require "../parsing/primitive"
+require "./parser_primitive"
 require "./ast"
 
 class RiSC16::Assembler::Parser < Parser

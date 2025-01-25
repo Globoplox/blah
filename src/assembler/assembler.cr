@@ -1,9 +1,15 @@
-require "../risc16"
 require "./ast"
-require "./object"
+require "./parser"
 
 module RiSC16::Assembler
   extend self
+
+  def assemble(source : String | Path)
+    assemble(File.open source do |input|
+      parser = RiSC16::Assembler::Parser.new input
+      parser.unit(name: source) || raise "Parse error in input file #{source}"
+    end)
+  end
 
   def assemble_immediate(section, address, immediate, kind)
     if symbol = immediate.symbol

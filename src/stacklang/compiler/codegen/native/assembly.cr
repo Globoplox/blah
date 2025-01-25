@@ -1,8 +1,8 @@
-
 alias Kind = RiSC16::Object::Section::Reference::Kind
 alias ISA = RiSC16::ISA
 alias Instruction = RiSC16::Instruction
 
+# Helper functions for generating the actual RiSC16 instructions
 class Stacklang::Native::Generator
 
   def overflow_immediate_offset?(value)
