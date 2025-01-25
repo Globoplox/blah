@@ -1,3 +1,4 @@
+require "./*"
 require "./expressions"
 
 struct Stacklang::ThreeAddressCode::Translator
@@ -5,7 +6,7 @@ struct Stacklang::ThreeAddressCode::Translator
     case statement
     in AST::Variable then statement.initialization.try { |expression| translate_expression expression } 
     in AST::If then translate_if statement
-    in AST::While
+    in AST::While then translate_while statement
     in AST::Return then translate_return statement
     in AST::Expression then translate_expression statement
     in AST::Statement

@@ -7,6 +7,7 @@ require "./assembly"
 # TODO: creating immediate address hosting global / function address, so they can be hosted in registers 
 # TODO: Full rewrite the redoc
 # TODO: Parametrizable ABI (stack and call_ret register) ?
+# TODO: a flag on meta "written" that is set when well written, so we do not spill address that are loaded but have not been written since load
 module Stacklang::Native
 
   # TODO: global initialization
@@ -419,8 +420,19 @@ module Stacklang::Native
 
     def unload_all(registers = GPR)
       @registers.select(registers).each do |(register, address)| 
+        pp "UNLOAD ALL: UNLOAD #{register} #{address}"
         next unless address
         unload address
+      end
+    end
+
+    # Unhost an address from a register, without spilling the address.
+    # This is usefull when a value must be read but not written but the cache can't survive due to jumps
+    def forget_cache(register : Register)
+      @registers[register]?.try do |address|
+        meta = @addresses[root_id address]
+        meta.set_live_in_register for: address, register: nil
+        @registers[register] = nil
       end
     end
 
@@ -587,6 +599,9 @@ module Stacklang::Native
       if code.address.size != code.into.size
         raise "Size mismatch in allocation #{code}"
       elsif code.into.size == 1
+
+        pp "START OF MOVE #{code}"
+        pp @registers.map { |(r, a)| "#{r} #{a}" }
         # Load address
         right = load code.address
 
@@ -594,10 +609,23 @@ module Stacklang::Native
         # because it wont be used and will be deleted anyway
         # If source is spillable yes but will not be used after this, it is safe to steal the cache 
 
+        # IF a = a
+
         # If source is spillable never it's safe to steal the cache, but this may be detrimental if the value is reused
         # in which case, it's better to take a new register and let future grab_free decide on which is best to unload
-        if source_meta.spillable.always? || source_meta.used_at.max <= @index    
+        # We never steel R0 because it is badly supported by other cache/spill routines as several could be hosted in r0
+        # leading to forgetting that some value are hosted and not spilled
+        # This COULD be fixed but is hard to do.
+        if right != ZERO_REGISTER && (source_meta.spillable.always? || source_meta.used_at.max <= @index) 
+          pp "STEAL"
           source_meta.set_live_in_register for: code.address, register: nil
+
+          # if dest is hosted, must un-host it as it will be assigned another register
+          into_reg = into_meta.live_in_register for: code.into
+          if into_reg
+            @registers[into_reg] = nil
+          end
+
           into_meta.set_live_in_register for: code.into, register: right
           @registers[right] = code.into
         # Standard way, grab and copy
@@ -607,6 +635,10 @@ module Stacklang::Native
         end
 
         clear({code.address}, {code.into})
+
+        pp "END OF MOVE"
+        pp @registers.map { |(r, a)| "#{r} #{a}" }
+
       else 
         # TODO
         raise "Multi word move is unsupported yet"
@@ -857,10 +889,12 @@ module Stacklang::Native
       # Unloading never use any registers that is susceptible of hosting something so the registers
       # we saved before still have the value we want them to after unloading
       unload_all
-    
-      # Now, if they wern't loaded, we load them because we actually NEED them
-      left_register ||= operands.try { |operands| load operands[0] }
-      right_register ||= operands.try { |operands| load operands[1] }
+
+      if operands
+        # Now, if they wern't loaded, we load them (but we dont save the cache so they dont get uselessly spilled after ?)
+        left_register ||= load operands[0] 
+        right_register ||= load operands[1]
+      end    
       
       # LOAD THE LABEL (name in code.location)
 
@@ -939,9 +973,9 @@ module Stacklang::Native
     def root_id(address : ThreeAddressCode::Address) : AddressRootId
       case address
       in ThreeAddressCode::Anonymous
-        0b00 << 30 | address.uid        
-      in ThreeAddressCode::Local
         0b01 << 30 | address.uid        
+      in ThreeAddressCode::Local
+        0b00 << 30 | address.uid        
       in ThreeAddressCode::Global
         address.name
       in ThreeAddressCode::Immediate 
@@ -989,12 +1023,13 @@ module Stacklang::Native
           labels << code.name
         end
 
-        addresses_of(code).each do |address|
-          # Note where the last jump to a label happen
-          code.as?(ThreeAddressCode::JumpEq).try do |jump|
-            last_ref_to_label[jump.location] = index
-          end
+        # Note where the last jump to a label happen
+        code.as?(ThreeAddressCode::JumpEq).try do |jump|
+          last_ref_to_label[jump.location] = index
+        end
 
+        addresses_of(code).each do |address|
+         
           id = root_id address
 
           metadata = @addresses[id]?
@@ -1003,27 +1038,37 @@ module Stacklang::Native
           else
             metadata = Metadata.new address, index
             @addresses[id] = metadata
- 
-            # Note the furthest labels declaration that this address is used after (only for spillable stuff)
-            if !metadata.spillable.never?
-              address_used_after_label_index[id] = labels.size
-            end
- 
             # Note abi expected address
             address.as?(ThreeAddressCode::Local).try do |address|
               reserved_addresses << address if address.abi_expected_stack_offset
             end
           end
+
+          # Note the furthest labels declaration that this address is used after (only for spillable stuff)
+          if !metadata.spillable.never?
+            address_used_after_label_index[id] = labels.size
+          end
+
         end
       end
 
+      # TODO CRITICAL:
+      # This does not work, find why
+
+      pp labels
+      pp last_ref_to_label
+
       # For each variable, take the biggest of all the last of usages of the jump of the labels its used after, and add it to the used_at of the var
       address_used_after_label_index.each do |(address_id, last_labels_defined_before_usage)|
+        puts "Address #{address_id} is used after (#{last_labels_defined_before_usage}) labels: #{labels[0..(last_labels_defined_before_usage - 1)].join ' '}"
+        
         # Each label defined before this variable last usage 
         # (AKA, all labels at which a jump may cause issues if the variable has lost it's stack offset between the label and the jump)
         furthest_jump = nil
-        last_labels_defined_before_usage.downto(0) do |label_defined_before_usage|
-          last_jump_to_this_label = last_ref_to_label[label_defined_before_usage]?
+        (0...last_labels_defined_before_usage).each do |label_defined_before_usage|
+          label = labels[label_defined_before_usage]
+          last_jump_to_this_label = last_ref_to_label[label]?
+          puts "  There is a jump to #{label} at #{last_jump_to_this_label}"
           next unless last_jump_to_this_label
           if furthest_jump.nil? || furthest_jump < last_jump_to_this_label
             furthest_jump = last_jump_to_this_label
@@ -1033,6 +1078,7 @@ module Stacklang::Native
         # the var must keep its stack allocated address until at least furthest_jump
         # else it may be overwritten before the jump, and the code after the label will load at a location that may have been used by another var
         # because the var has been cleared due to not being used anymore (in the order of instruction in code, but not in the order of the execution)
+        puts "Address #{address_id} add a furthest jump to #{furthest_jump}"
         @addresses[address_id].used_at << furthest_jump if furthest_jump
       end
 

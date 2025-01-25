@@ -15,7 +15,7 @@ class Stacklang::Native::Generator
     in String then movi into, imm, offset
     in Int32
       if !overflow_immediate_offset? imm
-        addi into, into, imm
+        addi into, Register::R0, imm
       elsif imm.bits(0..7) == 0
         lui into, imm
       else

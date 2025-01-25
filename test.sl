@@ -15,13 +15,16 @@
   - bitwise binary operators: & | ^
   - sugar assignments
   - mutating unsupported operators to call
-  - table access
+  - table accesss
   - All non-word sized address handling
 */
 
 fun main:_ {
-  var b = 0
-  if (!0 || (1 && (0 || !1)))
-    b = 0x1111
+  var a = 0
+  var b = 1
+  while (a != 7) {
+    a = a + 1
+    b = b + b
+  }
   return b
 }

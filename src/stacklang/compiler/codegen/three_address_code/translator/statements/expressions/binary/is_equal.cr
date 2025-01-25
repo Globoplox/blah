@@ -14,7 +14,7 @@ struct Stacklang::ThreeAddressCode::Translator
     right_address, right_typeinfo = right
 
     unless left_typeinfo == right_typeinfo || ((left_typeinfo.is_a?(Type::Word) || left_typeinfo.is_a?(Type::Pointer)) && (right_typeinfo.is_a?(Type::Word) || right_typeinfo.is_a?(Type::Pointer)))
-      else raise Exception.new "Cannot compare values of types #{left_typeinfo} and #{right_typeinfo}", expression, @function
+      raise Exception.new "Cannot compare values of types #{left_typeinfo} and #{right_typeinfo}", expression, @function
     end
 
     # if equal, jump to true
