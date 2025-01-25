@@ -25,12 +25,12 @@ struct Stacklang::ThreeAddressCode::Translator
         case expression.name
         when "==" then return translate_is_equal expression, jumps
         when "!=" then return translate_is_not_equal expression, jumps
-        when "<" then return
-        when ">" then return
-        when "<=" then return
-        when ">=" then return
         when "&&" then return translate_logical_and expression, jumps
         when "||" then return translate_logical_or expression, jumps
+        when "<" then return translate_inferior_to expression, jumps
+        when ">" then return translate_superior_to expression, jumps
+        when "<=" then return translate_inferior_equal_to expression, jumps
+        when ">=" then return translate_superior_equal_to expression, jumps
         end
       end
     end
@@ -49,4 +49,19 @@ struct Stacklang::ThreeAddressCode::Translator
   end 
 
   # TODO: the opposite function, that produce an actual value from the conditonnal operators that usually just jump
+  def translate_conditional_as_expression(expression) : {Address, Type}
+    t0 = anonymous 1
+    uid = next_uid
+    if_true = "__conditional_value_#{uid}_true"
+    if_false = "__conditional_value_#{uid}_false"
+    label_end = "__conditional_value_#{uid}_end"
+    yield ConditionalJumps.new if_true: if_true, if_false: if_false
+    @tacs << Label.new if_true, expression
+    @tacs << Move.new Immediate.new(1, expression), t0, expression
+    @tacs << JumpEq.new(label_end, nil, expression)
+    @tacs << Label.new if_false, expression
+    @tacs << Move.new Immediate.new(0, expression), t0, expression
+    @tacs << Label.new label_end, expression
+    return {t0, Type::Word.new}
+  end
 end

@@ -45,10 +45,25 @@ struct Stacklang::ThreeAddressCode::Translator
         raise Exception.new "Assignment of complex types is not supported yet", expression, @function
       end
 
-      @tacs << Move.new right_address, left_address,expression
+      @tacs << Move.new right_address, left_address, expression
     end
 
     {right_address, right_typeinfo}
   end
+
+  def translate_sugar_assignment(expression : AST::Binary, operator : String) : {Address, Type}
+    translate_expression AST::Binary.new(
+      token: expression.token, 
+      left: expression.left, 
+      name: "=",
+      right: AST::Binary.new(
+        token: expression.token, 
+        left: expression.left, 
+        name: operator,
+        right: expression.right
+      )
+    )
+  end
+
 end
   

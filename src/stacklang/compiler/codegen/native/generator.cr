@@ -426,15 +426,7 @@ module Stacklang::Native
       end
     end
 
-    # Unhost an address from a register, without spilling the address.
-    # This is usefull when a value must be read but not written but the cache can't survive due to jumps
-    def forget_cache(register : Register)
-      @registers[register]?.try do |address|
-        meta = @addresses[root_id address]
-        meta.set_live_in_register for: address, register: nil
-        @registers[register] = nil
-      end
-    end
+
 
     # Unload all address related to a specific local variable.
     # This is usefull when there is aliasing of this variable.
