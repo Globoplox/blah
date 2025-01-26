@@ -1,4 +1,4 @@
-class Stacklang::Native::Generator  
+class Stacklang::Native::Generator
   def compile_add(code : ThreeAddressCode::Add)
     raise "Bad operand size for value in add: #{code}" if code.into.size > 1 || code.left.size > 1 || code.right.size > 1
     left = load code.left

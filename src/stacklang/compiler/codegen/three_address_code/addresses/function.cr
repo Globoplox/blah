@@ -1,5 +1,4 @@
 module Stacklang::ThreeAddressCode
-
   # Address type for functions
   struct Function
     property name : String

@@ -11,7 +11,7 @@ struct Stacklang::ThreeAddressCode::Translator
     t0 = anonymous 1
     @tacs << Nand.new address, address, t0, expression
     t1 = anonymous 1
-    @tacs << Add.new t0, Immediate.new(1,  expression), t1, expression
+    @tacs << Add.new t0, Immediate.new(1, expression), t1, expression
     {t1, Type::Word.new}
   end
 end

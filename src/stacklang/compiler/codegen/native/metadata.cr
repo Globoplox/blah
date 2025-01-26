@@ -1,8 +1,7 @@
 # Metadata for three address codes addresses
-# using during native code generation to control stack allocation, register hosting, and 
-# behavior of addresses. 
+# using during native code generation to control stack allocation, register hosting, and
+# behavior of addresses.
 class Stacklang::Native::Generator::Metadata
-
   enum Spillable
     Always
     Yes
@@ -10,7 +9,7 @@ class Stacklang::Native::Generator::Metadata
   end
 
   # If the address is currently in a register:
-  # If it is a hash, denote that their are several different offset within this values that may be 
+  # If it is a hash, denote that their are several different offset within this values that may be
   property offsets : Hash(Int32, Register) = {} of Int32 => Register
 
   def live_in_register(for address) : Register?
@@ -26,7 +25,7 @@ class Stacklang::Native::Generator::Metadata
     end
   end
 
-  def set_live_in_register(for address, register : Register?) 
+  def set_live_in_register(for address, register : Register?)
     case address
     when ThreeAddressCode::Anonymous, ThreeAddressCode::Local, ThreeAddressCode::Global
       if register
@@ -42,14 +41,14 @@ class Stacklang::Native::Generator::Metadata
       end
     end
   end
-  
+
   # If the address is stored in the stack:
   property spilled_at : Stack::Index?
 
   # Address codes indexes, used to determine when an address is not used anymore
   property used_at : Array(Int32)
 
-  # Determine if this address can, must or must not be cached in a register or written to 
+  # Determine if this address can, must or must not be cached in a register or written to
   # the stack.
   property spillable : Spillable
 
@@ -59,11 +58,11 @@ class Stacklang::Native::Generator::Metadata
     in ThreeAddressCode::Anonymous
       @spillable = Spillable::Yes
       # Unless optimized to be reused, they will pretty much never
-      # be reused. 
+      # be reused.
       # However they may be assigned once, then read once but much later.
       # Common subexpression that dont read globals/aliased nodes/call return values
       # could be made reusable by optimizer as logn as the var they read
-      # are not reassigned between usage. 
+      # are not reassigned between usage.
 
     in ThreeAddressCode::Local
       if address.restricted
@@ -71,21 +70,18 @@ class Stacklang::Native::Generator::Metadata
       else
         @spillable = Spillable::Yes
       end
-
     in ThreeAddressCode::Global
       # Never put in cache (and so never read from cache)
       # It is loaded everytime it is read
       @spillable = Spillable::Always
-
     in ThreeAddressCode::Function
       # Function address: can be cached, but never spilled.
       # However since it will usually be used to call after being loaded
-      # which will spill/uncache. 
+      # which will spill/uncache.
       @spillable = Spillable::Never
-      
     in ThreeAddressCode::Immediate
-      # It can be cached, but it is never spilled, and it is reloaded fully 
-      # if reused and not cached. 
+      # It can be cached, but it is never spilled, and it is reloaded fully
+      # if reused and not cached.
       @spillable = Spillable::Never
     end
   end

@@ -1,5 +1,4 @@
 module Stacklang::ThreeAddressCode
-
   struct Nand
     property left : Address
     property right : Address

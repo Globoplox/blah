@@ -1,7 +1,6 @@
 struct Stacklang::ThreeAddressCode::Translator
-
   # Regular assignement: a = 5
-  def translate_assignement_as_move(expression : AST::Binary, left_override : {Address, Type}? = nil) : {Address, Type}    
+  def translate_assignement_as_move(expression : AST::Binary, left_override : {Address, Type}? = nil) : {Address, Type}
     left = left_override || translate_expression expression.left
 
     if left.nil?
@@ -28,7 +27,7 @@ struct Stacklang::ThreeAddressCode::Translator
   end
 
   # Store assignement: *a = 5
-  def translate_assignement_as_store(expression : AST::Binary, left_override : AST::Unary? = nil) : {Address, Type}    
+  def translate_assignement_as_store(expression : AST::Binary, left_override : AST::Unary? = nil) : {Address, Type}
     operand = (left_override || expression.left).as(AST::Unary).operand
     left = translate_expression operand
     if left.nil?
@@ -60,13 +59,13 @@ struct Stacklang::ThreeAddressCode::Translator
     {right_address, right_typeinfo}
   end
 
-  def translate_assignment(expression : AST::Binary) : {Address, Type}    
+  def translate_assignment(expression : AST::Binary) : {Address, Type}
     # A table access expression can be either substitued to a *(&l + r) expression
     # which is candidate for a store instead of a move.
     # However in some case it may also be automatically compiled to  an address as a no-op (in tacs terms)
     if expression.left.as?(AST::Binary).try(&.name.== "[")
       address = table_access_as_address? expression.left.as AST::Binary
-      if address 
+      if address
         translate_assignement_as_move expression, left_override: address
       else
         translate_assignement_as_store expression, left_override: convert_table_access expression.left.as AST::Binary
@@ -80,17 +79,15 @@ struct Stacklang::ThreeAddressCode::Translator
 
   def translate_sugar_assignment(expression : AST::Binary, operator : String) : {Address, Type}?
     translate_expression AST::Binary.new(
-      token: expression.token, 
-      left: expression.left, 
+      token: expression.token,
+      left: expression.left,
       name: "=",
       right: AST::Binary.new(
-        token: expression.token, 
-        left: expression.left, 
+        token: expression.token,
+        left: expression.left,
         name: operator,
         right: expression.right
       )
     )
   end
-
 end
-  

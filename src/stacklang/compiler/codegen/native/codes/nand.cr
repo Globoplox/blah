@@ -1,5 +1,4 @@
-class Stacklang::Native::Generator  
-
+class Stacklang::Native::Generator
   def compile_nand(code : ThreeAddressCode::Nand)
     raise "Bad operand size for value in nand: #{code}" if code.into.size > 1 || code.left.size > 1 || code.right.size > 1
     left = load code.left

@@ -20,16 +20,16 @@ struct Stacklang::ThreeAddressCode::Translator
         when "-" then translate_integer_opposite expression
         when "~" then translate_bitwise_not expression
         when "!" then translate_conditional_as_expression(expression) { |jumps| translate_logical_not expression, jumps }
-        else raise Exception.new "Unsupported unary operator '#{expression.name}'", expression, @function
-        end      
+        else          raise Exception.new "Unsupported unary operator '#{expression.name}'", expression, @function
+        end
       in AST::Binary
         case expression.name
-        when "+" then translate_add expression
-        when "-" then translate_substract expression
-        when "&" then translate_bitwise_and expression
-        when "|" then translate_bitwise_or expression
-        when "^" then translate_bitwise_xor expression
-        when "=" then translate_assignment expression
+        when "+"  then translate_add expression
+        when "-"  then translate_substract expression
+        when "&"  then translate_bitwise_and expression
+        when "|"  then translate_bitwise_or expression
+        when "^"  then translate_bitwise_xor expression
+        when "="  then translate_assignment expression
         when "+=" then translate_sugar_assignment expression, "+"
         when "-=" then translate_sugar_assignment expression, "-"
         when "&=" then translate_sugar_assignment expression, "&"
@@ -39,16 +39,16 @@ struct Stacklang::ThreeAddressCode::Translator
         when "!=" then translate_conditional_as_expression(expression) { |jumps| translate_is_not_equal expression, jumps }
         when "&&" then translate_conditional_as_expression(expression) { |jumps| translate_logical_and expression, jumps }
         when "||" then translate_conditional_as_expression(expression) { |jumps| translate_logical_or expression, jumps }
-        when "<" then translate_conditional_as_expression(expression) { |jumps| translate_inferior_to expression, jumps }
+        when "<"  then translate_conditional_as_expression(expression) { |jumps| translate_inferior_to expression, jumps }
         when "<=" then translate_conditional_as_expression(expression) { |jumps| translate_inferior_equal_to expression, jumps }
-        when ">" then translate_conditional_as_expression(expression) { |jumps| translate_superior_to expression, jumps }
+        when ">"  then translate_conditional_as_expression(expression) { |jumps| translate_superior_to expression, jumps }
         when ">=" then translate_conditional_as_expression(expression) { |jumps| translate_superior_equal_to expression, jumps }
         when "<<" then translate_binary_to_call expression, "left_bitshift"
         when ">>" then translate_binary_to_call expression, "right_bitshift"
-        when "*" then translate_binary_to_call expression, "multiply"
-        when "[" then translate_table_access expression
-        else raise Exception.new "Unsupported binary operator '#{expression.name}'", expression, @function
-        end      
+        when "*"  then translate_binary_to_call expression, "multiply"
+        when "["  then translate_table_access expression
+        else           raise Exception.new "Unsupported binary operator '#{expression.name}'", expression, @function
+        end
       in AST::Operator
         raise "Unexpected AST Operator node type: #{expression.class.name}"
       end

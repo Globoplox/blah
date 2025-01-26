@@ -1,5 +1,4 @@
 module Stacklang::ThreeAddressCode
-
   struct Add
     property left : Address
     property right : Address
@@ -17,5 +16,4 @@ module Stacklang::ThreeAddressCode
       @right.to_s io
     end
   end
-
 end

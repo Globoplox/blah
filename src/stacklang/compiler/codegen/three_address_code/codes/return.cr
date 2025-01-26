@@ -1,11 +1,10 @@
 module Stacklang::ThreeAddressCode
-
   struct Return
     property address : Address
     property ast : AST
 
     def initialize(@address, @ast)
-    end  
+    end
 
     def to_s(io)
       io << "Return to "

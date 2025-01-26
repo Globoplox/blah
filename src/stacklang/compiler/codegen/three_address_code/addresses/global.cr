@@ -1,5 +1,4 @@
 module Stacklang::ThreeAddressCode
-  
   # Address type for global variables
   struct Global
     property name : String

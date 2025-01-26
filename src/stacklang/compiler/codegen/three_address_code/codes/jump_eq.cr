@@ -1,5 +1,4 @@
 module Stacklang::ThreeAddressCode
-
   struct JumpEq
     property operands : {Address, Address}?
     property location : String

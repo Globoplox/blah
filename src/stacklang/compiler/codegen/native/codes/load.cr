@@ -1,5 +1,4 @@
-class Stacklang::Native::Generator  
-
+class Stacklang::Native::Generator
   def compile_load(code : ThreeAddressCode::Load)
     if code.address.size != code.into.size
       raise "Size mismatch in load #{code}"

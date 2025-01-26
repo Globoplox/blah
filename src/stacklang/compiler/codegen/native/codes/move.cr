@@ -1,7 +1,7 @@
-class Stacklang::Native::Generator  
+class Stacklang::Native::Generator
   def compile_move(code : ThreeAddressCode::Move)
     source_meta = @addresses[root_id code.address]
-    into_meta =  @addresses[root_id code.into]
+    into_meta = @addresses[root_id code.into]
 
     if into_meta.spillable.never?
       raise "Cannot move to unspillable address #{code.into}, not a valid LValue"
@@ -10,13 +10,12 @@ class Stacklang::Native::Generator
     if code.address.size != code.into.size
       raise "Size mismatch in allocation #{code}"
     elsif code.into.size == 1
-
       # Load address
       right = load code.address
 
-      # If source is spillable never or spillable always, it is safe to steal the cache 
+      # If source is spillable never or spillable always, it is safe to steal the cache
       # because it wont be used and will be deleted anyway
-      # If source is spillable yes but will not be used after this, it is safe to steal the cache 
+      # If source is spillable yes but will not be used after this, it is safe to steal the cache
 
       # IF a = a
 
@@ -25,7 +24,7 @@ class Stacklang::Native::Generator
       # We never steel R0 because it is badly supported by other cache/spill routines as several could be hosted in r0
       # leading to forgetting that some value are hosted and not spilled
       # This COULD be fixed but is hard to do.
-      if right != ZERO_REGISTER && (source_meta.spillable.always? || source_meta.used_at.max <= @index) 
+      if right != ZERO_REGISTER && (source_meta.spillable.always? || source_meta.used_at.max <= @index)
         source_meta.set_live_in_register for: code.address, register: nil
 
         # if dest is hosted, must un-host it as it will be assigned another register
@@ -36,14 +35,14 @@ class Stacklang::Native::Generator
 
         into_meta.set_live_in_register for: code.into, register: right
         @registers[right] = code.into
-      # Standard way, grab and copy
+        # Standard way, grab and copy
       else
         into = grab_for code.into
         add into, right, ZERO_REGISTER
       end
 
       clear({code.address}, {code.into})
-    else 
+    else
       # TODO
       raise "Multi word move is unsupported yet"
     end

@@ -1,5 +1,4 @@
-class Stacklang::Native::Generator  
-
+class Stacklang::Native::Generator
   def compile_store(code : ThreeAddressCode::Store)
     if code.address.size != code.value.size
       raise "Size mismatch in store #{code}"
@@ -8,7 +7,7 @@ class Stacklang::Native::Generator
       value = load code.value
       sw value, address, 0
       clear(read: {code.address, code.value}, written: Tuple().new)
-    else 
+    else
       # TODO
       raise "Multi word store is unsupported yet"
     end

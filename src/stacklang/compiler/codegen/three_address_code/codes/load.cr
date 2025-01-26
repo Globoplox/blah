@@ -1,5 +1,4 @@
 module Stacklang::ThreeAddressCode
-
   struct Load
     property address : Address
     property into : Address

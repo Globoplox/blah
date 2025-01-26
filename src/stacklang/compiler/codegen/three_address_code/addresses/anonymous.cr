@@ -1,5 +1,4 @@
 module Stacklang::ThreeAddressCode
- 
   # Address type for anonymous temporary values
   struct Anonymous
     property uid : Int32

@@ -1,6 +1,4 @@
-
 module Stacklang::ThreeAddressCode
- 
   # Address type for literal values (as words or labels to be linked)
   struct Immediate
     property value : Int32 | String

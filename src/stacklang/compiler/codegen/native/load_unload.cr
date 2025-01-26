@@ -1,8 +1,7 @@
 require "../three_address_code"
 require "./assembly"
 
-class Stacklang::Native::Generator  
-
+class Stacklang::Native::Generator
   def load_raw_address(address : ThreeAddressCode::Address, into : Register)
     case address
     in ThreeAddressCode::Local
@@ -19,19 +18,14 @@ class Stacklang::Native::Generator
         load_immediate into, stack_offset
         add into, STACK_REGISTER, into
       end
-    
     in ThreeAddressCode::Global
       load_immediate into, address.name, address.offset
-    
     in ThreeAddressCode::Function
-    load_immediate into, address.name
-
+      load_immediate into, address.name
     in ThreeAddressCode::Immediate
       raise "Cannot evaluate address of immediate value #{address}"
-    
     in ThreeAddressCode::Anonymous
       raise "Cannot evaluate address of temporary value #{address}"
-
     end
   end
 
@@ -42,8 +36,7 @@ class Stacklang::Native::Generator
     into = grab_free avoid: avoid
     case address
     in ThreeAddressCode::Local, ThreeAddressCode::Anonymous
-
-      stack_offset = @stack.offset_at meta.spilled_at || raise "Local has not been allocated yet #{address}. This may happen when accessin uninitialized variales." 
+      stack_offset = @stack.offset_at meta.spilled_at || raise "Local has not been allocated yet #{address}. This may happen when accessin uninitialized variales."
       stack_offset += address.offset
       if !overflow_immediate_offset? stack_offset
         lw into, STACK_REGISTER, stack_offset
@@ -52,14 +45,11 @@ class Stacklang::Native::Generator
         add into, STACK_REGISTER, into
         lw into, into, 0
       end
-
     in ThreeAddressCode::Global
       load_immediate into, address.name, address.offset
       lw into, into, 0
-
     in ThreeAddressCode::Immediate
       load_immediate into, address.value
-
     in ThreeAddressCode::Function
       load_immediate into, address.name
     end
@@ -74,15 +64,14 @@ class Stacklang::Native::Generator
   def unload(address)
     meta = @addresses[root_id address]
     register = meta.live_in_register for: address
-    raise "Cannot unload address not cached" unless register 
-    
+    raise "Cannot unload address not cached" unless register
+
     case meta.spillable
     when Metadata::Spillable::Always, Metadata::Spillable::Yes
       case address
       when ThreeAddressCode::Global
         load_immediate FILL_SPILL_REGISTER, address.name, address.offset
         sw register, FILL_SPILL_REGISTER, 0
-
       else
         if meta.spilled_at.nil?
           stack_allocate address
@@ -110,7 +99,7 @@ class Stacklang::Native::Generator
   end
 
   def unload_all(registers = GPR)
-    @registers.select(registers).each do |(register, address)| 
+    @registers.select(registers).each do |(register, address)|
       next unless address
       unload address
     end
@@ -150,11 +139,11 @@ class Stacklang::Native::Generator
       end
       @registers[register] = nil
     end
-    
+
     meta.offsets.clear
   end
 
-  # In the non free register other than avoid, 
+  # In the non free register other than avoid,
   # find the one hosting the value that wont be used in the most time
   # unload that
   def grab_free(avoid : Array(Register)? = nil) : Register
@@ -164,7 +153,7 @@ class Stacklang::Native::Generator
     best_distance = 0
     pick_in.map do |register|
       took_for = @registers[register]?
-      
+
       # There is a free register
       return register unless took_for
 
@@ -204,7 +193,7 @@ class Stacklang::Native::Generator
 
   def clear(read, written)
     addresses = written.map { |a| {a, true} } + read.map { |a| {a, false} }
-    
+
     addresses.each do |(address, written)|
       id = root_id address
       meta = @addresses[id]?
@@ -213,10 +202,10 @@ class Stacklang::Native::Generator
       # If it has been wrote and must be spilled, spill it
       if written && meta.spillable.always?
         # spill if it must
-        unload address 
-      
-      # If it always must be spilled, but has not been written, register cache is invalidated 
-      # (enforce re-load at every read)
+        unload address
+
+        # If it always must be spilled, but has not been written, register cache is invalidated
+        # (enforce re-load at every read)
       elsif meta.spillable.always?
         meta.live_in_register(for: address).try do |register|
           @registers[register] = nil
@@ -226,9 +215,8 @@ class Stacklang::Native::Generator
 
       # Any loaded address that wont be used anymore can be uncached, removed from stack
       if meta.used_at.max <= @index
-
         # free from stack
-        # But NOT if it is an ABI location, as to avoid it from being overwritten 
+        # But NOT if it is an ABI location, as to avoid it from being overwritten
         # they are allocated at function start and stay so for the whole function
         unless address.as?(ThreeAddressCode::Local).try &.abi_expected_stack_offset
           meta.spilled_at.try do |spill_index|
@@ -244,7 +232,7 @@ class Stacklang::Native::Generator
           @registers[register] = nil
         end
         meta.offsets.clear # just in case
-        
+
         # Remove from the addresses list
         @addresses.delete id
       end
@@ -258,5 +246,4 @@ class Stacklang::Native::Generator
     meta.spillable = Metadata::Spillable::Always
     unload_all_offset address
   end
-
 end

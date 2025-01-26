@@ -43,13 +43,13 @@ module RiSC16
         object.sections.each do |section|
           section.references.each do |(name, locations)|
             locations.each do |location|
-              local_name = name#.gsub("__function_", "").gsub("__global_", "")
-               if location.offset != 0
-                 if location.offset > 0
-                   local_name += "+" 
-                 end
-                 local_name += "#{location.offset}"
-               end
+              local_name = name # .gsub("__function_", "").gsub("__global_", "")
+              if location.offset != 0
+                if location.offset > 0
+                  local_name += "+"
+                end
+                local_name += "#{location.offset}"
+              end
               @references[location.address + section.absolute.not_nil!] = local_name # assuming we are debugging a binary loaded at 0
             end
           end
@@ -133,20 +133,20 @@ module RiSC16
 
         windows << Scroll.new x: (NCurses.maxx / 2).ceil, y: 0, height: 10, width: NCurses.maxx // 6, range: 0..7, title: "REGISTERS" do |line|
           case line
-          when 0         then "PC: 0x#{@vm.pc.to_w}"
-          else "R#{line}: 0x#{@vm.registers[line].to_w}"
+          when 0 then "PC: 0x#{@vm.pc.to_w}"
+          else        "R#{line}: 0x#{@vm.registers[line].to_w}"
           end
         end
 
         windows << Table.new(
           x: (NCurses.maxx / 6 * 4).ceil, y: 0, height: (NCurses.maxy).floor, width: NCurses.maxx // 6,
           columns: [3, 16], range: ((0)..(UInt16::MAX.to_i)), title: "STACK") do |address|
-          [(address == @vm.registers[7] ? ">" : " "),"0x#{address.to_u16.to_w}: 0x#{@vm.read_noio(address.to_u16).try(&.to_w) || "?IO?"}"]
+          [(address == @vm.registers[7] ? ">" : " "), "0x#{address.to_u16.to_w}: 0x#{@vm.read_noio(address.to_u16).try(&.to_w) || "?IO?"}"]
         end.tap(&.center @section_stack_symbol_value)
 
-        #windows << CustomWindow.new x: (NCurses.maxx / 2).ceil, y: (NCurses.maxy / 2).floor, height: (NCurses.maxy / 2).ceil, width: NCurses.maxx // 2, title: "TTY" do |window|
+        # windows << CustomWindow.new x: (NCurses.maxx / 2).ceil, y: (NCurses.maxy / 2).floor, height: (NCurses.maxy / 2).ceil, width: NCurses.maxx // 2, title: "TTY" do |window|
         #  window.mvaddstr(@output.tap(&.rewind).gets_to_end, x: 1, y: 1)
-        #end
+        # end
 
         windows.first.focus = true
         loop do

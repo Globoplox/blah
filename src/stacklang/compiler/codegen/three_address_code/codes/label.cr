@@ -1,5 +1,4 @@
 module Stacklang::ThreeAddressCode
-
   struct Label
     property name : String
     property ast : AST

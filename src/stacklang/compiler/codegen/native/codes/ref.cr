@@ -1,5 +1,4 @@
-class Stacklang::Native::Generator  
-
+class Stacklang::Native::Generator
   def compile_ref(code : ThreeAddressCode::Reference)
     raise "Bad operand size for value in ref: #{code}" if code.into.size > 1
     into = grab_for code.into

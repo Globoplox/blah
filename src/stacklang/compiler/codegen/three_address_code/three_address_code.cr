@@ -6,7 +6,6 @@ require "./translator"
 # It consists of a variety of 'codes' that represent assembly like instructions
 # and 'addresses' that represent different kind of values that can be manipulated.
 module Stacklang::ThreeAddressCode
-
   # Given block of code and the context, produce an array of three address code.
   # *unit* is used to pull type and function definitions,
   # *function* is the optional function being translated and is provided for

@@ -3,13 +3,13 @@ require "./metadata"
 require "./load_unload"
 require "./codes/*"
 
-class Stacklang::Native::Generator  
+class Stacklang::Native::Generator
   enum Register : UInt16
     R0 = 0u16
     R1 = 1u16
-    R2 = 2u16 
-    R3 = 3u16 
-    R4 = 4u16 
+    R2 = 2u16
+    R3 = 3u16
+    R4 = 4u16
     R5 = 5u16
     R6 = 6u16
     R7 = 7u16
@@ -39,40 +39,40 @@ class Stacklang::Native::Generator
   # List the address referenced by a code.
   def addresses_of(code : ThreeAddressCode::Code)
     case code
-    in ThreeAddressCode::Add then {code.left, code.right, code.into}
-    in ThreeAddressCode::Nand then {code.left, code.right, code.into}
+    in ThreeAddressCode::Add       then {code.left, code.right, code.into}
+    in ThreeAddressCode::Nand      then {code.left, code.right, code.into}
     in ThreeAddressCode::Reference then {code.address, code.into}
-    in ThreeAddressCode::Move then {code.address, code.into}
-    in ThreeAddressCode::Call then code.parameters.map(&.first) + [code.address, code.into].compact
-    in ThreeAddressCode::Start then {code.address}
-    in ThreeAddressCode::Return then {code.address}
-    in ThreeAddressCode::Store then {code.address, code.value}
-    in ThreeAddressCode::Load then {code.address, code.into}
-    in ThreeAddressCode::Label then Array(ThreeAddressCode::Address).new
-    in ThreeAddressCode::JumpEq then code.operands.try(&.to_a) || [] of ThreeAddressCode::Address
+    in ThreeAddressCode::Move      then {code.address, code.into}
+    in ThreeAddressCode::Call      then code.parameters.map(&.first) + [code.address, code.into].compact
+    in ThreeAddressCode::Start     then {code.address}
+    in ThreeAddressCode::Return    then {code.address}
+    in ThreeAddressCode::Store     then {code.address, code.value}
+    in ThreeAddressCode::Load      then {code.address, code.into}
+    in ThreeAddressCode::Label     then Array(ThreeAddressCode::Address).new
+    in ThreeAddressCode::JumpEq    then code.operands.try(&.to_a) || [] of ThreeAddressCode::Address
     end
   end
 
   # Compile a single three address code
   def compile_code(code : ThreeAddressCode::Code)
     case code
-    in ThreeAddressCode::Add then compile_add code
-    in ThreeAddressCode::Nand then compile_nand code
-    in ThreeAddressCode::Load then compile_load code
-    in ThreeAddressCode::Store then compile_store code
+    in ThreeAddressCode::Add       then compile_add code
+    in ThreeAddressCode::Nand      then compile_nand code
+    in ThreeAddressCode::Load      then compile_load code
+    in ThreeAddressCode::Store     then compile_store code
     in ThreeAddressCode::Reference then compile_ref code
-    in ThreeAddressCode::Move then compile_move code
-    in ThreeAddressCode::Call then compile_call code
-    in ThreeAddressCode::Return then compile_return code
-    in ThreeAddressCode::Start then compile_start code
-    in ThreeAddressCode::Label then compile_label code
-    in ThreeAddressCode::JumpEq then compile_jump_eq code
+    in ThreeAddressCode::Move      then compile_move code
+    in ThreeAddressCode::Call      then compile_call code
+    in ThreeAddressCode::Return    then compile_return code
+    in ThreeAddressCode::Start     then compile_start code
+    in ThreeAddressCode::Label     then compile_label code
+    in ThreeAddressCode::JumpEq    then compile_jump_eq code
     end
   end
 
   def generate : RiSC16::Object::Section
     @codes.each_with_index do |code, index|
-      @index  = index
+      @index = index
       compile_code code
     end
 
@@ -95,14 +95,14 @@ class Stacklang::Native::Generator
   def stack_free(address)
     meta = @addresses[root_id address]
     raise "Already free #{address} #{meta}" unless meta.spilled_at
-    meta.spilled_at.try do |index|      
+    meta.spilled_at.try do |index|
       @stack.free index
     end
     meta.spilled_at = nil
   end
 
-  # Address metadata holding, among other things, a stack location if any is needed, 
-  # and potential register hosting value for some offsets of this location 
+  # Address metadata holding, among other things, a stack location if any is needed,
+  # and potential register hosting value for some offsets of this location
   @addresses : Hash(AddressRootId, Metadata) = {} of AddressRootId => Metadata
 
   alias AddressRootId = Int32 | String
@@ -111,23 +111,24 @@ class Stacklang::Native::Generator
   def root_id(address : ThreeAddressCode::Address) : AddressRootId
     case address
     in ThreeAddressCode::Anonymous
-      0b01 << 30 | address.uid        
+      0b01 << 30 | address.uid
     in ThreeAddressCode::Local
-      0b00 << 30 | address.uid        
+      0b00 << 30 | address.uid
     in ThreeAddressCode::Global
       address.name
-    in ThreeAddressCode::Immediate 
+    in ThreeAddressCode::Immediate
       val = address.value
       case val
-        in String then val
-        in Int32 then 0b10 << 30 | val
+      in String then val
+      in Int32  then 0b10 << 30 | val
       end
-    in ThreeAddressCode::Function  
+    in ThreeAddressCode::Function
       address.name
     end
   end
-  
+
   @codes : Array(ThreeAddressCode::Code)
+
   def initialize(@function : Function, @codes)
     @index = 0
     @section = RiSC16::Object::Section.new @function.symbol, options: RiSC16::Object::Section::Options::Weak
@@ -162,7 +163,6 @@ class Stacklang::Native::Generator
       end
 
       addresses_of(code).each do |address|
-        
         id = root_id address
 
         metadata = @addresses[id]?
@@ -181,13 +181,12 @@ class Stacklang::Native::Generator
         if !metadata.spillable.never?
           address_used_after_label_index[id] = labels.size
         end
-
       end
     end
 
     # For each variable, take the biggest of all the last of usages of the jump of the labels its used after, and add it to the used_at of the var
     address_used_after_label_index.each do |(address_id, last_labels_defined_before_usage)|
-      # Each label defined before this variable last usage 
+      # Each label defined before this variable last usage
       # (AKA, all labels at which a jump may cause issues if the variable has lost it's stack offset between the label and the jump)
       furthest_jump = nil
       (0...last_labels_defined_before_usage).each do |label_defined_before_usage|

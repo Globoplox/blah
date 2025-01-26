@@ -19,14 +19,14 @@ class Stacklang::Function
   property ast : AST::Function
   property unit : Unit
 
-   # Check a block to ensure that it terminates.
-   def deep_check_termination(body)
+  # Check a block to ensure that it terminates.
+  def deep_check_termination(body)
     return false if body.empty?
     last = body[-1]
     case last
-    when AST::Return then true
+    when AST::Return         then true
     when AST::If, AST::While then deep_check_termination last.body
-    else false
+    else                          false
     end
   end
 
@@ -39,7 +39,7 @@ class Stacklang::Function
       end
     end
   end
-  
+
   def initialize(@ast, @unit)
     @name = @ast.name.name
     @symbol = "__function_#{name}"

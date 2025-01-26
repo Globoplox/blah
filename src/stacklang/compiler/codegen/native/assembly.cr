@@ -4,7 +4,6 @@ alias Instruction = RiSC16::Instruction
 
 # Helper functions for generating the actual RiSC16 instructions
 class Stacklang::Native::Generator
-
   def overflow_immediate_offset?(value)
     return true if value.is_a? String
     value > 0x3F || value < -0x40
@@ -21,7 +20,7 @@ class Stacklang::Native::Generator
       else
         movi into, imm
       end
-    end 
+    end
   end
 
   def add(a : Register, b : Register, c : Register)
@@ -75,9 +74,9 @@ class Stacklang::Native::Generator
     else
       immediate = immediate.as?(Int32).not_nil!
       bits = case kind
-              when .imm?, .beq? then 7
-              else                   16
-              end
+             when .imm?, .beq? then 7
+             else                   16
+             end
       value = (immediate < 0 ? (2 ** bits) + immediate.bits(0...(bits - 1)) : immediate).to_u16
       value = value >> 6 if kind.lui?
       value = value & 0x3fu16 if kind.lli?

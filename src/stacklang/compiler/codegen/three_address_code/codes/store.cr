@@ -1,5 +1,4 @@
 module Stacklang::ThreeAddressCode
-
   struct Store
     property address : Address
     property value : Address

@@ -1,5 +1,4 @@
-class Stacklang::Native::Generator  
-
+class Stacklang::Native::Generator
   def compile_call(code : ThreeAddressCode::Call)
     # Must fix the stack size before copying all parameters
     # this mean all parameters and the call address must have a stack location (if they are spilled or not does not matter yet)
@@ -50,11 +49,10 @@ class Stacklang::Native::Generator
     unload_all param_registers
     clear read: code.parameters.map(&.first), written: [] of ThreeAddressCode::Address
 
-
     # Now everything unloaded BUT maybe the call address.
     # We must spill it (in case it is somehting like a local variable assigned previously whose value is hosted but not spilled)
     # But we must keep the register in hour hand.
-    call_address_register =  @addresses[root_id code.address].live_in_register(code.address)
+    call_address_register = @addresses[root_id code.address].live_in_register(code.address)
     was_loaded = call_address_register != nil
     call_address_register ||= load code.address
     unload code.address if was_loaded
@@ -94,7 +92,7 @@ class Stacklang::Native::Generator
         else
           load_immediate FILL_SPILL_REGISTER, stack_size + return_value_offset
           lw into, FILL_SPILL_REGISTER, 0
-        end          
+        end
       else
         raise "Unsupported muti word return value move"
       end

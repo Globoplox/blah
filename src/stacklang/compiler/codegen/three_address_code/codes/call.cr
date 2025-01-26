@@ -1,5 +1,4 @@
 module Stacklang::ThreeAddressCode
-
   struct Call
     property address : Address
     property into : Address?

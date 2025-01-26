@@ -18,7 +18,7 @@ struct Stacklang::ThreeAddressCode::Translator
       if actual_typeinfo != definition.constraint
         raise Exception.new "Parameter #{definition.name} of #{expression.name} should be #{definition.constraint} but is a #{actual_typeinfo}", expression, @function
       end
-      
+
       {address, definition.offset}
     end
 

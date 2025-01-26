@@ -11,14 +11,17 @@ struct Stacklang::ThreeAddressCode::Translator
 
   # Don't ask
   @next_uid = NextUID.new
+
   class NextUID
     @local_uid = 0
+
     def next_uid
       id = @local_uid
       @local_uid += 1
       id
     end
   end
+
   def next_uid
     @next_uid.next_uid
   end
@@ -38,8 +41,8 @@ struct Stacklang::ThreeAddressCode::Translator
         raise Exception.new "Redeclaration of variable #{statement.name}", statement, function if search(statement.name.name) != nil
         typeinfo = function.unit.typeinfo(statement.constraint)
         @entries[statement.name.name] = {
-          Local.new(uid.next_uid, 0, typeinfo.size.to_i, statement, restricted: statement.restricted), 
-          typeinfo
+          Local.new(uid.next_uid, 0, typeinfo.size.to_i, statement, restricted: statement.restricted),
+          typeinfo,
         }
       end
     end
@@ -47,7 +50,7 @@ struct Stacklang::ThreeAddressCode::Translator
     # Build a scope from the root scope of a function including it's parameters only.
     def initialize(function : Stacklang::Function, uid : NextUID)
       @previous = nil
-      function.parameters.each do |parameter| 
+      function.parameters.each do |parameter|
         raise Exception.new "Parameter name conflict '#{parameter.name}'", parameter.ast, function if @entries[parameter.name]? != nil
         # Shadowing is allowed
         @entries[parameter.name] = {Local.new(uid.next_uid, 0, parameter.constraint.size.to_i, parameter.ast, abi_expected_stack_offset: parameter.offset), parameter.constraint}

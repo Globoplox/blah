@@ -7,24 +7,24 @@ struct Stacklang::Native::Generator::Stack
     @slots.each_with_index do |(entry, offset), index|
       case entry
       in ThreeAddressCode::Address then io.puts "Slot #{index}: #{entry} (size: #{entry.size}) (real stack offset: #{offset})"
-      in Int32 then io.puts "Slot #{index}: FREE (size: #{entry}) (real stack offset: #{offset})"
+      in Int32                     then io.puts "Slot #{index}: FREE (size: #{entry}) (real stack offset: #{offset})"
       end
     end
   end
-  
+
   def size
     return 0 if @slots.empty?
     (@slots.size - 1).downto(0) do |ri|
       entry, offset = @slots[ri]
       case entry
-        in ThreeAddressCode::Address then return offset + entry.size
-        in Int32 then next
+      in ThreeAddressCode::Address then return offset + entry.size
+      in Int32                     then next
       end
     end
     return 0
   end
 
-  # Legacy. 
+  # Legacy.
   # TODO: remove this and its usage
   def offset_at(index : Index) : Int32
     index
@@ -45,7 +45,7 @@ struct Stacklang::Native::Generator::Stack
         return enforced
       end
 
-      # Within current stack 
+      # Within current stack
       @slots.each_with_index do |(entry, offset), index|
         case entry
         in ThreeAddressCode::Address then next
@@ -59,16 +59,15 @@ struct Stacklang::Native::Generator::Stack
           elsif offset < enforced && entry == enforced - offset + address.size
             @slots[index, 1] = [{enforced - offset, offset}, {address, enforced}]
             return enforced
-          elsif offset < enforced && entry > enforced - offset + address.size 
-            @slots[index, 1] = [{enforced - offset, offset}, {address, enforced}, {entry -(address.size - enforced - offset), enforced + address.size}]
+          elsif offset < enforced && entry > enforced - offset + address.size
+            @slots[index, 1] = [{enforced - offset, offset}, {address, enforced}, {entry - (address.size - enforced - offset), enforced + address.size}]
             return enforced
           elsif offset > enforced
-              raise "Cannot allocate #{address} at enforced stack offset #{enforced}, offset is not free" 
+            raise "Cannot allocate #{address} at enforced stack offset #{enforced}, offset is not free"
           end
         end
       end
       raise "Cannot allocate #{address} at enforced stack offset #{enforced}, offset is not free"
-  
     else
       @slots.each_with_index do |(entry, offset), index|
         case entry
@@ -80,7 +79,8 @@ struct Stacklang::Native::Generator::Stack
           elsif entry > address.size
             @slots[index, 1] = [{address, offset}, {entry - address.size, offset + address.size}]
             return offset
-          else next
+          else
+            next
           end
         end
       end
@@ -110,9 +110,9 @@ struct Stacklang::Native::Generator::Stack
     count = 1
     entry = current[0]
     total_size = case entry
-      in ThreeAddressCode::Address then entry.size
-      in Int32 then entry
-    end
+                 in ThreeAddressCode::Address then entry.size
+                 in Int32                     then entry
+                 end
     base_address = current[1]
 
     @slots[index - 1]?.try do |entry, base|

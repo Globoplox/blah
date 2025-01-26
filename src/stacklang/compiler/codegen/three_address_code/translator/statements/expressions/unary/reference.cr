@@ -1,6 +1,5 @@
 struct Stacklang::ThreeAddressCode::Translator
   def translate_reference(expression : AST::Unary) : {Address, Type}
-
     operand = expression.operand
     case operand
     when AST::Identifier
@@ -12,8 +11,7 @@ struct Stacklang::ThreeAddressCode::Translator
       end
 
       @tacs << Reference.new address, t0, expression
-      {t0, Type::Pointer.new typeinfo}  
-
+      {t0, Type::Pointer.new typeinfo}
     when AST::Access
       t0 = anonymous 1
       address, typeinfo = translate_access operand
@@ -38,16 +36,14 @@ struct Stacklang::ThreeAddressCode::Translator
 
         if typeinfo.is_a? Type::Table
           typeinfo = typeinfo.table_of
-        end  
+        end
 
         unless typeinfo.is_a? Type::Pointer
           raise Exception.new "Expected pointer type, got non-pointer type #{typeinfo}", expression.operand, @function
         end
         {address, typeinfo}
-
       else raise Exception.new "Cannot compute LValue for Unary operator '#{expression.name}'", expression, @function
       end
-    
     else raise Exception.new "Cannot compute LValue for node '#{expression.class.name}'", expression, @function
     end
   end

@@ -1,7 +1,7 @@
 struct Stacklang::ThreeAddressCode::Translator
   # Conditonals and comparisons expressions return a result of 0 if false or any other value if true
   # However most of the time the result value itself is not used to compute but to jump.
-  # Operations that requires boolean need to perform jumps to assign the right value 
+  # Operations that requires boolean need to perform jumps to assign the right value
   # but this is often redondant with other previously planned umps.
   # This struct when instead of producing a value, the conditional or comparisons operation simply jump to the given label
   struct ConditionalJumps
@@ -20,15 +20,15 @@ struct Stacklang::ThreeAddressCode::Translator
       when AST::Unary
         case expression.name
         when "!" then return translate_logical_not expression, jumps
-        end      
+        end
       when AST::Binary
         case expression.name
         when "==" then return translate_is_equal expression, jumps
         when "!=" then return translate_is_not_equal expression, jumps
         when "&&" then return translate_logical_and expression, jumps
         when "||" then return translate_logical_or expression, jumps
-        when "<" then return translate_inferior_to expression, jumps
-        when ">" then return translate_superior_to expression, jumps
+        when "<"  then return translate_inferior_to expression, jumps
+        when ">"  then return translate_superior_to expression, jumps
         when "<=" then return translate_inferior_equal_to expression, jumps
         when ">=" then return translate_superior_equal_to expression, jumps
         end
@@ -46,7 +46,7 @@ struct Stacklang::ThreeAddressCode::Translator
     @tacs << JumpEq.new(jumps.if_false, {condition_address, Immediate.new 0, expression}, expression)
     # jump to if_true otherwise
     @tacs << JumpEq.new(jumps.if_true, nil, expression)
-  end 
+  end
 
   # TODO: the opposite function, that produce an actual value from the conditonnal operators that usually just jump
   def translate_conditional_as_expression(expression) : {Address, Type}
