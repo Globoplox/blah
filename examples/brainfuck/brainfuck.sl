@@ -1,16 +1,10 @@
-
 require "../../stdlib/prototypes.sl"
 
 fun load_io(io:*, destination:*, size):_ {
 
-  efzfrandom
-  /* 
-    Funny: this is detected as no-op by the compiler and removed before
-     it get checked for existance
-  */
   var restricted i = 0
   var restricted buffer
-  while ((buffer = *io) != 0xff00 ) {
+  while ((buffer = *io) != 0xff00) {
     if (i == size)
       return 0
     *(destination + i) = buffer
@@ -25,10 +19,10 @@ var ram: [0x100]
 fun main:_ {
   var restricted pc = 0
   var restricted ptr = 0
-  var program_size = load_io(&__io_brainfuck, &program, 0x1000)
+  var program_size = load_io(&__io_brainfuck, &program, 0x100)
   var restricted loop_count = 0
 
-  if (program_size == 0x10)
+  if (program_size == 0x100) /* If we have not loaded the whole program because we ran out of space */
      return 1
 
   while (1) {
@@ -56,13 +50,13 @@ fun main:_ {
     if (program[pc] == 0x5B) {
       if (ram[ptr] == 0) {
        	while (program[pc] != 0x5D || loop_count != 0) {
- 	  pc += 1
-	  if (pc == program_size)
-      	    return 1
-	  if (program[pc] == 0x5B)
-	    loop_count += 1
-	  if (program[pc] == 0x5D)
-	    loop_count -= 1
+        pc += 1
+        if (pc == program_size)
+                return 1
+        if (program[pc] == 0x5B)
+          loop_count += 1
+        if (program[pc] == 0x5D)
+          loop_count -= 1
         }
       }
     }
@@ -72,13 +66,13 @@ fun main:_ {
         loop_count = 1
        	while (program[pc] != 0x5B || loop_count != 0) {
           if (pc == 0)
-	    return 1
-	  pc -= 1
-	  if (program[pc] == 0x5D)
-	    loop_count += 1
-	  if (program[pc] == 0x5B)
-	    loop_count -= 1
-	}
+            return 1
+          pc -= 1
+          if (program[pc] == 0x5D)
+            loop_count += 1
+          if (program[pc] == 0x5B)
+            loop_count -= 1
+        }
       }
     }
 

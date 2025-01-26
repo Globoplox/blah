@@ -1,7 +1,7 @@
 require "./error"
 require "./unit"
 require "../parser"
-require "./codegen/native/generator"
+require "./codegen/native"
 
 # Stacklang compiler.
 # This particular class does the following:

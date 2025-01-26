@@ -27,4 +27,12 @@ struct Stacklang::ThreeAddressCode::Translator
     @tacs << Call.new function_address, into.try(&.[0]), parameters_and_offsets, expression, called_function.return_value_offset
     into
   end
+
+  def translate_binary_to_call(expression : AST::Binary, function_name : String) : {Address, Type}?
+    translate_call AST::Call.new(
+      token: expression.token,
+      name: AST::Identifier.new(expression.token, function_name),
+      parameters: [expression.left, expression.right]
+    )
+  end
 end

@@ -20,11 +20,11 @@ All of which are bundled within a single CLI tool, written in [Crystal](https://
 - [ ] Full refactor
   - [ ] Rewrite assembler parser 
   - [ ] Improve assembler/stacklang lexers to stream and parsers to have a fixed low look-ahead
-  - [ ] Full compiler refactor
-     - [ ] Three address code intermediary
+  - [x] Full compiler refactor
+     - [x] Three address code intermediary
      - [ ] Various simples optimizations
-     - [ ] Smarter register handling
-  - [ ] Consider switching to a custom 20 bits words ISA
+     - [x] Smarter register handling
+  - [ ] ~~Consider switching to a custom 20 bits words ISA~~
 - [x] Write an assembler able to ouput raw bitcode
   - [ ] Better error output for linker
 - [x] Write a dummy virtual machine that can execute this raw bitcode
@@ -41,10 +41,10 @@ All of which are bundled within a single CLI tool, written in [Crystal](https://
   - [ ] Operators overload on non-word or pointer types
   - [ ] Implement else, elsif, next, break
   - [ ] Global variable initialization
-  - [ ] Scoped variables (in statement blocks) allocated as needed
-  - [ ] Add error for stack size exceding small immediate size
-  - [ ] Fix && and ||
-  - [ ] Fix >= and <=
+  - [x] Scoped variables (in statement blocks) allocated as needed
+  - [ ] ~~Add error for stack size exceding small immediate size~~
+  - [x] Fix && and ||
+  - [x] Fix >= and <=
   - [ ] Refactor compiler to be simpler
   - [ ] Inline small functions
 - [ ] Stdlib

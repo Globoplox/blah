@@ -43,6 +43,10 @@ struct Stacklang::ThreeAddressCode::Translator
         when "<=" then translate_conditional_as_expression(expression) { |jumps| translate_inferior_equal_to expression, jumps }
         when ">" then translate_conditional_as_expression(expression) { |jumps| translate_superior_to expression, jumps }
         when ">=" then translate_conditional_as_expression(expression) { |jumps| translate_superior_equal_to expression, jumps }
+        when "<<" then translate_binary_to_call expression, "left_bitshift"
+        when ">>" then translate_binary_to_call expression, "right_bitshift"
+        when "*" then translate_binary_to_call expression, "multiply"
+        when "[" then translate_table_access expression
         else raise Exception.new "Unsupported binary operator '#{expression.name}'", expression, @function
         end      
       in AST::Operator

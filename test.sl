@@ -12,13 +12,17 @@
   - conditonal statement values (a = 1 || 0)
   - sugar assignments
   TODO:
-  - mutating unsupported operators to call
   - table access
   - All non-word sized address handling
-  - Maybe: else blocks ?
+  - Maybe: else blocks ? No condition while ?
 */
 
+require "stdlib/multiply"
+
+
 fun main:_ {
-  var a = 0x8765
-  return a
+  var a:[2]
+  a[0] = 1
+  a[a[0]] = 0xFFBC
+  return a[1]
 }

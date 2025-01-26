@@ -49,12 +49,14 @@ class Stacklang::Function
     offset = @return_type.try(&.size.to_i) || 0
     @parameters = @ast.parameters.map do |parameter|
       typeinfo = @unit.typeinfo(parameter.constraint)
-      Parameter.new(
+      parameter = Parameter.new(
         ast: parameter,
         name: parameter.name.name,
         constraint: typeinfo,
-        offset: (offset += typeinfo.size)
+        offset: offset
       )
+      offset += typeinfo.size
+      parameter
     end
   end
 end

@@ -6,12 +6,22 @@ struct Stacklang::ThreeAddressCode::Translator
     when AST::Identifier
       t0 = anonymous 1
       address, typeinfo = translate_identifier operand
+
+      if typeinfo.is_a? Type::Table
+        typeinfo = typeinfo.table_of
+      end
+
       @tacs << Reference.new address, t0, expression
       {t0, Type::Pointer.new typeinfo}  
 
     when AST::Access
       t0 = anonymous 1
       address, typeinfo = translate_access operand
+
+      if typeinfo.is_a? Type::Table
+        typeinfo = typeinfo.table_of
+      end
+
       @tacs << Reference.new address, t0, expression
       {t0, Type::Pointer.new typeinfo}
       # Note that if the root of this access is not an identifier or a dereferencement,
@@ -25,6 +35,11 @@ struct Stacklang::ThreeAddressCode::Translator
           raise Exception.new "Expression has no type", expression.operand, @function
         end
         address, typeinfo = target
+
+        if typeinfo.is_a? Type::Table
+          typeinfo = typeinfo.table_of
+        end  
+
         unless typeinfo.is_a? Type::Pointer
           raise Exception.new "Expected pointer type, got non-pointer type #{typeinfo}", expression.operand, @function
         end
