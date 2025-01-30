@@ -4,11 +4,9 @@ require "./parser"
 module RiSC16::Assembler
   extend self
 
-  def assemble(source : String | Path)
-    assemble(File.open source do |input|
-      parser = RiSC16::Assembler::Parser.new input
-      parser.unit(name: source) || raise "Parse error in input file #{source}"
-    end)
+  def assemble(sourcename : String, input : IO)
+    parser = RiSC16::Assembler::Parser.new input
+    assemble(parser.unit(name: sourcename) || raise "Parse error in input file #{sourcename}")
   end
 
   def assemble_immediate(section, address, immediate, kind)

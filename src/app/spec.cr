@@ -51,6 +51,7 @@ class RiSC16::Spec
     class IO < Segment
       property tty : Bool
       property source : String?
+      property sink : String?
 
       def initialize(properties)
         properties["size"] = "1"
@@ -61,7 +62,8 @@ class RiSC16::Spec
         else                   raise "Bad value for segment properties tty: '#{is_tty}'"
         end
         @source = properties["source"]?
-        raise "Source must be provided for no-tty io segment" if @source.nil? && !@tty
+        @sink = properties["sink"]?
+        raise "At least one of source or sink must be provided for no-tty io segment" if @source.nil? && @sink.nil? && !@tty
       end
     end
 
@@ -110,10 +112,8 @@ class RiSC16::Spec
     end
   end
 
-  def self.open(filename, macros)
-    File.open filename do |io|
-      self.new INI.parse(io), macros
-    end
+  def self.open(io, macros)
+    self.new INI.parse(io), macros
   end
 
   def self.default

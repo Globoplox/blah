@@ -35,11 +35,12 @@ class RiSC16::VM
       property start : UInt16
       property size : UInt16
 
-      def initialize(segment : RiSC16::Spec::Segment::Rom)
+      def initialize(segment : RiSC16::Spec::Segment::Rom, fs)
         @start = segment.start
         @size = segment.size
         @data = Slice(UInt16).new segment.size
-        File.open segment.source do |io|
+        input_name = segment.source
+        fs.read input_name do |io|
           0.upto segment.size do |index|
             @data[index] = Word.from_io io, ::IO::ByteFormat::BigEndian
           end
@@ -50,27 +51,38 @@ class RiSC16::VM
     class IO < Addressable
       property start : UInt16
       property size : UInt16
-      @read : ::IO
-      @write : ::IO
-      @opened : ::IO? = nil
+      @read : ::IO?
+      @write : ::IO?
+      @do_close = true
 
-      def initialize(segment : RiSC16::Spec::Segment::IO)
+      def initialize(segment : RiSC16::Spec::Segment::IO, fs, io_mapping)
         @start = segment.start
         @size = 1u16
-        if segment.tty
-          @read = STDIN
-          @write = STDOUT
+        overrides = io_mapping[segment.name]?
+        source  = 
+        if overrides
+          @do_close = false
+          @read, @write = overrides
         else
-          @read = @write = @opened = File.open segment.source.not_nil!
+          segment.source.try do |source|
+            @read = fs.open source, "r"
+            @write = nil
+          end
+          segment.sink.try do |sink|
+            @write = fs.open sink, "w"
+            @read = nil
+          end
         end
       end
 
-      def override(@read, @write)
-        @opened.try &.close
+      def close
+        return unless @do_close
+        @read.try &.close
+        @write.try &.close
       end
 
       def finalize
-        @opened.try &.close
+        close
       end
 
       EOS = 0xff00u16
@@ -118,24 +130,20 @@ class RiSC16::VM
   property halted = false
   @instruction : Instruction
 
-  # Build a VM from a specfile. Allow override of IO for easier debugging.
-  # TODO rework bcs it's ugly
-  def self.from_spec(spec, io_override = {} of String => {IO, IO})
+  def self.from_spec(spec, fs, io_mapping)
     segments = [] of Addressable
     default = Addressable::Default.new
     spec.segments.sort_by(&.start).reduce(0) { |address, segment|
       segments << case segment
-      when RiSC16::Spec::Segment::Rom then Addressable::Rom.new segment
-      when RiSC16::Spec::Segment::Ram then Addressable::Ram.new segment
+      when RiSC16::Spec::Segment::Rom
+        Addressable::Rom.new segment, fs
+      when RiSC16::Spec::Segment::Ram
+        Addressable::Ram.new segment
       when RiSC16::Spec::Segment::IO
-        io = Addressable::IO.new segment
-        if io_override[segment.name]?
-          read, write = io_override[segment.name]
-          io.override read, write
-        end
-        io
-      when RiSC16::Spec::Segment::Default then Addressable::Default.new segment
-      else                                     raise "Unknown segment kind"
+        Addressable::IO.new segment, fs, io_mapping
+      when RiSC16::Spec::Segment::Default
+        Addressable::Default.new segment
+      else raise "Unknown segment kind"
       end
       segment.start.to_i + segment.size
     }
@@ -144,6 +152,15 @@ class RiSC16::VM
 
   def initialize(@address_space, @default)
     @instruction = Instruction.decode 0u16
+  end
+
+  def close
+    @address_space.each do |segment|
+      case segment
+      when Addressable::IO
+        segment.close
+      end
+    end
   end
 
   def segment(address)
@@ -167,8 +184,8 @@ class RiSC16::VM
     segment(address).write(address, value)
   end
 
-  def load(program, at = 0)
-    program.each_byte do |byte|
+  def load(program : Bytes, at = 0)
+    program.each do |byte|
       raise "Program overflow address space at #{at}" if at > UInt16::MAX
       write((at.to_u16 // 2), (read(at.to_u16 // 2) | byte.to_i16 << 8 * ((at + 1) % 2)))
       at += 1

@@ -10,7 +10,7 @@ dependencies:
 
 targets:
   cli:
-    main: src/cli.cr
+    main: src/clients/cli/cli.cr
 
 crystal: 1.9.2
 

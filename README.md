@@ -16,6 +16,15 @@ It consists of:
 
 All of which are bundled within a single CLI tool, written in [Crystal](https://crystal-lang.org/).
 
+## TODO App
+- [ ] Group functionalities behind a presentation independent application
+  - [ ] Build a CLI presentation layer
+  - [ ] Build an HTTP API presentation layer
+- [ ] Build language servers
+- [ ] Rename the project
+- [ ] Build a web app client to the HTTP API presentation layer
+- [ ] ~~Optionnal stacklang body parsing skip when accessed to require only~~ 
+
 ## TODO
 - [ ] Full refactor
   - [ ] Rewrite assembler parser 
