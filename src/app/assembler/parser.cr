@@ -5,6 +5,9 @@ class RiSC16::Assembler::Parser < Parser
   include RiSC16::Assembler::AST
   @path : String? = nil
 
+  class Exception < ::Exception
+  end
+
   rule def number
     sign = str(["-", "+"]) || ""
     case str ["0x", "0b"]
@@ -107,12 +110,12 @@ class RiSC16::Assembler::Parser < Parser
     Section.new name.join, offset, weak: weak
   end
 
-  rule def unit(name = nil)
+  rule def unit
     multiline_whitespace
     statements = zero_or_more ->statement, separated_by: ->multiline_whitespace
     multiline_whitespace
     next unless read_fully?
-    Unit.new statements.reject(&.empty?), name: name
+    Unit.new statements.reject(&.empty?)
   end
 
   def initialize(path : String)

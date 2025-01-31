@@ -60,11 +60,9 @@ module RiSC16::Assembler::AST
   end
 
   class Unit < Node
-    property name : String?
     property statements : Array(Statement)
-    getter name
 
-    def initialize(@statements, @name = nil)
+    def initialize(@statements)
     end
   end
 end

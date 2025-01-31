@@ -3,7 +3,7 @@
 You know **con**langs, **Blah** is a **con**con (for con computer).  
 It is a from-scratch computing environnment based on [RiSC16](https://user.eng.umd.edu/~blj/risc/).
 
-**Blah** is a pet project that I am working on for fun. 
+**Blah** is a toy project that I am working on for fun. 
 It serves no other purpose than entertaining me.  
 
 It consists of:
@@ -16,16 +16,35 @@ It consists of:
 
 All of which are bundled within a single CLI tool, written in [Crystal](https://crystal-lang.org/).
 
-## TODO App
-- [ ] Group functionalities behind a presentation independent application
-  - [ ] Build a CLI presentation layer
-  - [ ] Build an HTTP API presentation layer
+## TODO App/Global
+- [x] Group functionalities behind a presentation independent application
+  - [x] Build a CLI presentation layer
+- [ ] Improve app instrumentation (stream events), support requirement context for stacklang
+- [ ] Split projects into toolchain/app toolchain/clients app/api app/client app/database, ...
 - [ ] Build language servers
 - [ ] Rename the project
-- [ ] Build a web app client to the HTTP API presentation layer
-- [ ] ~~Optionnal stacklang body parsing skip when accessed to require only~~ 
+- [ ] Recipe files / books (makeshift makefiles)
+- [ ] Debugger server
+- [ ] Design a reasonnably doable webappified version:
+  - [ ] API with:
+    - [ ] Docker, Migration, User with in-house auth and social logins
+    - [ ] Project with a file tree (total size quotas per project / per user)
+    - [ ] Websocket for streaming warning / error / compilation progress, and runtime tty (websocket quotas)
+    - [ ] Projects ACL, for sharing projects with various privilege (private, shared, public, read/write priviliege)
+      - [ ] Browse public projects (such as stdlib, wiki, demo)
+      - [ ] Clone project
+      - [ ] Language feature to allow references to public projects 
+  - [ ] Frontend client with:
+    - [ ] Toolbar for account/project management (create, switch, delete, export, log out, account details)
+    - [ ] File explorer
+    - [ ] Code editor
+    - [ ] Log console
+    - [ ] Up to several tty console
+    - [ ] A debugger client
+    - [ ] Markdown rendering
+  - [ ] TESTS
 
-## TODO
+## TODO Toolchain
 - [ ] Full refactor
   - [ ] Rewrite assembler parser 
   - [ ] Improve assembler/stacklang lexers to stream and parsers to have a fixed low look-ahead
@@ -71,7 +90,7 @@ All of which are bundled within a single CLI tool, written in [Crystal](https://
   - [ ] Memory paging trhough bank switch or file system
   - [ ] Memory protection (isolate programs and limit jump between programs)  
 - [ ] Define fixed spec for a computer
-- [ ] Define a standard configuration/description mechanism for detecting hardware
+- [ ] Define a standard configuration/description mechanism for detecting 'hardware'
 
 # Full example
 

@@ -1,9 +1,10 @@
-require "../../stdlib/prototypes.sl"
+require "../../stdlib/prototypes"
+require "../../stdlib/multiply"
 
 fun load_io(io:*, destination:*, size):_ {
 
-  var restricted i = 0
-  var restricted buffer
+  var i = 0
+  var buffer
   while ((buffer = *io) != 0xff00) {
     if (i == size)
       return 0
@@ -17,10 +18,10 @@ var program: [0x100]
 var ram: [0x100]
 
 fun main:_ {
-  var restricted pc = 0
-  var restricted ptr = 0
+  var pc = 0
+  var ptr = 0
   var program_size = load_io(&__io_brainfuck, &program, 0x100)
-  var restricted loop_count = 0
+  var loop_count = 0
 
   if (program_size == 0x100) /* If we have not loaded the whole program because we ran out of space */
      return 1
@@ -50,13 +51,13 @@ fun main:_ {
     if (program[pc] == 0x5B) {
       if (ram[ptr] == 0) {
        	while (program[pc] != 0x5D || loop_count != 0) {
-        pc += 1
-        if (pc == program_size)
-                return 1
-        if (program[pc] == 0x5B)
-          loop_count += 1
-        if (program[pc] == 0x5D)
-          loop_count -= 1
+          pc += 1
+          if (pc == program_size)
+                  return 1
+          if (program[pc] == 0x5B)
+            loop_count += 1
+          if (program[pc] == 0x5D)
+            loop_count -= 1
         }
       }
     }

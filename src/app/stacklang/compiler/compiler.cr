@@ -10,19 +10,21 @@ require "./codegen/native"
 # - extract and build cache of units
 class Stacklang::Compiler
   # Cache of all units opened
-  @units = {} of Path => Unit
+  @units = {} of String => Unit
   # The unit to compile
   @unit : Unit?
   getter spec
 
-  def initialize(path : String, @spec : RiSC16::Spec, @debug = true)
-    absolute = Path[path].expand home: true
-    begin
-      ast = Stacklang::Parser.open path, &.unit
-    rescue syntax_error : Parser::Exception
-      raise Exception.new syntax_error.message, cause: syntax_error
+  @fs : App::Filesystem
+  @events : App::EventStream
+
+  def initialize(path : String, @spec : RiSC16::Spec, @debug : Bool, @fs : App::Filesystem, @events : App::EventStream)
+    absolute = @fs.absolute path
+    ast = @fs.read path do |io|
+      Stacklang::Parser.new(io, path).unit
     end
-    @unit = Unit.new ast, absolute, self
+
+    @unit = Unit.new ast, absolute, self, @events
     @units[absolute] = @unit.not_nil!
   end
 
@@ -49,13 +51,17 @@ class Stacklang::Compiler
 
   # Fetch a required unit from cache or parse it.
   # Cached in a cache common with provided entrypoints units.
-  def require(path : String, from : Unit) : Unit
-    path += ".sl" unless path.includes? '.'
-    absolute = Path[path].expand home: true, base: from.path.dirname
+  def require(path : String, from : Unit, require_chain : Array(Unit)) : Unit
+    dir, base, ext = @fs.base path
+    raise "Requirement cannot be a directory" if base.nil?
+    ext ||= ".sl"
+    path = @fs.path_for dir, base, ext
+    base_dir, _, _ = @fs.base from.path
+    absolute = @fs.absolute path, root: base_dir
     @units[absolute]? || begin
-      @units[absolute] = Unit.new Stacklang::Parser.open(absolute.to_s, &.unit), absolute, self
-    rescue syntax_error : Parser::Exception
-      raise Exception.new syntax_error.message, cause: syntax_error
+      @fs.read absolute do |io|
+        @units[absolute] = Unit.new Stacklang::Parser.new(io, absolute).unit, absolute, self, @events, require_chain
+      end
     end
   end
 end

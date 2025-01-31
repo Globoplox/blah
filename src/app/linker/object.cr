@@ -2,7 +2,7 @@
 # It can be linked into other objects or into a binary. See `RiSC16::Assembler::Linker`.
 class RiSC16::Object
   # Optional name used to indicate the origin source of an object file, for helping humans.
-  property name : String?
+  property name : String
 
   # The array of sections, that is, continuous piece of data, declaring and referencing symbols.
   property sections : Array(Section) = [] of Section
@@ -12,7 +12,7 @@ class RiSC16::Object
   # have all the sections it contains have a fixed, relative to 0, absolute address.
   property merged : Bool
 
-  def initialize(@name = nil)
+  def initialize(@name)
     @merged = false
   end
 
@@ -130,7 +130,7 @@ class RiSC16::Object
   end
 
   # Build an object from given *io*.
-  def self.from_io(io, name = nil, endian = ENDIAN)
+  def self.from_io(io : IO, name : String, endian = ENDIAN)
     object = self.new(name)
     object.merged = UInt8.from_io(io, endian) != 0
     (Int32.from_io io, endian).times do

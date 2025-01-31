@@ -1,4 +1,3 @@
-# Representation and location independant business logic
 # TODO: warning
 # TODO: errors
 # TODO: vm
@@ -14,14 +13,129 @@ require "./assembler"
 require "./stacklang/compiler"
 require "./vm"
 
+# Representation and location independant business logic
 class App
   @debug : Bool
   @spec : RiSC16::Spec
   @fs : Filesystem
+  @events : EventStream
 
   getter spec
 
-  def initialize(@debug, spec_file : String?, macros : Hash(String, String), @fs)
+  # Provide access to files, asbtracting actual files locations.
+  abstract class Filesystem
+    
+    # Produce an user facing representation
+    abstract def normalize(path : String) : String 
+
+    # Return an aboslute path for the file, optionally giving a new root
+    abstract def absolute(path : String, root = nil) : String
+
+    # Open the requested file
+    abstract def open(path : String, mode : String) : IO
+    
+    def read(path : String)
+      io = open path, "r"
+      result = yield io
+      io.close
+      return result
+    end
+
+    def write(path : String)
+      io = open path, "w"
+      result = yield io
+      io.close
+      return result
+    end
+
+    # Test if the given path is a directory
+    abstract def directory?(path : String) : Bool
+    
+    # Split the given path in directory, base file name and file extension.
+    # Note that file extension include the '.'.
+    # If there are multiple extensions, only the last is returned:
+    # `base "file.tar.zip"` => ".zip"
+    abstract def base(path : String) : {String, String?, String?} # directory, base name, extension
+    
+    # Build a path given a directory, basename and extension
+    abstract def path_for(directory : String, basename : String?, extension : String?)
+  end
+
+  # Provide a target for streaming warning and errors
+  abstract class EventStream
+    enum Level
+      Warning
+      Error
+      Fatal
+      Context
+    end
+
+    class HandledFatalException < ::Exception
+    end
+
+    @debug = false
+
+    protected abstract def event(level : Level, title : String, body : String?, source : String?, line : Int32?, column : Int32?)
+
+    @context = [] of {String, String?, Int32?, Int32?}
+    def with_context(title : String, source : String? = nil, line : Int32? = nil, column : Int32? = nil)
+      @context.push({title, source, line, column})
+      begin
+        yield
+      rescue ex
+        fatal! ex
+      ensure
+        @context.pop
+      end
+    end
+
+    def warn(title : String, source : String? = nil, line : Int32? = nil, column : Int32? = nil, &)
+      body = String.build do |io|
+        yield io
+      end
+      event :warning, title, body, source, line, column
+    end
+    
+    def warn(title : String, source : String? = nil, line : Int32? = nil, column : Int32? = nil)
+      event :warning, title, nil, source, line, column
+    end
+
+    def error(title : String, source : String? = nil, line : Int32? = nil, column : Int32? = nil, &)
+      body = String.build do |io|
+        yield io
+      end
+      event :error, title, body, source, line, column
+    end
+
+    def error(title : String, source : String? = nil, line : Int32? = nil, column : Int32? = nil)
+      event :error, title, nil, source, line, column
+    end
+
+    # Log and interrupt
+    def fatal!(title : String, source : String? = nil, line : Int32? = nil, column : Int32? = nil, &) : NoReturn
+      body = String.build do |io|
+        yield io
+      end
+      event :fatal, title, body, source, line, column
+      raise HandledFatalException.new
+    end
+
+    # Log exception thrown by external source
+    def fatal!(exception : Exception) : NoReturn
+      case exception
+      when HandledFatalException then raise exception
+      else
+        body = exception.message || exception.inspect
+        if @debug
+          body = [body, exception.backtrace.map { |s| "  from #{s}" }].flatten.join "\n"
+        end
+        event :fatal, exception.class.name, body, nil, nil, nil
+        raise HandledFatalException.new cause: exception
+      end
+    end
+  end
+
+  def initialize(@debug, spec_file : String?, macros : Hash(String, String), @fs, @events)
     @spec = spec_file.try do |file|
       @fs.read file, ->(io : IO) do
         RiSC16::Spec.open io, macros
@@ -29,175 +143,112 @@ class App
     end || RiSC16::Spec.default
   end
 
-  # Provide access to files, asbtracting actual files locations
-  abstract class Filesystem
-    abstract def normalize(path : String) : String 
-    abstract def open(path : String, mode : String) : IO
-    
-    def read(path : String)
-      io = open(path, "r")
-      v = yield io
-      io.close
-      v
-    end
+  # Commands methods
+  # Provide pure access to compilation related functionalities. 
+  # Dependency on filesystems and consoles are injected.
+  # Note that command method do raise exception in case of error, additionaly to emitting error and fatal events.
+  # Commands accepts inputs both as filsystem handles and occasionally as runtime object, 
+  # and return runtime object additionaly to outputting to filesystem.
+  # This allows instrumentation with low hassle while not compromising on performance
+  # and prevent unecessary temporary / intermediate files cluttering. 
 
-    def write(path : String)
-      io = open(path, "w")
-      v = yield io
-      io.close
-      v
-    end
+  def assemble(source : String, destination : String)
+    @events.with_context "assembling #{@fs.normalize source} into '#{@fs.normalize destination}'" do 
+      object = @fs.read source do |input|
+        RiSC16::Assembler.assemble(@fs.normalize(source), input, @events)
+      end
 
-    abstract def directory?(path : String) : Bool
-    abstract def base(path : String) : {String, String?, String?} # directory, base name, extension
-    abstract def path_for(directory : String, basename : String?, extension : String?)
-  end
-
-  def assemble(source : String, destination : String?) : RiSC16::Object
-    _, source_base, source_ext = @fs.base source
-
-    object = @fs.read source do |input|
-      RiSC16::Assembler.assemble(@fs.normalize(source), input)
-    end
-
-    if destination
-      dest_dir, dest_base, dest_ext = @fs.base destination
-      dest_ext = ".ro" unless dest_ext
-      dest_base = source_base unless dest_base
-      destination = @fs.path_for dest_dir, dest_base, dest_ext
       @fs.write destination do |output|
         object.to_io(output)
       end
     end
-    
-    return object
   end
 
-  def open(source : String) : Array(RiSC16::Object)
-    _, source_base, source_ext = @fs.base source
-    @fs.read source do |input|
-      case source_ext
-      when ".lib" then RiSC16::Lib.from_io(input).objects
-      when ".ro" then [RiSC16::Object.from_io input, name: source]
-      else raise "Unable to handle file #{@fs.normalize source}"
-      end   
-    end
-  end
+  def compile(source : String, destination : String)
+    @events.with_context "compiling #{@fs.normalize source} into '#{@fs.normalize destination}'" do 
+      object = @fs.read source do |input|
+        Stacklang::Compiler.new(source, @spec, @debug, @fs, @events).compile
+      end
 
-  def compile(source : String, destination : String?) : RiSC16::Object
-    _, source_base, source_ext = @fs.base source
-
-    object = @fs.read source do |input|
-      Stacklang::Compiler.new(source, @spec, @debug).compile
-    end
-
-    if destination
-      dest_dir, dest_base, dest_ext = @fs.base destination
-      dest_ext = ".ro" unless dest_ext
-      dest_base = source_base unless dest_base
-      destination = @fs.path_for dest_dir, dest_base, dest_ext
       @fs.write destination do |output|
         object.to_io(output)
       end
     end
-    
-    return object
   end
 
-  def lib(sources : Indexable(String | RiSC16::Object | RiSC16::Lib), destination : String?) : RiSC16::Lib
-    objects = sources.map do |source|
-      case source
-        in RiSC16::Object then source 
-        in RiSC16::Lib then source.objects 
-        in String
+  def lib(sources : Indexable(String), destination : String)
+    source_names = sources.map { |source| @fs.normalize source }.join " "
+    @events.with_context "making lib '#{source_names}' into '#{@fs.normalize destination}'" do 
+      objects = sources.map do |source|
+        _, _, source_ext = @fs.base source
         @fs.read source do |input|
           case source_ext
-          when ".lib" then RiSC16::Lib.from_io(input).objects
-          when ".ro" then RiSC16::Object.from_io input, name: source
-          else raise "Unable to handle file #{@fs.noramlize source}"
-          end   
+          when ".lib" then RiSC16::Lib.from_io(input, name: @fs.normalize source).objects
+          when ".ro" then RiSC16::Object.from_io input, name: @fs.normalize source
+          else raise "Unable to handle file #{@fs.normalize source}"
+          end
         end
-      end
-    end.flatten
+      end.flatten
 
-    libfile = RiSC16::Lib.new(objects)
+      libfile = RiSC16::Lib.new(objects, name: destination)
 
-    if destination
       @fs.write destination do |output|
         libfile.to_io(output)
       end
     end
-    
-    return libfile
   end
 
-  def merge(sources : Indexable(String | RiSC16::Object | RiSC16::Lib), destination : String?, dce : Bool = true) : RiSC16::Object
-    objects = sources.map do |source|
-      case source
-        in RiSC16::Object then source 
-        in RiSC16::Lib then source.objects 
-        in String
+  def merge(sources : Indexable(String), destination : String, dce : Bool = true) 
+
+    source_names = sources.map { |source| @fs.normalize source }.join " "
+    @events.with_context "merging '#{source_names}' into '#{@fs.normalize destination}'" do 
+      objects = sources.map do |source|
         _, _, source_ext = @fs.base source
         @fs.read source do |input|
           case source_ext
-          when ".lib" then RiSC16::Lib.from_io(input).objects
-          when ".ro" then RiSC16::Object.from_io input, name: source
-          else raise "Unable to handle file #{@fs.noramlize source}"
+          when ".lib" then RiSC16::Lib.from_io(input, name: @fs.normalize source).objects
+          when ".ro" then RiSC16::Object.from_io input, name: @fs.normalize source
+          else raise "Unable to handle file #{@fs.normalize source}"
           end   
         end
-      end
-    end.flatten
+      end.flatten
 
-    RiSC16::Dce.optimize objects if dce
-    object = RiSC16::Linker.merge(@spec, objects)
+      RiSC16::Dce.optimize objects if dce
+      object = RiSC16::Linker.merge(@spec, objects, destination)
 
-    if destination
       @fs.write destination do |output|
         object.to_io(output)
       end
     end
-
-    return object
   end
 
-  def link(source : String | RiSC16::Object, destination : String?) : Bytes
-    object = case source
-    in RiSC16::Object then source 
-    in String
-      _, _, source_ext = @fs.base source
-      @fs.read source do |input|
-        case source_ext
-        when ".ro" then RiSC16::Object.from_io input, name: source
-        else raise "Unable to handle file #{@fs.noramlize source}"
-        end
+  def link(source : String, destination : String)
+    @events.with_context "linking '#{@fs.normalize source}'' into '#{@fs.normalize destination}'" do 
+      object = @fs.read source do |input|
+        RiSC16::Object.from_io input, name: @fs.normalize source
       end
-    end
-    
-    # Log.warn &.emit "Linking into a binary without 'start' symbol" unless silence_no_start || merged_object.has_start?
+      
+      unless object.has_start?
+        @events.warn title: "Link source merged object has no 'start' symbol", source: @fs.normalize source
+      end
 
-
-    raw = IO::Memory.new
-    RiSC16::Linker.static_link @spec, object, raw, start: 0
-    
-    if destination
+      raw = IO::Memory.new
+      RiSC16::Linker.static_link @spec, object, raw, start: 0
+      
       @fs.write destination do |output|
         raw.rewind
         IO.copy src: raw, dst: output
       end
     end
-
-    return raw.to_slice
   end
  
-  def run(source : String | Bytes, io_mapping : Hash(String, {IO, IO})) : Void
-    bytes = case source
-    in Bytes then source
-    in String
-      @fs.read source do |input|
+  def run(source : String, io_mapping : Hash(String, {IO, IO})) : Void
+    @events.with_context "running '#{@fs.normalize source}'" do 
+      bytes = @fs.read source do |input|
         input.getb_to_end
       end
+        
+      RiSC16::VM.from_spec(spec, @fs, io_mapping).tap(&.load(bytes, at: 0)).tap(&.run).close
     end
-
-    RiSC16::VM.from_spec(spec, @fs, io_mapping).tap(&.load(bytes, at: 0)).tap(&.run).close
   end
 end

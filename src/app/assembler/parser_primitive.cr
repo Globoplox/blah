@@ -45,7 +45,6 @@ class Parser
       unless @checkpoint.locked
         rollback
       else
-        pp @checkpoint
         raise Exception.new "Parse error"
       end
     end

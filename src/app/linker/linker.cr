@@ -27,7 +27,7 @@ module RiSC16::Linker
   # Link several objects into a single object.
   # It set the `absolute` field of section, which mean
   # Attributing them an absolute location, assuming a loading location of 0.
-  def merge(spec : Spec, objects : Array(RiSC16::Object)) : RiSC16::Object
+  def merge(spec : Spec, objects : Array(RiSC16::Object), destination_name) : RiSC16::Object
     start = 0
     predefined_section_size = {} of String => UInt32
     predefined_section_address = {} of String => UInt32
@@ -78,7 +78,7 @@ module RiSC16::Linker
       end
     end
 
-    RiSC16::Object.new.tap do |object|
+    RiSC16::Object.new(name: destination_name).tap do |object|
       objects.each &.sections.each do |section|
         object.sections << section
       end
@@ -126,7 +126,7 @@ module RiSC16::Linker
   # This is the piece of code that would be necessary to bootstrap to be able to
   # dynamically load programs from another program (this would also work for loading dynamic libraries).
   def static_link(spec, object, io, start : Int32 = 0)
-    object = merge(spec, [object]) if object.merged == false
+    raise "Cannot link unmerged object" if object.merged == false
 
     link_local_beq object
     strip_unused object

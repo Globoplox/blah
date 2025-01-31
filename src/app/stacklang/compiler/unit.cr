@@ -16,30 +16,33 @@ class Stacklang::Unit
   @structs : Hash(String, Type::Struct)? = nil
   @functions : Hash(String, Function)? = nil
   @globals : Hash(String, Global)? = nil
-
-  def initialize(@ast : AST::Unit, @path : Path, @compiler : Compiler)
+  
+  def initialize(@ast : AST::Unit, @path : String, @compiler : Compiler, @events : App::EventStream, @require_chain : Array(Unit) = [] of Unit)
   end
 
-  # Get the unit of all the directly required units.
-  def requirements : Array(Unit)
-    @requirements ||= @ast.requirements.map do |requirement|
-      @compiler.require requirement.target, from: self
-    end
-  end
-
+  @traversed : Array(Unit)? = nil
   # Get the unit of all the directly and indirectly required units.
   def traverse
-    ([] of Unit).tap do |units|
-      traverse units
-    end.uniq
+    @traversed ||= (([] of Unit).tap do |units|
+      traverse units, [] of Unit
+    end.uniq)
   end
 
   # Get the unit of all the directly and indirectly required units.
-  def traverse(units)
+  def traverse(units, require_chain)
     return if self.in? units
     units << self
-    requirements.each do |requirement|
-      requirement.traverse units
+    require_chain << self
+    return @requirements if @requirements
+
+    @requirements = requirements = [] of Unit
+    
+    @ast.requirements.flat_map do |requirement|
+      @events.with_context "requiring #{requirement.target}", requirement.token.source, requirement.token.line, requirement.token.character do
+        required = @compiler.require requirement.target, from: self, require_chain: require_chain
+        requirements << required
+        required.traverse units, require_chain.map(&.itself)
+      end
     end
   end
 

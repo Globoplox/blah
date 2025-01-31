@@ -4,9 +4,18 @@ require "./parser"
 module RiSC16::Assembler
   extend self
 
-  def assemble(sourcename : String, input : IO)
+  class Exception < ::Exception
+  end 
+
+  def assemble(sourcename : String, input : IO, events : App::EventStream)
     parser = RiSC16::Assembler::Parser.new input
-    assemble(parser.unit(name: sourcename) || raise "Parse error in input file #{sourcename}")
+    unit = parser.unit
+    unless unit
+      events.fatal!(title: "RiSC16 Assembly parse error", source: sourcename) do |message| 
+        message.puts "Unspecified parse error" 
+      end
+    end
+    assemble sourcename, unit, events
   end
 
   def assemble_immediate(section, address, immediate, kind)
@@ -26,9 +35,9 @@ module RiSC16::Assembler
     end
   end
 
-  def assemble(unit : AST::Unit) : Object
+  def assemble(sourcename : String, unit : AST::Unit, events : App::EventStream) : Object
     current_section = Object::Section.new "text"
-    object = Object.new unit.name
+    object = Object.new sourcename
     object.sections << current_section
     text = [] of UInt16
     immediates = [] of {AST::Immediate, Int32, Object::Section::Reference::Kind}
@@ -48,7 +57,9 @@ module RiSC16::Assembler
 
       statement.symbol.try do |label|
         all_defintions[label]?.try do |previous|
-          raise "Duplicate symbol '#{label}' in #{unit.name || "???"} at line #{statement.line}. Previously defined at line #{previous.line}"
+          events.fatal!(title: "Duplicate symbol '#{label}'", source: sourcename, line: statement.line) do |message| 
+            message.puts "Symbol '#{label}' is already defined at line #{previous.line}"
+          end
         end
         all_defintions[label] = statement
         current_section.definitions[label] = Object::Section::Symbol.new text.size, statement.exported
@@ -104,37 +115,40 @@ module RiSC16::Assembler
         when ".ascii"
           string = instruction.parameters[0].as AST::Text
           string.text.to_slice.each { |byte| text << byte.to_u16 }
-        when "function"
-          stack = instruction.parameters[0].as AST::Register
-          call = instruction.parameters[1].as AST::Register
-          text << Instruction.new(ISA::Sw, reg_a: call.index.to_u16, reg_b: stack.index.to_u16, immediate: 1u16).encode
-        when "return"
-          stack = instruction.parameters[0].as AST::Register
-          ret = instruction.parameters[1].as AST::Register
-          call = instruction.parameters[2].as AST::Register
-          text << Instruction.new(ISA::Lw, reg_a: call.index.to_u16, reg_b: stack.index.to_u16, immediate: 1u16).encode
-          text << Instruction.new(ISA::Sw, reg_a: ret.index.to_u16, reg_b: stack.index.to_u16, immediate: 1u16).encode
-          text << Instruction.new(ISA::Jalr, reg_a: 0u16, reg_b: call.index.to_u16, immediate: 0u16).encode
-        when "call"
-          target = instruction.parameters[0].as AST::Immediate
-          stack = instruction.parameters[1].as AST::Register
-          call = instruction.parameters[-1].as AST::Register
-          regs = instruction.parameters[2..(-2)].map &.as AST::Register
-          regs.each_with_index do |reg, index|
-            text << Instruction.new(ISA::Sw, reg_a: reg.index.to_u16, reg_b: stack.index.to_u16, immediate: index == 0 ? 0u16 : MAX_IMMEDIATE - index).encode
+        # when "function"
+        #   stack = instruction.parameters[0].as AST::Register
+        #   call = instruction.parameters[1].as AST::Register
+        #   text << Instruction.new(ISA::Sw, reg_a: call.index.to_u16, reg_b: stack.index.to_u16, immediate: 1u16).encode
+        # when "return"
+        #   stack = instruction.parameters[0].as AST::Register
+        #   ret = instruction.parameters[1].as AST::Register
+        #   call = instruction.parameters[2].as AST::Register
+        #   text << Instruction.new(ISA::Lw, reg_a: call.index.to_u16, reg_b: stack.index.to_u16, immediate: 1u16).encode
+        #   text << Instruction.new(ISA::Sw, reg_a: ret.index.to_u16, reg_b: stack.index.to_u16, immediate: 1u16).encode
+        #   text << Instruction.new(ISA::Jalr, reg_a: 0u16, reg_b: call.index.to_u16, immediate: 0u16).encode
+        # when "call"
+        #   target = instruction.parameters[0].as AST::Immediate
+        #   stack = instruction.parameters[1].as AST::Register
+        #   call = instruction.parameters[-1].as AST::Register
+        #   regs = instruction.parameters[2..(-2)].map &.as AST::Register
+        #   regs.each_with_index do |reg, index|
+        #     text << Instruction.new(ISA::Sw, reg_a: reg.index.to_u16, reg_b: stack.index.to_u16, immediate: index == 0 ? 0u16 : MAX_IMMEDIATE - index).encode
+        #   end
+        #   text << Instruction.new(ISA::Addi, reg_a: stack.index.to_u16, reg_b: stack.index.to_u16, immediate: MAX_IMMEDIATE - (regs.size)).encode
+        #   offset = assemble_immediate current_section, text.size.to_u16, target, Object::Section::Reference::Kind::Lui
+        #   text << Instruction.new(ISA::Lui, reg_a: call.index.to_u16, immediate: offset >> 6).encode
+        #   offset = assemble_immediate current_section, text.size, target, Object::Section::Reference::Kind::Lli
+        #   text << Instruction.new(ISA::Addi, reg_a: call.index.to_u16, reg_b: call.index.to_u16, immediate: offset).encode
+        #   text << Instruction.new(ISA::Jalr, reg_a: call.index.to_u16, reg_b: call.index.to_u16, immediate: 0u16).encode
+        #   text << Instruction.new(ISA::Lw, reg_a: call.index.to_u16, reg_b: stack.index.to_u16, immediate: 1u16).encode
+        #   regs.each_with_index do |reg, index|
+        #     text << Instruction.new(ISA::Lw, reg_a: reg.index.to_u16, reg_b: stack.index.to_u16, immediate: index.to_u16 + 2).encode
+        #   end
+        #   text << Instruction.new(ISA::Addi, reg_a: stack.index.to_u16, reg_b: stack.index.to_u16, immediate: regs.size.to_u16 + 1).encode
+        else 
+          events.fatal!(title: "Unknown memo '#{memo}'", source: sourcename, line: statement.line) do |message|
+            message.puts "Assembler instruction memo '#{memo}' is unknown or unsupported."
           end
-          text << Instruction.new(ISA::Addi, reg_a: stack.index.to_u16, reg_b: stack.index.to_u16, immediate: MAX_IMMEDIATE - (regs.size)).encode
-          offset = assemble_immediate current_section, text.size.to_u16, target, Object::Section::Reference::Kind::Lui
-          text << Instruction.new(ISA::Lui, reg_a: call.index.to_u16, immediate: offset >> 6).encode
-          offset = assemble_immediate current_section, text.size, target, Object::Section::Reference::Kind::Lli
-          text << Instruction.new(ISA::Addi, reg_a: call.index.to_u16, reg_b: call.index.to_u16, immediate: offset).encode
-          text << Instruction.new(ISA::Jalr, reg_a: call.index.to_u16, reg_b: call.index.to_u16, immediate: 0u16).encode
-          text << Instruction.new(ISA::Lw, reg_a: call.index.to_u16, reg_b: stack.index.to_u16, immediate: 1u16).encode
-          regs.each_with_index do |reg, index|
-            text << Instruction.new(ISA::Lw, reg_a: reg.index.to_u16, reg_b: stack.index.to_u16, immediate: index.to_u16 + 2).encode
-          end
-          text << Instruction.new(ISA::Addi, reg_a: stack.index.to_u16, reg_b: stack.index.to_u16, immediate: regs.size.to_u16 + 1).encode
-        else raise "Unknown statement memo '#{memo}' in #{unit.name || "???"} at line #{statement.line}."
         end
       end
     end

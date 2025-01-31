@@ -62,14 +62,16 @@ module Stacklang::Tokenizer
           character_at_start = character
         end
       elsif c == '\n' || c == ';'
-        unless last == '\n'
           transform_last = '\n'
-          tokens << Token.new token.join, line_at_start, character_at_start, source unless token.empty?
-          tokens << Token.new "\n", line, character, source unless tokens[-1]?.try &.value.== "\n"
+          unless token.empty?
+            tokens << Token.new token.join, line_at_start, character_at_start, source 
+          end
+          unless tokens[-1]?.try &.value.== "\n"
+            tokens << Token.new "\n", line, character, source 
+          end
           token.clear
           line_at_start = line + 1
           character_at_start = 1
-        end
       elsif c == ' ' || c == '\t'
         unless token.empty?
           tokens << Token.new token.join, line_at_start, character_at_start, source unless token.empty?
