@@ -4,6 +4,6 @@
 /.shards/
 *.dwarf
 a.out
-cli
+./cli
 /build/
 *.ro

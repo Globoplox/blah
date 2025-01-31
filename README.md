@@ -19,9 +19,12 @@ All of which are bundled within a single CLI tool, written in [Crystal](https://
 ## TODO App/Global
 - [x] Group functionalities behind a presentation independent application
   - [x] Build a CLI presentation layer
-- [ ] Improve app instrumentation (stream events), support requirement context for stacklang
+- [ ] Improve app instrumentation (stream events)
   - [x] Multiple sources per errors
   - [x] Text effects
+  - [ ] Linker errors
+  - [ ] Native codegen errors
+  - [ ] Spec errors
 - [ ] Split projects into toolchain/app toolchain/clients app/api app/client app/database, ...
 - [ ] Build language servers
 - [ ] Rename the project
