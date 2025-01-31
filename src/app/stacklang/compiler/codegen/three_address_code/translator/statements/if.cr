@@ -9,7 +9,7 @@ struct Stacklang::ThreeAddressCode::Translator
     @tacs << Label.new label_start, expression
 
     current_scope = @scope
-    @scope = Scope.new(@scope, expression.body, @function, @next_uid)
+    @scope = Scope.new(@scope, expression.body, @function, @next_uid, @events)
     expression.body.each do |statement|
       translate_statement statement
     end

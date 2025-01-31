@@ -96,7 +96,9 @@ class RiSC16::Spec
     end
   end
 
-  def initialize(@properties, @macros)
+  getter path
+  
+  def initialize(@properties, @macros, @path : String)
     @properties.transform_values! &.transform_values do |value|
       if value.starts_with? '$'
         @macros[value.lchop]? || value
@@ -112,18 +114,8 @@ class RiSC16::Spec
     end
   end
 
-  def self.open(io, macros)
-    self.new INI.parse(io), macros
-  end
-
-  def self.default
-    self.new(
-      {
-        "hardware.segment.ram" => {"kind" => "ram", "start" => 0x0.to_s, "size" => 0xffff.to_s},
-        "hardware.segment.tty" => {"kind" => "io", "tty" => "true", "start" => 0xffff.to_s},
-        "linker.section.text"  => {"start" => "0"},
-        "linker.section.stack" => {"start" => "0xff00", "size" => "0x00ff"},
-      }, {} of String => String)
+  def self.open(io, macros, path)
+    self.new INI.parse(io), macros, path
   end
 
   def segments

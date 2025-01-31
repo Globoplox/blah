@@ -1,9 +1,12 @@
 struct Stacklang::ThreeAddressCode::Translator
-  def translate_return(expression : AST::Return)
-    retval = expression.value.try do |expression|
+  def translate_return(return_expression : AST::Return)
+    retval = return_expression.value.try do |expression|
       target = translate_expression(expression)
       unless target
-        raise Exception.new "Cannot cast expression with no value or type", expression, @function
+        @events.error(title: "Type error", line: expression.token.line, column: expression.token.character) do |io|
+          io << "Cannot return an expression with no value"
+        end
+        return
       end
       target
     end
@@ -11,13 +14,23 @@ struct Stacklang::ThreeAddressCode::Translator
     if retval
       address, typeinfo = retval
       if typeinfo != @function.return_type
-        raise Exception.new "cannot return expression of type #{typeinfo} from a function of type #{@function.return_type || "None"}", expression, @function
+        @events.error(title: "Type error", line: return_expression.token.line, column: return_expression.token.character) do |io|
+          if @function.return_type
+            io << "Cannot return expression of type #{@events.emphasis(typeinfo.to_s)} from a function of type #{@events.emphasis(@function.return_type.to_s)}"
+          else
+            io << "Cannot return expression of type #{@events.emphasis(typeinfo.to_s)} from a function with no return type"
+          end
+        end
+        return
       end
-      @tacs << Move.new address, @return_value.not_nil!, expression
+      @tacs << Move.new address, @return_value.not_nil!, return_expression
     elsif @function.return_type
-      raise Exception.new "cannot return from a function of type #{@function.return_type} without a return value", expression, @function
+      @events.error(title: "Type error", line: return_expression.token.line, column: return_expression.token.character) do |io|
+        io << "Cannot return from a function of type #{@events.emphasis(@function.return_type.to_s)} without a return value"
+      end
+      return
     end
 
-    @tacs << Return.new @return_address, expression
+    @tacs << Return.new @return_address, return_expression
   end
 end

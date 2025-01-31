@@ -20,6 +20,8 @@ All of which are bundled within a single CLI tool, written in [Crystal](https://
 - [x] Group functionalities behind a presentation independent application
   - [x] Build a CLI presentation layer
 - [ ] Improve app instrumentation (stream events), support requirement context for stacklang
+  - [x] Multiple sources per errors
+  - [x] Text effects
 - [ ] Split projects into toolchain/app toolchain/clients app/api app/client app/database, ...
 - [ ] Build language servers
 - [ ] Rename the project

@@ -21,10 +21,10 @@ class Stacklang::Compiler
   def initialize(path : String, @spec : RiSC16::Spec, @debug : Bool, @fs : App::Filesystem, @events : App::EventStream)
     absolute = @fs.absolute path
     ast = @fs.read path do |io|
-      Stacklang::Parser.new(io, path).unit
+      Stacklang::Parser.new(io, path, @events).unit
     end
 
-    @unit = Unit.new ast, absolute, self, @events
+    @unit = Unit.new ast, absolute, self, @events, @spec
     @units[absolute] = @unit.not_nil!
   end
 
@@ -39,11 +39,31 @@ class Stacklang::Compiler
       ({global.name, global.typeinfo}) unless global.extern
     end
 
+    function_tacs = [] of {Function, Array(ThreeAddressCode::Code)}
+    
     unit.self_functions.each do |func|
-      next if func.ast.extern
-      func.check_fix_termination
-      codes = ThreeAddressCode.translate func
+      @events.with_context(
+        "compiling function #{@events.emphasis(func.name)}", 
+        func.ast.token.source, 
+        func.ast.token.line, 
+        func.ast.token.character 
+      ) do
+        next if func.ast.extern
+        func.check_fix_termination @events
+        function_tacs << {func, ThreeAddressCode.translate func, @events}
+      end
+    end
+
+    if @events.errored
+      @events.fatal!(title: "Compilation failed at intermediary code generation") {}
+    end
+
+    function_tacs.each do |(func, codes)|
       object.sections << Stacklang::Native.generate_function_section func, codes
+    end
+
+    if @events.errored
+      @events.fatal!(title: "Compilation failed at native code generation") {}
     end
 
     return object
@@ -53,14 +73,14 @@ class Stacklang::Compiler
   # Cached in a cache common with provided entrypoints units.
   def require(path : String, from : Unit, require_chain : Array(Unit)) : Unit
     dir, base, ext = @fs.base path
-    raise "Requirement cannot be a directory" if base.nil?
+    @events.fatal!(title: "Requirement cannot be a directory", source: @fs.normalize(from.path)) {} if base.nil?
     ext ||= ".sl"
     path = @fs.path_for dir, base, ext
     base_dir, _, _ = @fs.base from.path
     absolute = @fs.absolute path, root: base_dir
     @units[absolute]? || begin
       @fs.read absolute do |io|
-        @units[absolute] = Unit.new Stacklang::Parser.new(io, absolute).unit, absolute, self, @events, require_chain
+        @units[absolute] = Unit.new Stacklang::Parser.new(io, absolute, @events).unit, absolute, self, @events, @spec, require_chain
       end
     end
   end

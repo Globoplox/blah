@@ -74,8 +74,15 @@ class App
     end
 
     @debug = false
+    @errored = false
+    getter errored
 
-    protected abstract def event(level : Level, title : String, body : String?, source : String?, line : Int32?, column : Int32?)
+    def event(level : Level, title : String, body : String?, locations : Array({String?, Int32?, Int32?}))
+      @errored = true if level.error? || level.fatal?
+      event_impl level, title, body, locations
+    end
+
+    protected abstract def event_impl(level : Level, title : String, body : String?, locations : Array({String?, Int32?, Int32?}))
 
     @context = [] of {String, String?, Int32?, Int32?}
     def with_context(title : String, source : String? = nil, line : Int32? = nil, column : Int32? = nil)
@@ -89,34 +96,51 @@ class App
       end
     end
 
+    # Return the given text with emphasis if supported by implementation 
+    def emphasis(str)
+      str
+    end
+
     def warn(title : String, source : String? = nil, line : Int32? = nil, column : Int32? = nil, &)
       body = String.build do |io|
         yield io
       end
-      event :warning, title, body, source, line, column
+      event :warning, title, body, [{source, line, column}]
     end
     
     def warn(title : String, source : String? = nil, line : Int32? = nil, column : Int32? = nil)
-      event :warning, title, nil, source, line, column
+      event :warning, title, nil, [{source, line, column}]
     end
 
     def error(title : String, source : String? = nil, line : Int32? = nil, column : Int32? = nil, &)
       body = String.build do |io|
         yield io
       end
-      event :error, title, body, source, line, column
+      event :error, title, body, [{source, line, column}]
     end
 
     def error(title : String, source : String? = nil, line : Int32? = nil, column : Int32? = nil)
-      event :error, title, nil, source, line, column
+      event :error, title, nil, [{source, line, column}]
     end
 
-    # Log and interrupt
+    def fatal!(title : String, locations : Array({String?, Int32?, Int32?}), &) : NoReturn
+      body = String.build do |io|
+        yield io
+      end
+      event :fatal, title, body, locations
+      raise HandledFatalException.new
+    end
+
+    def fatal!(title : String, locations : Array({String?, Int32?, Int32?})) : NoReturn
+      event :fatal, title, nil, locations
+      raise HandledFatalException.new
+    end
+
     def fatal!(title : String, source : String? = nil, line : Int32? = nil, column : Int32? = nil, &) : NoReturn
       body = String.build do |io|
         yield io
       end
-      event :fatal, title, body, source, line, column
+      event :fatal, title, body, [{source, line, column}]
       raise HandledFatalException.new
     end
 
@@ -129,18 +153,18 @@ class App
         if @debug
           body = [body, exception.backtrace.map { |s| "  from #{s}" }].flatten.join "\n"
         end
-        event :fatal, exception.class.name, body, nil, nil, nil
+        event :fatal, exception.class.name, body, [] of {String?, Int32?, Int32?}
         raise HandledFatalException.new cause: exception
       end
     end
   end
 
-  def initialize(@debug, spec_file : String?, macros : Hash(String, String), @fs, @events)
+  def initialize(@debug, spec_file : String, macros : Hash(String, String), @fs, @events)
     @spec = spec_file.try do |file|
       @fs.read file, ->(io : IO) do
-        RiSC16::Spec.open io, macros
+        RiSC16::Spec.open io, macros, @fs.normalize(spec_file)
       end
-    end || RiSC16::Spec.default
+    end
   end
 
   # Commands methods
@@ -153,7 +177,7 @@ class App
   # and prevent unecessary temporary / intermediate files cluttering. 
 
   def assemble(source : String, destination : String)
-    @events.with_context "assembling #{@fs.normalize source} into '#{@fs.normalize destination}'" do 
+    @events.with_context "assembling #{@events.emphasis(@fs.normalize source)} into '#{@fs.normalize destination}'" do 
       object = @fs.read source do |input|
         RiSC16::Assembler.assemble(@fs.normalize(source), input, @events)
       end
@@ -165,7 +189,7 @@ class App
   end
 
   def compile(source : String, destination : String)
-    @events.with_context "compiling #{@fs.normalize source} into '#{@fs.normalize destination}'" do 
+    @events.with_context "compiling #{@events.emphasis(@fs.normalize source)} into '#{@fs.normalize destination}'" do 
       object = @fs.read source do |input|
         Stacklang::Compiler.new(source, @spec, @debug, @fs, @events).compile
       end
@@ -223,7 +247,7 @@ class App
   end
 
   def link(source : String, destination : String)
-    @events.with_context "linking '#{@fs.normalize source}'' into '#{@fs.normalize destination}'" do 
+    @events.with_context "linking '#{@events.emphasis(@fs.normalize source)}'' into '#{@fs.normalize destination}'" do 
       object = @fs.read source do |input|
         RiSC16::Object.from_io input, name: @fs.normalize source
       end

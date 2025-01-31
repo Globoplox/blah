@@ -20,7 +20,8 @@ struct Stacklang::ThreeAddressCode::Translator
         when "-" then translate_integer_opposite expression
         when "~" then translate_bitwise_not expression
         when "!" then translate_conditional_as_expression(expression) { |jumps| translate_logical_not expression, jumps }
-        else          raise Exception.new "Unsupported unary operator '#{expression.name}'", expression, @function
+        else          
+          @events.error(title: "Unsupported unary operator '#{@events.emphasis(expression.name)}'", line: expression.token.line, column: expression.token.character) {}          
         end
       in AST::Binary
         case expression.name
@@ -47,13 +48,15 @@ struct Stacklang::ThreeAddressCode::Translator
         when ">>" then translate_binary_to_call expression, "right_bitshift"
         when "*"  then translate_binary_to_call expression, "multiply"
         when "["  then translate_table_access expression
-        else           raise Exception.new "Unsupported binary operator '#{expression.name}'", expression, @function
+        else
+          @events.error(title: "Unsupported binary operator '#{@events.emphasis(expression.name)}'", line: expression.token.line, column: expression.token.character) {}          
         end
       in AST::Operator
-        raise "Unexpected AST Operator node type: #{expression.class.name}"
+        @events.error(title: "Unexpected AST Operator node type '#{@events.emphasis(expression.class.name)}'", line: expression.token.line, column: expression.token.character) {}          
       end
     in AST::Expression
-      raise "Unexpected AST Expression node type: #{expression.class.name}"
+
+    @events.error(title: "Unexpected AST Expression node type '#{@events.emphasis(expression.class.name)}'", line: expression.token.line, column: expression.token.character) {}          
     end
   end
 end

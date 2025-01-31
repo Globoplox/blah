@@ -1,8 +1,9 @@
 struct Stacklang::ThreeAddressCode::Translator
-  def translate_cast(expression : AST::Cast) : {Address, Type}
+  def translate_cast(expression : AST::Cast) : {Address, Type}?
     target = translate_expression(expression.target)
     unless target
-      raise Exception.new "Cannot cast expression with no value or type", expression, @function
+      @events.error(title: "Cannot cast expression with no value or type", line: expression.token.line, column: expression.token.character) {}              
+      return
     end
     address, typeinfo = target
     {address, @function.unit.typeinfo(expression.constraint)}

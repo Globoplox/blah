@@ -34,11 +34,38 @@ struct Stacklang::ThreeAddressCode::Translator
     @entries = {} of String => {Local, Type}
 
     # Build a scope from a body of statements.
-    def initialize(prev : Scope, statements : Array(AST::Statement), function : Stacklang::Function, uid : NextUID)
+    def initialize(prev : Scope, statements : Array(AST::Statement), function : Stacklang::Function, uid : NextUID, events)
       @previous = prev
       statements.each do |statement|
         next unless statement.is_a? AST::Variable
-        raise Exception.new "Redeclaration of variable #{statement.name}", statement, function if search(statement.name.name) != nil
+        
+        existing_in_scope =  @entries[statement.name.name]?
+        if existing_in_scope
+          events.event(
+            :error,
+            title: "Redeclaration of variable #{events.emphasis(statement.name)}",
+            body: nil,
+            locations: [
+              {nil, statement.token.line, statement.token.character},
+              {nil, existing_in_scope[0].ast.token.line, existing_in_scope[0].ast.token.character}
+            ]
+          )
+          next
+        end
+
+        existing_in_outer_scope = search statement.name.name
+        if existing_in_outer_scope
+          events.event(
+            :warning,
+            title: "Shadowing of variable #{events.emphasis(statement.name)}",
+            body: nil,
+            locations: [
+              {nil, statement.token.line, statement.token.character},
+              {nil, existing_in_outer_scope[0].ast.token.line, existing_in_outer_scope[0].ast.token.character}
+            ]
+          )
+        end
+
         typeinfo = function.unit.typeinfo(statement.constraint)
         @entries[statement.name.name] = {
           Local.new(uid.next_uid, 0, typeinfo.size.to_i, statement, restricted: statement.restricted),
@@ -48,12 +75,24 @@ struct Stacklang::ThreeAddressCode::Translator
     end
 
     # Build a scope from the root scope of a function including it's parameters only.
-    def initialize(function : Stacklang::Function, uid : NextUID)
+    def initialize(function : Stacklang::Function, uid : NextUID, events)
       @previous = nil
-      function.parameters.each do |parameter|
-        raise Exception.new "Parameter name conflict '#{parameter.name}'", parameter.ast, function if @entries[parameter.name]? != nil
-        # Shadowing is allowed
-        @entries[parameter.name] = {Local.new(uid.next_uid, 0, parameter.constraint.size.to_i, parameter.ast, abi_expected_stack_offset: parameter.offset), parameter.constraint}
+
+      function.parameters.group_by(&.name).each do |name, duplicates|
+        if duplicates.size > 1
+          events.event(
+            :error,
+            title: "Duplicate parameter name #{events.emphasis(name)}",
+            body: nil,
+            locations: duplicates.map do |parameter|
+              {nil.as(String?), parameter.ast.token.line, parameter.ast.token.character}
+            end
+          )
+          next
+        else
+          parameter = duplicates.first
+          @entries[name] = {Local.new(uid.next_uid, 0, parameter.constraint.size.to_i, parameter.ast, abi_expected_stack_offset: parameter.offset), parameter.constraint}
+        end
       end
     end
 
@@ -74,7 +113,7 @@ struct Stacklang::ThreeAddressCode::Translator
     Anonymous.new(@anonymous += 1, size)
   end
 
-  def initialize(@function)
+  def initialize(@function, @events : App::EventStream)
     @globals = @function.unit.globals.map do |(name, global)|
       {name, {Global.new(global.symbol, global.typeinfo.size.to_i, global.ast), global.typeinfo}}
     end.to_h
@@ -84,11 +123,12 @@ struct Stacklang::ThreeAddressCode::Translator
       Local.new(next_uid, 0, typeinfo.size.to_i, @function.ast, abi_expected_stack_offset: @function.return_value_offset.not_nil!, restricted: true)
     end
     # Top Level var and parameters (parameters with ABI enforced location)
-    @scope = Scope.new(Scope.new(@function, @next_uid), @function.ast.body, @function, @next_uid)
+    @scope = Scope.new(Scope.new(@function, @next_uid, @events), @function.ast.body, @function, @next_uid, @events)
     # local offset used to store the return address
     @return_address = Local.new(next_uid, 0, 1, @function.ast)
   end
 end
+
 
 require "./statements"
 

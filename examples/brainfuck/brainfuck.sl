@@ -1,5 +1,4 @@
 require "../../stdlib/prototypes"
-require "../../stdlib/multiply"
 
 fun load_io(io:*, destination:*, size):_ {
 
@@ -12,6 +11,12 @@ fun load_io(io:*, destination:*, size):_ {
     i += 1
   }
   return i
+}
+
+fun noop(a:*) {}
+
+fun test {
+  noop(1)
 }
 
 var program: [0x100]

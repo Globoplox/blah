@@ -2,12 +2,14 @@ struct Stacklang::ThreeAddressCode::Translator
   def translate_inferior_to(expression : AST::Binary, jumps : ConditionalJumps, or_equal = false, inverse = false)
     left = translate_expression expression.left
     if left.nil?
-      raise Exception.new "Expression has no type", expression.left, @function
+      @events.error(title: "Expression has no type", line: expression.left.token.line, column: expression.left.token.character) {}
+      return
     end
 
     right = translate_expression expression.right
     if right.nil?
-      raise Exception.new "Expression has no type", expression.right, @function
+      @events.error(title: "Expression has no type", line: expression.right.token.line, column: expression.right.token.character) {}
+      return
     end
 
     left_address, left_typeinfo = left
@@ -17,7 +19,11 @@ struct Stacklang::ThreeAddressCode::Translator
     when {Type::Word, Type::Word}    then Type::Word.new
     when {Type::Word, Type::Pointer} then right_typeinfo
     when {Type::Pointer, Type::Word} then left_typeinfo
-    else                                  raise Exception.new "Cannot add values of types #{left_typeinfo} and #{right_typeinfo}", expression, @function
+    else                             
+      @events.error(title: "Type error", line: expression.token.line, column: expression.token.character) do |io|
+        io << "Cannot compare values of types #{@events.emphasis(left_typeinfo)} and #{@events.emphasis(right_typeinfo)}"
+      end
+      return
     end
 
     if_true = jumps.if_true

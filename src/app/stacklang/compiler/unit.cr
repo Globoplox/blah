@@ -17,7 +17,7 @@ class Stacklang::Unit
   @functions : Hash(String, Function)? = nil
   @globals : Hash(String, Global)? = nil
   
-  def initialize(@ast : AST::Unit, @path : String, @compiler : Compiler, @events : App::EventStream, @require_chain : Array(Unit) = [] of Unit)
+  def initialize(@ast : AST::Unit, @path : String, @compiler : Compiler, @events : App::EventStream, @spec : RiSC16::Spec, @require_chain : Array(Unit) = [] of Unit)
   end
 
   @traversed : Array(Unit)? = nil
@@ -62,21 +62,21 @@ class Stacklang::Unit
         function.name
       end.transform_values do |functions|
         if functions.size > 1
-          message = String.build { |io|
-            io << "Name clash for function name #{functions.first.name.colorize.bold}\n"
-            io << "Defined in:\n"
-            functions.each do |defined|
-              if token = defined.ast.token
-                source = token.source
-                if source
-                  rel = Path[source].relative_to(Dir.current).to_s
-                  source = rel if rel.size < source.size
-                end
-                io << "- #{source} line #{token.line} column #{token.character}\n"
+          locations = functions.compact_map do |defined|
+            if token = defined.ast.token
+              source = token.source
+              if source
+                rel = Path[source].relative_to(Dir.current).to_s
+                source = rel if rel.size < source.size
               end
+              {source.as(String?), token.line.as(Int32?), token.character.as(Int32?)}
             end
-          }
-          raise Exception.new message, ast: functions.first.ast
+          end
+
+          @events.fatal!(
+            title: "Name clash for function #{@events.emphasis(functions.first.name)}:",
+            locations: locations
+          )
         end
         functions.first
       end
@@ -98,21 +98,21 @@ class Stacklang::Unit
         structure.name
       end.transform_values do |structs|
         if structs.size > 1
-          message = String.build { |io|
-            io << "Name clash for struct type #{structs.first.name.colorize.bold}\n"
-            io << "Defined in:\n"
-            structs.each do |defined|
-              if token = defined.ast.token
-                source = token.source
-                if source
-                  rel = Path[source].relative_to(Dir.current).to_s
-                  source = rel if rel.size < source.size
-                end
-                io << "- #{source} line #{token.line} column #{token.character}\n"
+          locations = structs.compact_map do |defined|
+            if token = defined.ast.token
+              source = token.source
+              if source
+                rel = Path[source].relative_to(Dir.current).to_s
+                source = rel if rel.size < source.size
               end
+              {source.as(String?), token.line.as(Int32?), token.character.as(Int32?)}
             end
-          }
-          raise Exception.new message, ast: structs.first.ast
+          end
+
+          @events.fatal!(
+            title: "Name clash for struct #{@events.emphasis(structs.first.name)}:",
+            locations: locations
+          )
         end
         structs.first
       end
@@ -142,26 +142,26 @@ class Stacklang::Unit
 
       all_globals.transform_values do |globals|
         if globals.size > 1
-          message = String.build { |io|
-            io << "Name clash for global name #{globals.first.name.colorize.bold}\n"
-            io << "Defined in:\n"
-            globals.each do |defined|
-              if (ast = defined.ast) && (token = ast.token)
-                source = token.source
-                if source
-                  rel = Path[source].relative_to(Dir.current).to_s
-                  source = rel if rel.size < source.size
-                end
-                io << "- #{source} line #{token.line} column #{token.character}\n"
-              else
-                io << "- Compiler generated global from specifications raw symbol: #{defined.symbol}"
+
+          locations = globals.compact_map do |defined|
+            if (ast = defined.ast) && (token = ast.token)
+              source = token.source
+              if source
+                rel = Path[source].relative_to(Dir.current).to_s
+                source = rel if rel.size < source.size
               end
+              {source.as(String?), token.line.as(Int32?), token.character.as(Int32?)}
+            else
+              {@spec.path.as(String?), nil.as(Int32?), nil.as(Int32?)}
             end
-          }
-          raise Exception.new message, ast: globals.first.ast
-        else
-          globals.first
+          end
+
+          @events.fatal!(
+            title: "Name clash for global #{@events.emphasis(globals.first.name)}:",
+            locations: locations
+          )
         end
+        globals.first
       end
     end
   end

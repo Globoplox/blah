@@ -1,19 +1,26 @@
 struct Stacklang::ThreeAddressCode::Translator
-  def translate_access(expression : AST::Access) : {Address, Type}
+  def translate_access(expression : AST::Access) : {Address, Type}?
     left = translate_expression expression.operand
     if left.nil?
-      raise Exception.new "Expression has no type", expression.operand, @function
+      @events.error(title: "Expression has no type", line: expression.operand.token.line, column: expression.operand.token.character) {}
+      return
     end
     address, typeinfo = left
 
     unless typeinfo.is_a? Type::Struct
-      raise Exception.new "Cannot access field #{expression.field.name} of type #{typeinfo}", expression, @function
+      @events.error(title: "Invalid struct access", line: expression.token.line, column: expression.token.character) do |io|
+        io << "Cannot access field #{@events.emphasis(expression.field.name)} in non-structure type #{@events.emphasis(typeinfo.to_s)}"
+      end
+      return
     end
 
     field = typeinfo.fields.find &.name.== expression.field.name
 
     unless field
-      raise Exception.new "No field named #{expression.field.name} in structure #{typeinfo}", expression, @function
+      @events.error(title: "Invalid struct access", line: expression.token.line, column: expression.token.character) do |io|
+        io << "No field named #{@events.emphasis(expression.field.name)} in structure #{@events.emphasis(typeinfo.to_s)}"
+      end
+      return
     end
 
     if address.is_a?(Local)
@@ -26,7 +33,10 @@ struct Stacklang::ThreeAddressCode::Translator
       address = Anonymous.new address.uid, field.constraint.size.to_i, address.offset + field.offset.to_i
       {address, field.constraint}
     else
-      raise "Invalid left side of access #{expression.operand}"
+      @events.error(title: "Invalid struct access", line: expression.token.line, column: expression.token.character) do |io|
+        io << "Not a valid lvalue"
+      end
+      return
     end
   end
 end

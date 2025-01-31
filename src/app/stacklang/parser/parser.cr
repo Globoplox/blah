@@ -1,4 +1,3 @@
-require "colorize"
 require "./tokenizer"
 require "./ast"
 
@@ -33,26 +32,26 @@ class Stacklang::Parser
       token = next_token! "Any expression"
       case token.value
       when "["
-        raise syntax_error allows.to_s, token unless allows.binary_operator?
+        syntax_error allows.to_s, token unless allows.binary_operator?
         chain << {kind: Arity::Binary, value: token}
         chain << expression
         consume! "]"
         allows = Category::BinaryOperator
         expect_more = false
       when "("
-        raise syntax_error allows.to_s, token unless allows.operand?
+        syntax_error allows.to_s, token unless allows.operand?
         chain << expression
         consume! ")"
         allows = Category::BinaryOperator
         expect_more = false
       when "~", "!"
-        raise syntax_error allows.to_s, token unless allows.unary_operator?
+        syntax_error allows.to_s, token unless allows.unary_operator?
         chain << {kind: Arity::Unary, value: token}
         allows = Category::UnaryOperator | Category::Operand
         expect_more = true
       when "<", ">", "=", ">=", "<=", "==", "!=", "/", "%", "|", "^", "&&", "||", "+", ".", ">>", "<<",
            "+=", "-=", "&=", "|=", "^=", "*=", "/=", "%="
-        raise syntax_error allows.to_s, token unless allows.binary_operator?
+        syntax_error allows.to_s, token unless allows.binary_operator?
         chain << {kind: Arity::Binary, value: token}
         allows = Category::UnaryOperator | Category::Operand
         expect_more = true
@@ -71,9 +70,9 @@ class Stacklang::Parser
           break
         end
       else
-        raise syntax_error allows.to_s, token unless allows.includes? :operand
+        syntax_error allows.to_s, token unless allows.includes? :operand
         if token.value.starts_with? '"'
-          raise "Quoted string literal are not supported"
+          syntax_error "Quoted string literal are not supported", nil
         elsif token.value.chars.first.ascii_number?
           chain << number token
         else
@@ -96,7 +95,7 @@ class Stacklang::Parser
                 case nt.value
                 when "," then next
                 when ")" then break
-                else          raise syntax_error "A ',' or a ')'", nt
+                else          syntax_error "A ',' or a ')'", nt
                 end
               end unless consume? ")"
               chain << AST::Call.new token, AST::Identifier.new(token, token.value), call_parameters
@@ -109,7 +108,7 @@ class Stacklang::Parser
         expect_more = false
       end
     end
-    raise syntax_error allows.to_s, nil if expect_more
+    syntax_error allows.to_s, nil if expect_more
     chain
   end
 
@@ -169,7 +168,7 @@ class Stacklang::Parser
             b = chain[index + 1].as AST::Expression
 
             if token.value == "."
-              b = b.as?(AST::Identifier) || raise syntax_error "Right side of access operator must be an identifier", b.token
+              b = b.as?(AST::Identifier) || syntax_error "Right side of access operator must be an identifier", b.token
               node = AST::Access.new token, operand: a, field: b
             else
               node = AST::Binary.new token, name: token.value, left: a, right: b
@@ -198,8 +197,8 @@ class Stacklang::Parser
       end
     end
 
-    raise "Clutter found in expression #{chain}" unless chain.size == 1
-    return chain.first.as?(AST::Expression) || raise "Unknown operators in expression #{chain}"
+    syntax_error "Clutter found in expression #{chain}", nil unless chain.size == 1
+    return chain.first.as?(AST::Expression) || syntax_error "Unknown operators in expression #{chain}", nil
   end
 
   def expression
@@ -246,7 +245,7 @@ class Stacklang::Parser
   # If an identifier is given as a parameter, it use it instead of consuming a token.
   def identifier(token = nil)
     token ||= next_token! "identifier"
-    raise syntax_error "identifier", token unless token.value.chars.all? do |c|
+    syntax_error "identifier", token unless token.value.chars.all? do |c|
                                              c == '_' || c.lowercase?
                                            end
     AST::Identifier.new token, token.value
@@ -268,14 +267,14 @@ class Stacklang::Parser
   # parse and return a type name.
   # If a type name is given as a parameter, it use it instead of consuming a token.
   def type_name(token = nil)
-    type_name?(token) || raise syntax_error "type_name", current
+    type_name?(token) || syntax_error "type_name", current
   end
 
   def number(token = nil)
     token ||= next_token! "number"
     AST::Literal.new token, token.value.to_i whitespace: false, underscore: true, prefix: true, strict: true, leading_zero_is_octal: false
   rescue ex
-    raise syntax_error "number literal", token
+    syntax_error "number literal", token
   end
 
   def literal(token = nil)
@@ -287,7 +286,7 @@ class Stacklang::Parser
     if colon
       unless consume? ":"
         if explicit
-          raise syntax_error "Colon ':'", current
+          syntax_error "Colon ':'", current
         else
           return AST::Word.new context_token
         end
@@ -311,7 +310,7 @@ class Stacklang::Parser
       @index = save # The token was not meant for this, rollbacking.
       # TODO do it better
       return AST::Word.new context_token unless explicit
-      raise syntax_error "custom_type_name", token
+      syntax_error "custom_type_name", token
     end
   end
 
@@ -323,7 +322,7 @@ class Stacklang::Parser
     name = identifier name_token
 
     if name.in? ["sizeof", "cast"]
-      raise syntax_error "Name '#{name.name}' is not allowed for functions", name_token
+      syntax_error "Name '#{name.name}' is not allowed for functions", name_token
     end
 
     parameters = [] of AST::Function::Parameter
@@ -339,7 +338,7 @@ class Stacklang::Parser
           had_separator = true
           next
         else
-          raise syntax_error ", or )", token if !first && !had_separator
+          syntax_error ", or )", token if !first && !had_separator
           param_name = identifier token
           param_constraint = type_constraint context_token: token
           parameters << AST::Function::Parameter.new token, param_name, param_constraint
@@ -404,7 +403,7 @@ class Stacklang::Parser
     root = consume! "require"
     token = next_token! "A quoted string literal"
     unless token.value.starts_with?('"') && token.value.ends_with?('"')
-      raise syntax_error "A quoted string literal", token
+      syntax_error "A quoted string literal", token
     end
     AST::Requirement.new root, token.value.strip '"'
   end
@@ -437,11 +436,11 @@ class Stacklang::Parser
       when "struct"  then elements << structure
       when nil       then break
       else
-        raise syntax_error "require or var or fun or struct", current
+        syntax_error "require or var or fun or struct", current
       end
     end
     consume? NEWLINE
-    raise syntax_error "End Of File", current unless eof?
+    syntax_error "End Of File", current unless eof?
     AST::Unit.from_top_level elements
   end
 
@@ -450,12 +449,12 @@ class Stacklang::Parser
   # Consume a token and raise if it not equal to *expected*.
   # Return the token.
   def consume!(expected) : Token
-    token = (@tokens[@index]? || raise syntax_error expected, @tokens[@index - 1]?).tap do
+    token = (@tokens[@index]? || syntax_error expected, @tokens[@index - 1]?).tap do
       @index += 1
     end
 
     unless token.value == expected
-      raise syntax_error expected.dump, token
+      syntax_error expected.dump, token
     end
 
     token
@@ -466,21 +465,15 @@ class Stacklang::Parser
 
   # Raise an error stating that the current token is unexpected.
   # The *expected* parameter is used to document the error.
-  def syntax_error(expected, token) : Exception
-    Exception.new String.build { |io|
-      if filename = @filename
-        io << "In "
-        io << filename
-        io << ":\n"
-      end
-      io << "Syntax Error"
+  def syntax_error(expected, token) : NoReturn
+    @events.fatal!(
+      title: "Syntax error, expected: '#{expected}'",
+      source: @filename,
+      line: token.try(&.line),
+      column: token.try(&.character), 
+    )  do |io|
       if token
-        io << " line "
-        io << token.line
-        io << " column "
-        io << token.character
         if (locs = @locs) && (loc = locs[token.line - 1]?)
-          io << '\n'
           io.puts "=" * 40
           [
             locs[token.line - 3]?,
@@ -489,7 +482,7 @@ class Stacklang::Parser
             io.puts before
           end
 
-          io.puts [loc[0, token.character - 1].colorize.bold, token.value.colorize.bold.underline, loc[(token.character - 1 + token.value.size)..].colorize.bold].join.gsub("\n", "")
+          io.puts @events.emphasis([loc[0, token.character - 1], token.value, loc[(token.character - 1 + token.value.size)..]].join.gsub("\n", ""))
           io.puts (" " * (token.character - 1)) + ("^" * token.value.size)
           [
             locs[token.line]?,
@@ -504,10 +497,7 @@ class Stacklang::Parser
           io << '"'
         end
       end
-      io << '\n'
-      io << "Expected: "
-      io << expected
-    }
+    end
   end
 
   # Return true and consume the current token value if it is equal to *token* parameter.
@@ -539,7 +529,7 @@ class Stacklang::Parser
   # Get the next token value. Raise if none.
   # Parameter *expected* is used to document the raised error.
   def next_token!(expected) : Token
-    (@tokens[@index]? || raise syntax_error expected, @tokens.last?).tap do
+    (@tokens[@index]? || syntax_error expected, @tokens.last?).tap do
       @index += 1
     end
   end
@@ -548,7 +538,7 @@ class Stacklang::Parser
   # Cache of all line of codes, used for fancy debug.
   @locs : Array(String)?
 
-  def initialize(io : IO, @filename)
+  def initialize(io : IO, @filename, @events : App::EventStream)
     @locs = io.gets_to_end.lines
     io.rewind
     @tokens = Tokenizer.tokenize io, @filename

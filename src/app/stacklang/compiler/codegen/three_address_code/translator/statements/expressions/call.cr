@@ -2,21 +2,31 @@ struct Stacklang::ThreeAddressCode::Translator
   def translate_call(expression : AST::Call) : {Address, Type}?
     called_function = @function.unit.functions[expression.name.name]?
     unless called_function
-      raise Exception.new "Identifier: '#{expression.name}' does not refer to any known function name", expression, @function
+      @events.error(title: "Unknown function", line: expression.token.line, column: expression.token.character) do |io|
+        io << "No function named '#{@events.emphasis(expression.name)}' found"
+      end
+      return
     end
 
     if expression.parameters.size != called_function.parameters.size
-      raise Exception.new "Function #{expression.name} require #{called_function.parameters.size} parameters but has been given #{expression.parameters.size} parameters", expression, @function
+      @events.error(title: "Bad parameters", line: expression.token.line, column: expression.token.character) do |io|
+        io << "Function '#{@events.emphasis(expression.name)}' require #{called_function.parameters.size} parameters but has been given #{expression.parameters.size}"
+      end
+      return
     end
 
     parameters_and_offsets = expression.parameters.zip(called_function.parameters).map do |parameter, definition|
       target = translate_expression parameter
       unless target
-        raise Exception.new "Expression has no type", parameter, @function
+        @events.error(title: "Expression for parameter '#{@events.emphasis(definition.name)}' has no type", line: parameter.token.line, column: parameter.token.character) {}
+        return
       end
       address, actual_typeinfo = target
       if actual_typeinfo != definition.constraint
-        raise Exception.new "Parameter #{definition.name} of #{expression.name} should be #{definition.constraint} but is a #{actual_typeinfo}", expression, @function
+        @events.error(title: "Parameter type error", line: parameter.token.line, column: parameter.token.character) do |io|
+          io << "Parameter #{@events.emphasis(definition.name)} of #{@events.emphasis(expression.name)} should be #{@events.emphasis(definition.constraint)} but is a #{@events.emphasis(actual_typeinfo)}"
+        end
+        return
       end
 
       {address, definition.offset}

@@ -38,7 +38,8 @@ struct Stacklang::ThreeAddressCode::Translator
     # If we have not return, this mean the expression does not usually deal with bool and we must check it's value and jump
     condition = translate_expression expression
     if condition.nil?
-      raise Exception.new "Expression has no type", expression, @function
+      @events.error(title: "Conditonnal expression has no type", line: expression.token.line, column: expression.token.character) {}              
+      return
     end
     condition_address, condition_typeinfo = condition
 

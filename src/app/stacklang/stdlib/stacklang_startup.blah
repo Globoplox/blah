@@ -2,7 +2,7 @@
 # This setup the stack pointer, call the stacklang main.
 
 section text+0x0
-export startt: # Unecessary but that will silence a warning.
+export start: # Unecessary but that will silence a warning.
 
 # Linker will provide the __section_* symbol automatically. It does not need to be defined.
 # The same is true for __io_* symbols.
