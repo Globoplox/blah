@@ -24,7 +24,7 @@ struct Stacklang::ThreeAddressCode::Translator
     end
 
     @tacs << Move.new right_address, left_address, expression
-    {right_address, right_typeinfo}
+    {left_address, right_typeinfo}
   end
 
   # Store assignement: *a = 5

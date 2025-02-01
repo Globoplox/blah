@@ -9,7 +9,7 @@ class Stacklang::Native::Generator
       # Note that the address will be valid but extra step may be required before reading/writing at the required address
       # as "address" may be cached. If so, Reading wont read the right value and Writing may be overwritten with previous value.
       meta = @addresses[root_id address]
-      stack_allocate address
+      stack_allocate address if meta.spilled_at.nil?
       stack_offset = @stack.offset_at meta.spilled_at.not_nil!
       stack_offset += address.offset
       if !overflow_immediate_offset? stack_offset
