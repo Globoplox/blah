@@ -18,8 +18,8 @@ module Stacklang::Native
     section
   end
 
-  def self.generate_function_section(function : Function, codes : Array(ThreeAddressCode::Code)) : RiSC16::Object::Section
-    Generator.new(function, codes).generate
+  def self.generate_function_section(function : Function, codes : Array(ThreeAddressCode::Code), events : App::EventStream) : RiSC16::Object::Section
+    Generator.new(function, codes, events).generate
   end
 
   class Stacklang::Native::Generator

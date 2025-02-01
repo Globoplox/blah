@@ -36,7 +36,17 @@ class Stacklang::Native::Generator
     into = grab_free avoid: avoid
     case address
     in ThreeAddressCode::Local, ThreeAddressCode::Anonymous
-      stack_offset = @stack.offset_at meta.spilled_at || raise "Local has not been allocated yet #{address}. This may happen when accessin uninitialized variales."
+      stack_offset = @stack.offset_at meta.spilled_at || begin
+        @events.fatal!(
+          title: "Access before initialization",
+          source: @codes[@index].ast.token.source,
+          line: @codes[@index].ast.token.line,
+          column: @codes[@index].ast.token.character
+        ) do |io|
+          io.puts "No real address found while loading address #{@events.emphasis(address)}"
+          io << "Common cause for this is usage of local variable before they are initialized"
+        end
+      end
       stack_offset += address.offset
       if !overflow_immediate_offset? stack_offset
         lw into, STACK_REGISTER, stack_offset

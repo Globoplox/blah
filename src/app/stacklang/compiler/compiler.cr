@@ -52,6 +52,8 @@ class Stacklang::Compiler
         func.check_fix_termination @events
         function_tacs << {func, ThreeAddressCode.translate func, @events}
       end
+    rescue ex : App::EventStream::HandledFatalException
+      # Keep accumulating fatal error for all function
     end
 
     if @events.errored
@@ -59,7 +61,9 @@ class Stacklang::Compiler
     end
 
     function_tacs.each do |(func, codes)|
-      object.sections << Stacklang::Native.generate_function_section func, codes
+      object.sections << Stacklang::Native.generate_function_section func, codes, @events
+    rescue ex : App::EventStream::HandledFatalException
+      # Keep accumulating fatal error for all function
     end
 
     if @events.errored

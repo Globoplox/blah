@@ -27,7 +27,7 @@ module RiSC16::Linker
   # Link several objects into a single object.
   # It set the `absolute` field of section, which mean
   # Attributing them an absolute location, assuming a loading location of 0.
-  def merge(spec : Spec, objects : Array(RiSC16::Object), destination_name) : RiSC16::Object
+  def merge(spec : Spec, objects : Array(RiSC16::Object), destination_name, events) : RiSC16::Object
     start = 0
     predefined_section_size = {} of String => UInt32
     predefined_section_address = {} of String => UInt32
@@ -39,12 +39,35 @@ module RiSC16::Linker
     end
 
     globals = symbols_from_spec(spec)
+    deduplicates = {} of String => Array({String?, Int32?, Int32?})
+    globals.each do |(name, _)|
+      (deduplicates[name] ||= Array({String?, Int32?, Int32?}).new) << {spec.path, nil, nil}
+    end
 
     # check for conflict between exported symbols
-    objects.each &.sections.each &.definitions.each do |(name, symbol)|
-      next unless symbol.exported
-      raise "duplicate global symbol #{name}" if globals[name]?
-      globals[name] = symbol
+    objects.each do |object| 
+      object.sections.each do |section| 
+        section.definitions.each do |(name, symbol)|
+          next unless symbol.exported
+          (deduplicates[name] ||= Array({String?, Int32?, Int32?}).new) << {object.name, nil, nil}
+          globals[name] = symbol
+        end
+      end
+    end
+
+    deduplicates.each do |name, sources|
+      if sources.size > 1
+        events.event(
+          level: :error,
+          body: nil,
+          title: "Duplicate global symbol #{events.emphasis(name)}",
+          locations: sources
+        )
+      end
+    end
+
+    if events.errored
+      events.fatal!(title: "Merging failed at symbol conflict check") {}
     end
 
     # Set all the texts, symbols and references address
@@ -58,13 +81,21 @@ module RiSC16::Linker
     end.reduce(start) do |absolute, (name, sections)|
       fixed = predefined_section_address[name]?.try &.to_i32
       base = fixed || absolute
-      raise "Section #{name} cannot overwrite at offset #{base}, there are already data up to #{absolute}" if base < absolute
+      
+      if base < absolute
+        events.fatal!(title: "Section merge conflict") do |io|
+          io << "Section #{events.emphasis(name)} cannot overwrite at offset #{events.emphasis(base)}, there are already data up to #{events.emphasis(absolute)}" 
+        end
+      end
+
       # `base` is an absolute address of where we want to start writing the blocks for the current section
       sections.sort_by { |section| section.offset || Int32::MAX }.reduce(base) do |absolute, section|
         # `absolute`: is an absolute address of where we CAN begin writing stuff.
         # `section.offset`, is an offset to `base` were we WANT to begin writing stuff.
         if base + (section.offset || UInt16::MAX) < absolute
-          raise "Block offset conflict in section #{name}, cannot overwrite at #{base} + #{section.offset}, there are already data up to #{absolute}"
+          events.fatal!(title: "Section merge conflict") do |io|
+            io << "Block offset conflict in section #{events.emphasis(name)}, cannot overwrite at #{events.emphasis(base)} + #{events.emphasis(section.offset)}, there are already data up to #{events.emphasis(absolute)}"
+          end
         elsif section.offset
           absolute = base + (section.offset || 0)
         end
@@ -74,7 +105,11 @@ module RiSC16::Linker
       end.tap do |at_end|
         size = at_end - base
         max = predefined_section_size[name]? || Int32::MAX
-        raise "Section #{name} of size #{size} overflow maximum size constraint #{max}" if size > max
+        if size > max
+          events.fatal!(title: "Section merge conflict") do |io|
+            io << "Section #{events.emphasis(name)} of size #{events.emphasis(size)} overflow maximum size constraint #{events.emphasis(max)}" 
+          end
+        end
       end
     end
 
@@ -97,7 +132,7 @@ module RiSC16::Linker
   # If a section contain a BEQ reference to a symbol defined in the same section,
   # it can be linked without knowing the absolute section location
   # because BEQ symbol are relative to definition
-  def link_local_beq(section : RiSC16::Object::Section)
+  def link_local_beq(section : RiSC16::Object::Section, events)
     section.references.each do |name, references|
       next unless symbol = section.definitions[name]?
       rem = [] of RiSC16::Object::Section::Reference
@@ -105,7 +140,9 @@ module RiSC16::Linker
         next unless reference.kind.beq?
         value = symbol.address + reference.offset - reference.address - 1
         if value > 0b111111 || value < -0b1111111
-          raise "Reference to #{name} = #{value} overflow from allowed 7 bits for symbol of type #{reference.kind}"
+          events.fatal!(title: "Section merge conflict") do |io|
+            io << "Reference to #{events.emphasis(name)} = #{events.emphasis(value)} overflow from allowed 7 bits for symbol of type #{events.emphasis(reference.kind)}"
+          end
         end
         section.text[reference.address] = section.text[reference.address] & ~0b0111_1111 | (value < 0 ? (2 ** 7) + value.bits(0...6) : value).to_u16
         rem << reference
@@ -115,9 +152,9 @@ module RiSC16::Linker
     section.references.reject! { |_, v| v.empty? }
   end
 
-  def link_local_beq(object : RiSC16::Object)
+  def link_local_beq(object : RiSC16::Object, events)
     object.sections.each do |section|
-      link_local_beq section
+      link_local_beq section, events
     end
   end
 
@@ -125,10 +162,14 @@ module RiSC16::Linker
   # It performs the final symbols/value substitution.
   # This is the piece of code that would be necessary to bootstrap to be able to
   # dynamically load programs from another program (this would also work for loading dynamic libraries).
-  def static_link(spec, object, io, start : Int32 = 0)
-    raise "Cannot link unmerged object" if object.merged == false
+  def static_link(spec, object, io, events, start : Int32 = 0)
+    if object.merged == false
+      events.fatal!(title: "Link Error", source: object.name) do |io|
+        io << "Cannot link unmerged object"
+      end
+    end
 
-    link_local_beq object
+    link_local_beq object, events
     strip_unused object
 
     globals = symbols_from_spec(spec).transform_values do |symbol|
@@ -161,7 +202,10 @@ module RiSC16::Linker
       block_location = section.absolute.not_nil! - start
       section.text.copy_to binary[block_location...(block_location + section.text.size)]
       section.references.each do |name, references|
-        symbol, symbol_section = symbols[name]? || raise "Undefined reference to symbol '#{name}' in section '#{section.name}'"
+        symbol, symbol_section = symbols[name]? || begin
+          events.error(title: "Undefined Reference to #{events.emphasis(name)} in section #{events.emphasis(section.name)}", source: object.name) {}
+          next
+        end
         references.each do |reference|
           value = symbol.address + (symbol_section.try(&.absolute) || 0) + reference.offset
           reference_address = section.absolute.not_nil! + reference.address - start
@@ -169,32 +213,53 @@ module RiSC16::Linker
           case reference.kind
           in Object::Section::Reference::Kind::Data
             if value > 0b1111_1111_1111_1111 || value < -0b1111_1111_1111_1111
-              raise "Reference to #{name} = #{value} overflow from allowed 16 bits for symbol of type #{reference.kind}"
+              events.error(title: "Reference Overflow", source: object.name) do |io|
+                io << "Reference to #{events.emphasis(name)} = #{events.emphasis(value)} overflow from allowed 16 bits for symbol of type #{events.emphasis(reference.kind)} in section #{events.emphasis(section.name)}"
+              end
+            else
+              binary[reference_address] = (value < 0 ? (2 ** 16) + value.bits(0...(16 - 1)) : value).to_u16
             end
-            binary[reference_address] = (value < 0 ? (2 ** 16) + value.bits(0...(16 - 1)) : value).to_u16
           in Object::Section::Reference::Kind::Imm
             if value > 0b0011_1111 || value < -0b0111_1111
-              raise "Reference to #{name} = #{value} overflow from allowed 7 bits for symbol of type #{reference.kind}"
+              events.error(title: "Reference Overflow", source: object.name) do |io|
+                io << "Reference to #{events.emphasis(name)} = #{events.emphasis(value)} overflow from allowed 7 bits for symbol of type #{events.emphasis(reference.kind)} in section #{events.emphasis(section.name)}"
+              end
+            else
+              binary[reference_address] = binary[reference_address] & ~0b0111_1111 | (value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16
             end
-            binary[reference_address] = binary[reference_address] & ~0b0111_1111 | (value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16
           in Object::Section::Reference::Kind::Lui
             if value > 0b1111_1111_1111_1111 || value < -0b1111_1111_1111_1111
-              raise "Reference to #{name} = #{value} overflow from allowed 16 bits for symbol of type #{reference.kind}"
+              events.error(title: "Reference Overflow", source: object.name) do |io|
+                io << "Reference to #{events.emphasis(name)} = #{events.emphasis(value)} overflow from allowed 16 bits for symbol of type #{events.emphasis(reference.kind)} in section #{events.emphasis(section.name)}"
+              end
+            else
+              binary[reference_address] = binary[reference_address] & ~0b11_1111_1111 | ((value < 0 ? (2 ** 16) + value.bits(0...(16 - 1)) : value).to_u16 >> 6)
             end
-            binary[reference_address] = binary[reference_address] & ~0b11_1111_1111 | ((value < 0 ? (2 ** 16) + value.bits(0...(16 - 1)) : value).to_u16 >> 6)
           in Object::Section::Reference::Kind::Lli
             if value > 0b1111_1111_1111_1111 || value < -0b1111_1111_1111_1111
-              raise "Reference to #{name} = #{value} overflow from allowed 16 bits for symbol of type #{reference.kind}"
+              events.error(title: "Reference Overflow", source: object.name) do |io|
+                io << "Reference to #{events.emphasis(name)} = #{events.emphasis(value)} overflow from allowed 16 bits for symbol of type #{events.emphasis(reference.kind)} in section #{events.emphasis(section.name)}"
+              end
+            else
+              binary[reference_address] = binary[reference_address] & ~0b0111_1111 | ((value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16 & 0x3f)
             end
-            binary[reference_address] = binary[reference_address] & ~0b0111_1111 | ((value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16 & 0x3f)
           in Object::Section::Reference::Kind::Beq
             value = value - (reference.address + section.absolute.not_nil!) - 1
             if value > 0b0011_1111 || value < -0b0111_1111
-              raise "Reference to #{name} = #{value} overflow from allowed 7 bits for symbol of type #{reference.kind}"
+              events.error(title: "Reference Overflow", source: object.name) do |io|
+                io << "Reference to #{events.emphasis(name)} = #{events.emphasis(value)} overflow from allowed 7 bits for symbol of type #{events.emphasis(reference.kind)} in section #{events.emphasis(section.name)}"
+              end
+            else
+              binary[reference_address] = binary[reference_address] & ~0b0111_1111 | (value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16
             end
-            binary[reference_address] = binary[reference_address] & ~0b0111_1111 | (value < 0 ? (2 ** 7) + value.bits(0...(7 - 1)) : value).to_u16
           end
         end
+      end
+    end
+
+    if events.errored
+      events.fatal!(title: "Linker error") do |io|
+        io << "A fatal error interrupted executable linking"
       end
     end
 

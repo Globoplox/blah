@@ -22,9 +22,9 @@ All of which are bundled within a single CLI tool, written in [Crystal](https://
 - [ ] Improve app instrumentation (stream events)
   - [x] Multiple sources per errors
   - [x] Text effects
-  - [ ] Linker errors
-  - [ ] Native codegen errors
-  - [ ] Spec errors
+  - [x] Linker errors
+  - [x] ~~Native codegen errors~~ Unfinished but enough for now
+  - [x] Spec errors
 - [ ] Split projects into toolchain/app toolchain/clients app/api app/client app/database, ...
 - [ ] Build language servers
 - [ ] Rename the project
@@ -55,7 +55,7 @@ All of which are bundled within a single CLI tool, written in [Crystal](https://
   - [ ] Improve assembler/stacklang lexers to stream and parsers to have a fixed low look-ahead
   - [x] Full compiler refactor
      - [x] Three address code intermediary
-     - [ ] Various simples optimizations
+     - [x] Various simples optimizations
      - [x] Smarter register handling
   - [ ] ~~Consider switching to a custom 20 bits words ISA~~
 - [x] Write an assembler able to ouput raw bitcode
@@ -69,7 +69,7 @@ All of which are bundled within a single CLI tool, written in [Crystal](https://
 - [x] Design and write a compiler for a small stack language
   - [x] Finish parser refactor to full-featurness
   - [x] Detect unterminating functions
-  - [ ] Rework compiler error handling
+  - [x] Rework compiler error handling
   - [ ] Define a way to debug at link time (A non-loaded section that can contain an index of informations)
   - [ ] Operators overload on non-word or pointer types
   - [ ] Implement else, elsif, next, break
@@ -78,11 +78,11 @@ All of which are bundled within a single CLI tool, written in [Crystal](https://
   - [ ] ~~Add error for stack size exceding small immediate size~~
   - [x] Fix && and ||
   - [x] Fix >= and <=
-  - [ ] Refactor compiler to be simpler
-  - [ ] Inline small functions
+  - [x] Refactor compiler to be simpler
+  - [ ] ~~Inline small functions~~
 - [ ] Stdlib
-  - IO handling
-  - Basic math
+  - [ ] IO handling
+  - [ ] Basic math
 - [ ] Write an OS
   - [ ] Implement a file system
   - [ ] Relocate and load another program

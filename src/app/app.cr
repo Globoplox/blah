@@ -162,7 +162,9 @@ class App
   def initialize(@debug, spec_file : String, macros : Hash(String, String), @fs, @events)
     @spec = spec_file.try do |file|
       @fs.read file, ->(io : IO) do
-        RiSC16::Spec.open io, macros, @fs.normalize(spec_file)
+        @events.with_context "Configuring specification '#{@events.emphasis(spec_file)}'" do 
+          RiSC16::Spec.open io, macros, @fs.normalize(spec_file), @events
+        end
       end
     end
   end
@@ -238,7 +240,7 @@ class App
       end.flatten
 
       RiSC16::Dce.optimize objects if dce
-      object = RiSC16::Linker.merge(@spec, objects, destination)
+      object = RiSC16::Linker.merge(@spec, objects, destination, @events)
 
       @fs.write destination do |output|
         object.to_io(output)
@@ -257,7 +259,7 @@ class App
       end
 
       raw = IO::Memory.new
-      RiSC16::Linker.static_link @spec, object, raw, start: 0
+      RiSC16::Linker.static_link @spec, object, raw, @events, start: 0
       
       @fs.write destination do |output|
         raw.rewind
