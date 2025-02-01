@@ -1,17 +1,19 @@
-name: blah
-version: 0.1.0
-
+name: blah-cli
+version: 1.0.0
+  
 authors:
   - Globoplox <globoplox@gmail.com>
 
 dependencies:
   ncurses:
     github: agatan/ncurses.cr
+  blah-toolchain:
+    path: ../toolchain
 
 targets:
   cli:
-    main: src/clients/cli/cli.cr
+    main: src/cli.cr
 
-crystal: 1.9.2
+crystal: 1.15.0
 
 license: MIT

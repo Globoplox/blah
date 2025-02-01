@@ -1,8 +1,3 @@
-# TODO: warning
-# TODO: errors
-# TODO: vm
-# TODO: debugger
-
 require "./risc16"
 require "./spec"
 require "./linker/object"
@@ -14,7 +9,7 @@ require "./stacklang/compiler"
 require "./vm"
 
 # Representation and location independant business logic
-class App
+class Toolchain
   @debug : Bool
   @spec : RiSC16::Spec
   @fs : Filesystem

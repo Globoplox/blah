@@ -7,7 +7,7 @@ module RiSC16::Assembler
   class Exception < ::Exception
   end 
 
-  def assemble(sourcename : String, input : IO, events : App::EventStream)
+  def assemble(sourcename : String, input : IO, events : Toolchain::EventStream)
     parser = RiSC16::Assembler::Parser.new input
     unit = parser.unit
     unless unit
@@ -35,7 +35,7 @@ module RiSC16::Assembler
     end
   end
 
-  def assemble(sourcename : String, unit : AST::Unit, events : App::EventStream) : Object
+  def assemble(sourcename : String, unit : AST::Unit, events : Toolchain::EventStream) : Object
     current_section = Object::Section.new "text"
     object = Object.new sourcename
     object.sections << current_section

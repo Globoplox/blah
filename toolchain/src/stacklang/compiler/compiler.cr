@@ -15,10 +15,10 @@ class Stacklang::Compiler
   @unit : Unit?
   getter spec
 
-  @fs : App::Filesystem
-  @events : App::EventStream
+  @fs : Toolchain::Filesystem
+  @events : Toolchain::EventStream
 
-  def initialize(path : String, @spec : RiSC16::Spec, @debug : Bool, @fs : App::Filesystem, @events : App::EventStream)
+  def initialize(path : String, @spec : RiSC16::Spec, @debug : Bool, @fs : Toolchain::Filesystem, @events : Toolchain::EventStream)
     absolute = @fs.absolute path
     ast = @fs.read path do |io|
       Stacklang::Parser.new(io, path, @events).unit
@@ -52,7 +52,7 @@ class Stacklang::Compiler
         func.check_fix_termination @events
         function_tacs << {func, ThreeAddressCode.translate func, @events}
       end
-    rescue ex : App::EventStream::HandledFatalException
+    rescue ex : Toolchain::EventStream::HandledFatalException
       # Keep accumulating fatal error for all function
     end
 
@@ -62,7 +62,7 @@ class Stacklang::Compiler
 
     function_tacs.each do |(func, codes)|
       object.sections << Stacklang::Native.generate_function_section func, codes, @events
-    rescue ex : App::EventStream::HandledFatalException
+    rescue ex : Toolchain::EventStream::HandledFatalException
       # Keep accumulating fatal error for all function
     end
 

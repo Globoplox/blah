@@ -135,7 +135,7 @@ class Stacklang::Native::Generator
 
   @codes : Array(ThreeAddressCode::Code)
 
-  def initialize(@function : Function, @codes, @events : App::EventStream)
+  def initialize(@function : Function, @codes, @events : Toolchain::EventStream)
     @index = 0
     @section = RiSC16::Object::Section.new @function.symbol, options: RiSC16::Object::Section::Options::Weak
     @section.definitions[@function.symbol] = RiSC16::Object::Section::Symbol.new 0, true

@@ -538,7 +538,7 @@ class Stacklang::Parser
   # Cache of all line of codes, used for fancy debug.
   @locs : Array(String)?
 
-  def initialize(io : IO, @filename, @events : App::EventStream)
+  def initialize(io : IO, @filename, @events : Toolchain::EventStream)
     @locs = io.gets_to_end.lines
     io.rewind
     @tokens = Tokenizer.tokenize io, @filename

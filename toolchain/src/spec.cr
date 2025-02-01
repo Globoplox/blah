@@ -33,7 +33,7 @@ class RiSC16::Spec
       property read : Bool
       property write : Bool
 
-      def initialize(properties, events : App::EventStream)
+      def initialize(properties, events : Toolchain::EventStream)
         super(properties)
         case property = properties["read"]?
         when "true", nil then @read = true
@@ -59,7 +59,7 @@ class RiSC16::Spec
       property source : String?
       property sink : String?
 
-      def initialize(properties, events : App::EventStream)
+      def initialize(properties, events : Toolchain::EventStream)
         properties["size"] = "1"
         super(properties)
         case is_tty = properties["tty"]?
@@ -101,7 +101,7 @@ class RiSC16::Spec
       @name = properties["name"]?
     end
 
-    def self.build(properties, events : App::EventStream)
+    def self.build(properties, events : Toolchain::EventStream)
       case Kind.parse properties["kind"]
       when .ram?     then Ram.new properties
       when .rom?     then Rom.new properties
@@ -113,7 +113,7 @@ class RiSC16::Spec
 
   getter path
   
-  def initialize(@properties, @macros, @path : String, @events : App::EventStream)
+  def initialize(@properties, @macros, @path : String, @events : Toolchain::EventStream)
     @properties.transform_values! &.transform_values do |value|
       if value.starts_with? '$'
         @macros[value.lchop]? || value

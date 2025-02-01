@@ -17,7 +17,7 @@ class Stacklang::Unit
   @functions : Hash(String, Function)? = nil
   @globals : Hash(String, Global)? = nil
   
-  def initialize(@ast : AST::Unit, @path : String, @compiler : Compiler, @events : App::EventStream, @spec : RiSC16::Spec, @require_chain : Array(Unit) = [] of Unit)
+  def initialize(@ast : AST::Unit, @path : String, @compiler : Compiler, @events : Toolchain::EventStream, @spec : RiSC16::Spec, @require_chain : Array(Unit) = [] of Unit)
   end
 
   @traversed : Array(Unit)? = nil

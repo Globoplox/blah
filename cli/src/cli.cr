@@ -1,12 +1,12 @@
 require "option_parser"
 require "colorize"
-require "../../app"
+require "blah-toolchain"
 require "./debugger"
 
 # CLI front for App
 module Clients::Cli
 
-  class CLIEventStream < App::EventStream
+  class CLIEventStream < Toolchain::EventStream
     @debug = true
 
     protected def location(source : String?, line : Int32?, column : Int32?) : String?
@@ -69,7 +69,7 @@ module Clients::Cli
   
   end
   
-  class LocalFilesystem < App::Filesystem
+  class LocalFilesystem < Toolchain::Filesystem
    
     def normalize(path : String) : String
       Path[path].relative_to("./").to_s
@@ -209,7 +209,7 @@ module Clients::Cli
 
       fs = LocalFilesystem.new
       events = CLIEventStream.new
-      app = App.new debug, spec_file, macros, fs, events
+      app = Toolchain.new debug, spec_file, macros, fs, events
       
       case command
       when :run
@@ -308,7 +308,7 @@ module Clients::Cli
         "Invalid command: #{command}"
       end
     end
-  rescue ex: App::EventStream::HandledFatalException
+  rescue ex: Toolchain::EventStream::HandledFatalException
     exit 1
   end
 end

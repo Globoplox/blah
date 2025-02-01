@@ -113,7 +113,7 @@ struct Stacklang::ThreeAddressCode::Translator
     Anonymous.new(@anonymous += 1, size)
   end
 
-  def initialize(@function, @events : App::EventStream)
+  def initialize(@function, @events : Toolchain::EventStream)
     @globals = @function.unit.globals.map do |(name, global)|
       {name, {Global.new(global.symbol, global.typeinfo.size.to_i, global.ast), global.typeinfo}}
     end.to_h
