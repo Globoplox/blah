@@ -52,6 +52,10 @@ class Stacklang::Native::Generator::Metadata
   # the stack.
   property spillable : Spillable
 
+  # Spillable set when spillable Yes addresses are written.
+  # If not set, spill is a no-op 
+  property tainted : Bool = false
+
   def initialize(address : ThreeAddressCode::Address, first_found_at)
     @used_at = [first_found_at]
     case address

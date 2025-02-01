@@ -66,8 +66,7 @@ class Stacklang::Native::Generator
     register = meta.live_in_register for: address
     raise "Cannot unload address not cached" unless register
 
-    case meta.spillable
-    when Metadata::Spillable::Always, Metadata::Spillable::Yes
+    if (meta.spillable.yes? && meta.tainted) || meta.spillable.always?
       case address
       when ThreeAddressCode::Global
         load_immediate FILL_SPILL_REGISTER, address.name, address.offset
@@ -94,6 +93,7 @@ class Stacklang::Native::Generator
       end
     end
 
+    meta.tainted = false
     meta.set_live_in_register for: address, register: nil
     @registers[register] = nil
   end
@@ -198,6 +198,10 @@ class Stacklang::Native::Generator
       id = root_id address
       meta = @addresses[id]?
       next unless meta # Happen if the address has already been cleared, like if it is read twice
+
+      if written && meta.spillable.yes?
+        meta.tainted = true
+      end
 
       # If it has been wrote and must be spilled, spill it
       if written && meta.spillable.always?

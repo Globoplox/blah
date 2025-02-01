@@ -13,14 +13,8 @@ fun load_io(io:*, destination:*, size):_ {
   return i
 }
 
-fun noop(a:*) {}
-
-fun test {
-  noop(1)
-}
-
-var program: [0x100]
-var ram: [0x100]
+var program: [110]
+var ram: [20]
 
 fun main:_ {
   var pc = 0

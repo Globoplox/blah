@@ -76,6 +76,12 @@ class Stacklang::Native::Generator
       compile_code code
     end
 
+    # old_size = @text.size
+    peephole_optimize
+    # new_size = @text.size
+    # percent = (new_size/old_size * 100).to_i
+    # puts "Optimized function #{@function.name}: new size is #{percent}% of unoptimized size" if percent < 100
+
     @section.text = Slice(UInt16).new @text.to_unsafe, @text.size
 
     @section
