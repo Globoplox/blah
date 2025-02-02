@@ -3,9 +3,11 @@ require "colorize"
 require "blah-toolchain"
 require "./debugger"
 
-# CLI front for App
+# CLI front for Toolchain.
 module Clients::Cli
 
+  # Implement an event stream that simply log to 
+  # STDERR with a few ansi colors and effects. 
   class CLIEventStream < Toolchain::EventStream
     @debug = true
 
@@ -69,6 +71,7 @@ module Clients::Cli
   
   end
   
+  # Implement a filesystem provider that simply wrap the local filesystem.
   class LocalFilesystem < Toolchain::Filesystem
    
     def normalize(path : String) : String
@@ -130,7 +133,6 @@ module Clients::Cli
     target_file = "a.out"
     target_specified = false
     no_dce = false
-    silence_no_start = false
     create_intermediary = true
     build_dir = "./build"
 
@@ -173,13 +175,12 @@ module Clients::Cli
         target_specified = true
       }
       parser.on("-d DEFINE", "--define=DEFINE", "Define a value for specs.") { |it| it.split('=').tap { |it| macros[it[0]] = it[1] } }
-      parser.on("-u", "--unclutter", "Do not serialize the relocatable files.") { create_intermediary = false }
+      parser.on("-u", "--unclutter", "Do not serialize the relocatable files to the build directory.") { create_intermediary = false }
       parser.on("-b DIR", "--build-dir=DIR", "Specify the directory for relocatable files.") { |directory| build_dir = directory }
       parser.on("-g", "--debug", "Run in debugger.") { debug = true }
       parser.on("-r", "--also-run", "Run the created executable.") { also_run = true }
       parser.on("-l", "--make-lib", "Make a library instead of running.") { make_lib = true }
       parser.on("--no-dce", "Disable dead code elimination when compiling an executable binary.") { no_dce = true }
-      parser.on("--silence-no-start", "Disable warning when linking executable without exported `start` symbol.") { silence_no_start = true }
 
       parser.unknown_args do |filenames, parameters|
         sources_files = filenames
@@ -213,8 +214,15 @@ module Clients::Cli
       
       case command
       when :run
-        raise "No program specified" if sources_files.empty?
-        raise "More than one program specified" if sources_files.size > 1
+        if sources_files.empty?
+          STDERR << "No program specified" 
+          exit 1
+        end
+
+        if sources_files.size > 1
+          STDERR << "More than one program specified" 
+          exit 1
+        end
 
         io_mapping = {} of String => {IO, IO}
         app.spec.segments.each do |segment|
@@ -237,7 +245,8 @@ module Clients::Cli
 
       when :asm
         if sources_files.empty?
-          raise "No input files"
+          STDERR << "No input files"
+          exit 1
         end
 
         intermediary_dir = if create_intermediary
@@ -263,7 +272,8 @@ module Clients::Cli
           elsif source.ends_with?(".lib") || source.ends_with?(".ro")
             source
           else
-            raise "Unknown type of input file: #{source}"
+            STDERR << "Unknown type of input file: #{source}"
+            exit 1
           end
         end
 
@@ -303,7 +313,8 @@ module Clients::Cli
         end
 
       when nil 
-        raise "No command given"
+        STDERR << "No command given"
+        exit 1
       else 
         "Invalid command: #{command}"
       end

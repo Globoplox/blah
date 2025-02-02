@@ -1,0 +1,31 @@
+name: blah-app-api
+version: 1.0.0
+
+authors:
+  - globoplox <globoplox@gmail.com>
+
+dependencies:
+  pg:
+    github: will/crystal-pg
+  redis:
+    github: stefanwille/crystal-redis
+  openssl_ext:
+    github: spider-gazelle/openssl_ext
+    version: ~> 2.3.0
+  pluto:
+    github: phenopolis/pluto
+  awscr-s3:
+    github: taylorfinnell/awscr-s3
+  email:
+    github: arcage/crystal-email
+    version: 0.6.4
+  kemal:
+    github: kemalcr/kemal
+    
+targets:
+  api:
+    main: src/main.cr
+
+crystal: '>= 1.15.0'
+
+license: MIT

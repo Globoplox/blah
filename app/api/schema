@@ -1,0 +1,97 @@
+PERSISTED SQL DATABASE:
+
+identities
+- id
+- user_id
+- email
+- ext_id
+- provider_id
+
+credentials
+- user_id
+- email
+- hash
+
+identity_providers
+- id
+- type (oauth)
+- client_id
+- client_secret
+- audience
+- wellknown_uri
+
+blobs
+- id
+- content_type
+- size
+
+users
+- id
+- name
+- email
+- avatar_blob_id?
+- quota_id
+
+user_quotas
+- id
+- blob_size_sum
+- allowed_blob_size_sum
+- allowed_concurrent_job
+- allowed_concurrent_tty
+
+project_quotas
+- id
+- blob_size_sum
+- allowed_blob_size_sum
+
+projects
+- id
+- user_id
+- visibilty
+- name
+- quota_id
+
+project_acls
+- project_id
+- user_id
+- authorization_level (read | write)
+
+project_files
+- id
+- project_id
+- path
+- author_id
+- editor_id
+- creation_time
+- edition_time
+- blob_id
+
+VOLATILE DOCUMENT STORE:
+
+user_authentication_sessions
+- session_id
+- user_id
+- login_method (credential | identity_provider)
+- login_id
+- opened_at
+
+jobs
+- job_id
+- user_id
+- started_at
+- event_tty_id
+
+run_ttys:
+- job_id
+- tty_id
+
+ttys
+- id
+
+ALSO
+
+redis pub/sub channels are used
+when api is asked to notify update to (project or file), it subscribe to a redis channel, and open the websocket.
+when api do edit a file / project, it publish it on redis.
+
+TODO maybe: remove quotas on tty/console ?

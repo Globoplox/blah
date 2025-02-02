@@ -1,0 +1,58 @@
+version: 2.0
+shards:
+  awscr-s3:
+    git: https://github.com/taylorfinnell/awscr-s3.git
+    version: 0.8.3
+
+  awscr-signer:
+    git: https://github.com/taylorfinnell/awscr-signer.git
+    version: 0.8.2
+
+  backtracer:
+    git: https://github.com/sija/backtracer.cr.git
+    version: 1.2.2
+
+  db:
+    git: https://github.com/crystal-lang/crystal-db.git
+    version: 0.13.1
+
+  email:
+    git: https://github.com/arcage/crystal-email.git
+    version: 0.6.4
+
+  exception_page:
+    git: https://github.com/crystal-loot/exception_page.git
+    version: 0.4.1
+
+  kemal:
+    git: https://github.com/kemalcr/kemal.git
+    version: 1.6.0
+
+  openssl_ext:
+    git: https://github.com/spider-gazelle/openssl_ext.git
+    version: 2.3.0
+
+  pg:
+    git: https://github.com/will/crystal-pg.git
+    version: 0.29.0
+
+  pluto:
+    git: https://github.com/phenopolis/pluto.git
+    version: 1.0.1
+
+  pool:
+    git: https://github.com/ysbaddaden/pool.git
+    version: 0.2.4
+
+  radix:
+    git: https://github.com/luislavena/radix.git
+    version: 0.4.1
+
+  redis:
+    git: https://github.com/stefanwille/crystal-redis.git
+    version: 2.9.1
+
+  stumpy_core:
+    git: https://github.com/stumpycr/stumpy_core.git
+    version: 1.9.1
+
