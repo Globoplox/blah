@@ -5,8 +5,10 @@ import Container from 'react-bootstrap/Container';
 import Alert from 'react-bootstrap/Alert';
 import { ErrorCode, Api, Error, ParameterError } from "../api";
 import { ChangeEvent, useState } from 'react'
+import { useNavigate } from "react-router";
 
 export default function Login({api, redirectTo}: {api: Api, redirectTo: string | null}) {
+  const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,7 +20,7 @@ export default function Login({api, redirectTo}: {api: Api, redirectTo: string |
     api.login(email, password, staySignedIn).then(_ => {
       setFeedback({type: "valid", content: "Successfully logged in", alert: "success"});
       if (redirectTo !== null) {
-        setTimeout(() => { window.location.replace(redirectTo) }, 1000)
+        setTimeout(() => { navigate(redirectTo) }, 1000)
       }
     }).catch(error => {
       if (error.code === ErrorCode.InvalidCrdentials)

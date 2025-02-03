@@ -5,10 +5,8 @@ import Container from 'react-bootstrap/Container';
 import Alert from 'react-bootstrap/Alert';
 import { ErrorCode, Api, Error, ParameterError } from "../api";
 import { ChangeEvent,useState } from 'react'
-import { useNavigate } from "react-router";
 
-export default function Register({api, redirectTo}: {api: Api, redirectTo: string | null}) {
-  const navigate = useNavigate();
+export default function CreateProject({api}: {api: Api}) {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,9 +29,6 @@ export default function Register({api, redirectTo}: {api: Api, redirectTo: strin
     
     api.register(email, name, password, staySignedIn).then(_ => {
       setFeedback({type: "valid", content: "Successfully logged in", alert: "success"});
-      if (redirectTo !== null) {
-        setTimeout(() => { navigate(redirectTo) }, 1000)
-      }
     }).catch((error: Error) => {
       if (error.code === ErrorCode.BadParameter) {
         (error as ParameterError).parameters.forEach(parameter => {

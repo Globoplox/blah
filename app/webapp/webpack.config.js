@@ -15,6 +15,7 @@ module.exports = {
   output: {
     filename: 'blah-app-webapp.js',
     path: path.resolve(__dirname, 'dist'),
+    publicPath: '/'
   },
 
   module: {
