@@ -12,14 +12,14 @@ class Api
 
     def >>(body : Type.class) : Type forall Type
       unless @request.headers["Content-Type"]? == "application/json"
-        raise Error.new HTTP::Status::UNSUPPORTED_MEDIA_TYPE, "UnsupportedMediaType", "Expected application/json body"
+        raise Error::BadContentType.new
       end
-      body.from_json @request.body || raise Error.new HTTP::Status::BAD_REQUEST, "BadRequest", "No body in request, expected a #{body}"
+      body.from_json @request.body || raise Error::MissingBody.new
     end
 
     def <<(obj)
       case obj
-      when Error then @response.status = obj.code
+      when Error then @response.status = obj.http_status
       end
       @response.content_type = "application/json"
       obj.to_json @response

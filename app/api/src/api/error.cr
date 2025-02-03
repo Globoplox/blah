@@ -7,12 +7,30 @@ end
 
 class Api
   class Error < Exception
+
+    enum Code
+      UNAUTHORIZED
+      INVALID_CREDENTIALS
+      BAD_REQUEST
+      BAD_PARAMETER
+      SERVER_ERROR
+      NOT_FOUND
+    end
+
+    def self.status_for(code : Code) : HTTP::Status
+      case code
+      else HTTP::Status::UNPROCESSABLE_ENTITY
+      end
+    end
+
     include JSON::Serializable
-    property code : HTTP::Status
+    @[JSON::Field(ignore: true)]
+    property http_status : HTTP::Status
+    property code : Code
     property error : String
     property message : String?
 
-    def initialize(@code, @error, @message)
+    def initialize(@code, @error, @message = nil, @http_status = Error.status_for(code))
     end
 
     def self.validation(field, message)
@@ -21,43 +39,51 @@ class Api
 
     class NotFound < Error
       def initialize(resource)
-        @code = HTTP::Status::NOT_FOUND
-        @error = "Not found"
-        @message = "The resource #{resource} was not found"
+        super(:not_found, "Ressource not found", "The resource #{resource} was not found")
+      end
+    end
+
+    class ServerError < Error
+      def initialize(message)
+        super(:server_error, "Server Error", (message if Api.debug))
+      end
+    end
+
+    class InvalidCredential < Error
+      def initialize
+        super(:invalid_credentials, "Bad credentials")
       end
     end
 
     class Auth < Error
-      def initialize(@message)
-        @code = HTTP::Status::UNAUTHORIZED
-        @error = "Unauthorized"
+      def initialize(message)
+        super(:unauthorized, "Unauthorized", message)
       end
     end
 
     class MissingBody < Error
       def initialize
-        @code = HTTP::Status::UNPROCESSABLE_ENTITY
-        @error = "Missing body"
-        @message = "A body was expected, none found"
+        super(:bad_request, "Missing body", "A body was expected, none found")
       end
     end
 
     class BadContentType < Error
       def initialize
-        @code = HTTP::Status::UNPROCESSABLE_ENTITY
-        @error = "Bad content-type"
-        @message = "Request content-type is missing or unsupported"
+        super(:bad_request, "Bad content-type", "Request content-type is missing or unsupported")
       end
     end
 
-    class Validations < Error
-      include JSON::Serializable
-      property causes : Array(Error)
+    class BadParameter < Error
+      class Parameter
+        include JSON::Serializable
+        property name : String
+        property issue : String
+        def initialize(@name, @issue)
+        end
+      end
 
-      def initialize(@causes : Array(Error))
-        @code = HTTP::Status::UNPROCESSABLE_ENTITY
-        @error = "Validation"
-        @message = "Invalid body"
+      def initialize(@parameters : Array(Parameter))
+        super(:bad_parameter, "Bad parameter", message)
       end
     end
   end

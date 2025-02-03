@@ -13,7 +13,8 @@ class Api
   VERSION = {{ `shards version #{__DIR__}`.chomp.stringify }}
   @@router = Cradix((Api, Context) -> Nil).new
   @@debug = ENV["ENV"]?.in?({"dev", "local"})
-  
+  class_getter debug
+
   @server : HTTP::Server
   @storage : Storage
   @cache : Cache
@@ -38,7 +39,7 @@ class Api
         routes = @@router.search "#{ctx.request.method}#{ctx.request.path.rstrip '/'}"
         ctx = Context.new ctx
         if routes.empty?
-          ctx << Error.new HTTP::Status::NOT_FOUND, "NotFound", "Route #{ctx.request.method} #{ctx.request.path} was not found on this API."
+          ctx << Error::NotFound.new "Route #{ctx.request.method} #{ctx.request.path}"
         else
           handler, path_parameters = routes.first
           ctx.path_parameters = path_parameters
@@ -48,20 +49,14 @@ class Api
             ctx << error
           rescue ex
             Log.error exception: ex, &.emit "Exception handling route #{ctx.request.method}#{ctx.request.path.rstrip '/'}"
-            if @@debug
-              name = ex.class.name
-              message = ex.message
-            else
-              name =  "InternalServerError"
-              message = "Something unexpected happened"
-            end
-            ctx << Error.new HTTP::Status::INTERNAL_SERVER_ERROR, name, message
+            ctx << Error::ServerError.new ex.message
           end
         end
       end
       Log.info &.emit "Took: #{(Time.monotonic - t).total_milliseconds}ms"
     end
 
+    Log.info &.emit "Bound to #{bind}"
     @server.bind uri: bind
   end
 

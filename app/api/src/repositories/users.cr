@@ -64,13 +64,13 @@ class Repositories::Users::Database < Repositories::Users
         users.tag,                                                                                                                                            
         users.allowed_project,                                                                                                                          
         users.allowed_blob_size,                                                                                                                        
-        users.allowed_concurrent_jobs,                                                                                                                  
-        users.allowed_concurrent_ttys,                                                                                                                   
+        users.allowed_concurrent_job,                                                                                                                  
+        users.allowed_concurrent_tty,                                                                                                                   
         credentials.email,                                                                                                                                       
         credentials.password_hash,                                                                                                                                       
         credentials.id as credential_id                                                                                                                                    
-      FROM credentials                                                                                                                                        
-        LEFT JOIN users ON users.id = crendentials.user_id                                                                                                    
+      FROM credentials
+        LEFT JOIN users ON users.id = credentials.user_id                                                                                                    
       WHERE credentials.email = $1                                                                                                                            
     SQL
   end

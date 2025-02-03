@@ -4,9 +4,9 @@ class Api
 
   def authenticate(ctx) : UUID
     session_id = get_session_cookie(ctx)
-    raise Error::Auth.new "Unauthenticated" unless session_id
+    raise Error::Auth.new "Not authenticated" unless session_id
     user_id = get_session(session_id)
-    raise Error::Auth.new "Unauthenticated" unless user_id
+    raise Error::Auth.new "Not authenticated" unless user_id
     user_id
   end
 
@@ -30,13 +30,14 @@ class Api
 
   SESSION_COOKIE_NAME = "__Host-session"
 
-  def set_session_cookie(ctx, session_id : SessionID)
+  def set_session_cookie(ctx, session_id : SessionID, stay_signed : Bool)
     ctx.response.cookies << HTTP::Cookie.new(
       name: SESSION_COOKIE_NAME,
       value: session_id.to_s,
       secure: true,
       http_only: true,
-      samesite: :strict
+      samesite: HTTP::Cookie::SameSite::Strict,
+      max_age: stay_signed.try { 8.hours }
     )
   end
 
@@ -46,7 +47,7 @@ class Api
       value: "",
       secure: true,
       http_only: true,
-      samesite: :strict,
+      samesite: HTTP::Cookie::SameSite::Strict,
       max_age: Time::Span::ZERO
     )
   end
@@ -62,16 +63,23 @@ class Api
     property email : String
     property password : String
     property name : String
+    property stay_signed : Bool = false
   end
 
   route POST, "/register", def register(ctx)
     registration = ctx >> Request::Registration
 
+    Validations.validate! do
+      accumulate "email", check_email registration.email
+      accumulate "password", check_password registration.password, email: registration.email, name: registration.name
+      accumulate "name", check_username registration.name
+    end
+
     user_id = @users.insert(
-      email: Validations.email(registration.email),
-      name: Validations.username(registration.name),
+      email: registration.email,
+      name: registration.name,
       password_hash: Crypto::Bcrypt::Password.create(
-        Validations.password(registration.password),
+        registration.password,
         cost: REGISTER_PASSWORD_BCRYPT_COST
       ).digest,
       tag: "0000", 
@@ -82,7 +90,7 @@ class Api
     )
     
     session_id = open_session(user_id)
-    set_session_cookie(ctx, session_id)
+    set_session_cookie(ctx, session_id, registration.stay_signed)
 
     ctx.response.status = HTTP::Status::CREATED
   end
@@ -91,6 +99,7 @@ class Api
     include JSON::Serializable
     property email : String
     property password : String
+    property stay_signed : Bool = false
   end
 
   route PUT, "/login", def login(ctx)
@@ -98,15 +107,15 @@ class Api
 
     user_and_credentials = @users.get_by_email_with_credentials(login.email)
     unless user_and_credentials
-      raise Error::Auth.new "Invalid Credentials"
+      raise Error::InvalidCredential.new
     end
     
     unless Crypto::Bcrypt::Password.new(user_and_credentials.password_hash).verify(login.password)
-      raise Error::Auth.new "Invalid Credentials" 
+      raise Error::InvalidCredential.new
     end
     
     session_id = open_session(user_and_credentials.id)
-    set_session_cookie(ctx, session_id)
+    set_session_cookie(ctx, session_id, login.stay_signed)
     ctx.response.status = HTTP::Status::CREATED
   end
 

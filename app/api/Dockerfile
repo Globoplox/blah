@@ -4,5 +4,5 @@ RUN apk add libjpeg-turbo-dev
 RUN apk add libspng-dev
 WORKDIR /root
 COPY . .
-RUN shards build api --no-debug --verbose --no-color -p -s -t --error-trace
+RUN shards build api --verbose --no-color -p -s -t --error-trace
 CMD ["/root/bin/api"]
