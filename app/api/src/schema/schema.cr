@@ -1,56 +1,60 @@
 require "db"
 require "pg"
+require "log"
 
 module Schema
   extend self
 
-  abstract struct Migration
-    abstract def version
+  # abstract struct Migration
+  #   abstract def version
 
-    def name
-      {{ @type.name.gsub(/^.+::/, "").stringify.underscore }}
-    end
+  #   def name
+  #     {{ @type.name.gsub(/^.+::/, "").stringify.underscore }}
+  #   end
 
-    abstract def migrate(database)
-  end
+  #   macro inherited
+  #     def self.schema
+  #       Path[__DIR__].basename
+  #     end
+  #   end
+
+  #   abstract def migrate(database)
+  # end
 end
 
+require "./migrations/**"
+
 module Schema
+  # dir => {version, name, text}
+  RAW_MIGRATIONS = {{run "./embed_migration.cr", "#{__DIR__}/migrations"}}
 
-  RAW_MIGRATIONS = {{run "./tool/compile_time_text_migrations.cr", "#{__DIR__}/migrations"}}
+  # dir => Database::Migration.class
+  #HANDLED_MIGRATIONS = {{Migration.all_subclasses.reject(&.abstract?).map(&.name)}}.group_by &.schema
 
-  # HANDLED_MIGRATIONS = {{Migration.all_subclasses.reject(&.abstract?).map(&.name)}}
+  def migrate(database : DB::Database, schema : String)
 
-  delegate :close, :query_one, :query_one?, :query_all, :exec, :transaction, :query, to: connexion
-
-  @@database : DB::Database?
-
-  def connexion
-    @@database.not_nil!
-  end
-
-  def init
-    @@database = DB.open ENV["DATABASE_URI"]
-
-    connexion.exec <<-SQL
+    database.exec <<-SQL
       CREATE TABLE IF NOT EXISTS migrations (
+        schema_name VARCHAR NOT NULL,
         version INT PRIMARY KEY NOT NULL,
         name TEXT NOT NULL,
         finished_at TIMESTAMPTZ NOT NULL
       )
     SQL
 
-    done = connexion.query_all <<-SQL, as: Int32
-      SELECT version FROM migrations
+    done = database.query_all <<-SQL, schema, as: Int32
+      SELECT version FROM migrations WHERE schema_name = $1
     SQL
 
-    # handled_migrations = HANDLED_MIGRATIONS.map do |migration_class|
+    # handled_migrations = HANDLED_MIGRATIONS[schema]?.try &.map do |migration_class|
     #   migration = migration_class.new
     #   {migration.version, migration.name, migration}
     # end
 
-    raw_migrations = RAW_MIGRATIONS
-    migrations =  raw_migrations # + handled_migrations
+    raw_migrations = RAW_MIGRATIONS[schema]?
+    #migrations = (handled_migrations && raw_migrations && handled_migrations + raw_migrations) || handled_migrations || raw_migrations
+    migrations = raw_migrations
+    return unless migrations
 
     duplicate = migrations.group_by(&.first).select { |_, values| values.size > 1 }
 
@@ -62,13 +66,13 @@ module Schema
       if !done.includes? version
         begin
           Log.info &.emit "Running migration #{version}: #{name}"
-          connexion.transaction do |transaction|
+          database.transaction do |transaction|
             case payload
             in String    then transaction.connection.as(PG::Connection).exec_all payload
-            in Migration then payload.migrate transaction.connection
+            #in Migration then payload.migrate transaction.connection
             end
-            transaction.connection.exec <<-SQL, version, name, Time.utc
-              INSERT INTO migrations (version, name, finished_at) VALUES ($1, $2, $3)
+            transaction.connection.exec <<-SQL, version, name, Time.utc, schema
+              INSERT INTO migrations (version, name, finished_at, schema_name) VALUES ($1, $2, $3, $4)
             SQL
           end
           Log.info &.emit "Migration #{version}: #{name} ran with success"
@@ -80,5 +84,3 @@ module Schema
     end
   end
 end
-
-require "./*"

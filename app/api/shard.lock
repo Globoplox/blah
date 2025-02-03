@@ -8,25 +8,13 @@ shards:
     git: https://github.com/taylorfinnell/awscr-signer.git
     version: 0.8.2
 
-  backtracer:
-    git: https://github.com/sija/backtracer.cr.git
-    version: 1.2.2
+  cradix:
+    git: https://github.com/globoplox/cradix.git
+    version: 1.0.0
 
   db:
     git: https://github.com/crystal-lang/crystal-db.git
     version: 0.13.1
-
-  email:
-    git: https://github.com/arcage/crystal-email.git
-    version: 0.6.4
-
-  exception_page:
-    git: https://github.com/crystal-loot/exception_page.git
-    version: 0.4.1
-
-  kemal:
-    git: https://github.com/kemalcr/kemal.git
-    version: 1.6.0
 
   openssl_ext:
     git: https://github.com/spider-gazelle/openssl_ext.git
@@ -43,10 +31,6 @@ shards:
   pool:
     git: https://github.com/ysbaddaden/pool.git
     version: 0.2.4
-
-  radix:
-    git: https://github.com/luislavena/radix.git
-    version: 0.4.1
 
   redis:
     git: https://github.com/stefanwille/crystal-redis.git

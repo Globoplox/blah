@@ -5,27 +5,22 @@ authors:
   - globoplox <globoplox@gmail.com>
 
 dependencies:
+  cradix:
+    github: globoplox/cradix
   pg:
     github: will/crystal-pg
+  awscr-s3:
+    github: taylorfinnell/awscr-s3
+  pluto:
+    github: phenopolis/pluto
   redis:
     github: stefanwille/crystal-redis
   openssl_ext:
     github: spider-gazelle/openssl_ext
     version: ~> 2.3.0
-  pluto:
-    github: phenopolis/pluto
-  awscr-s3:
-    github: taylorfinnell/awscr-s3
-  email:
-    github: arcage/crystal-email
-    version: 0.6.4
-  kemal:
-    github: kemalcr/kemal
-    
+
 targets:
   api:
     main: src/main.cr
 
 crystal: '>= 1.15.0'
-
-license: MIT

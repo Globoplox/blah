@@ -1,24 +1,42 @@
 require "log"
-require "kemal"
+require "db"
+require "pg" # Load the PGSQL driver
+
+require "./storage/s3"
+require "./cache/redis"
 require "./schema"
-require "./cache"
-require "./storage"
-require "./app"
+require "./repositories/*"
+require "./api"
 
-Schema.init
-Storage.init
-Cache.init
+# Setup all dependencies with a suitable implementation
+storage = Storage::S3.from_environnment ENV["BUCKET"]
+cache = Cache::Redis.from_environnment
 
-APP = App.new schema: Schema, storage: Storage, cache: Cache
+# Standard library database implementation is already an interface and factory for itself based on uri
+# and loaded drivers.
+database = DB.open ENV["DB_URI"]
 
-require "./routes/*"
+# Run migrations if any
+Schema.migrate database, schema: "main"
 
-Signal::TERM.trap { Kemal.stop }
+# Back to dependencies
+users = Repositories::Users::Database.new database
 
-Kemal.run do |config|
-  config.server.not_nil!.bind ENV["BIND_URI"]
-end
+# NOTE that vinding must be explicitely using tcp or tls to enable port reuse for horizontal scaling purposes
+bind = ENV["BIND_URI"]
 
-# Remind the skill you want to show off:
-# dback: docker, compose, git, sql, nice auth, oauth, redis, pubsub, loadbalancing, scaling, clean code arch, dependency injection, TESTING
-# front: you can do react
+Api.new(
+  storage: storage,
+  cache: cache,
+  users: users,
+  bind: bind
+).tap do |api|
+  Signal::TERM.trap do
+    Log.info &.emit "Received sigterm, gracefully shutting down"
+    api.close
+    database.close
+    storage.close
+    cache.close
+    Log.info &.emit "Shutting down"
+  end
+end.start
