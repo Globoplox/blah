@@ -6,6 +6,7 @@ import Alert from 'react-bootstrap/Alert';
 import { ErrorCode, Api, Error, ParameterError } from "../api";
 import { ChangeEvent,useState } from 'react'
 import { useNavigate } from "react-router";
+import { Link } from "react-router";
 
 export default function Register({api, redirectTo}: {api: Api, redirectTo: string | null}) {
   const navigate = useNavigate();
@@ -20,7 +21,7 @@ export default function Register({api, redirectTo}: {api: Api, redirectTo: strin
   const [emailFeedback, setEmailFeedback] = useState(null);
   const [passwordFeedback, setPasswordFeedback] = useState(null);
 
-  const parameterFeedbacks : Record<string, Dispatch<string>> = {
+  const parameterFeedbacks : Record<string, Dispatch<{type: string, content: string, alert: string}>> = {
     "name": setNameFeedback,
     "email": setEmailFeedback,
     "password": setPasswordFeedback,
@@ -30,10 +31,8 @@ export default function Register({api, redirectTo}: {api: Api, redirectTo: strin
     event.preventDefault();
     
     api.register(email, name, password, staySignedIn).then(_ => {
-      setFeedback({type: "valid", content: "Successfully logged in", alert: "success"});
-      if (redirectTo !== null) {
-        setTimeout(() => { navigate(redirectTo) }, 1000)
-      }
+      setFeedback({type: "valid", content: "Successfully sign-in", alert: "success"});
+      setTimeout(() => { navigate(redirectTo || "/") }, 1000)
     }).catch((error: Error) => {
       if (error.code === ErrorCode.BadParameter) {
         (error as ParameterError).parameters.forEach(parameter => {
@@ -65,51 +64,53 @@ export default function Register({api, redirectTo}: {api: Api, redirectTo: strin
   return (
     <Container className="flex-flex">
       <div className="flex-flex center-center">
-      <Form onSubmit={onSubmit}>
+        <Form onSubmit={onSubmit}>
+          <h3 className="pb-3">Sign-up</h3>
+    
+          <Form.Group className="mb-3">
+            <Form.Label>Email address</Form.Label>
+            {/* Not using type="email" because something then mess up the form by adding random validation popup */}
+            <Form.Control type="text" placeholder="Enter email" value={email} onChange={onEmailInput} isInvalid={emailFeedback?.type == "invalid"}/>
+            <Form.Text className="text-muted">
+              We'll never share your email with anyone else.
+            </Form.Text>
+            <Form.Control.Feedback type="invalid">
+              {emailFeedback?.content}
+            </Form.Control.Feedback>
+          </Form.Group>
 
-        <Form.Group className="mb-3">
-          <Form.Label>Email address</Form.Label>
-          {/* Not using type="email" because something then mess up the form by adding random validation popup */}
-          <Form.Control type="text" placeholder="Enter email" value={email} onChange={onEmailInput} isInvalid={emailFeedback?.type == "invalid"}/>
-          <Form.Text className="text-muted">
-            We'll never share your email with anyone else.
-          </Form.Text>
-          <Form.Control.Feedback type="invalid">
-            {emailFeedback?.content}
-          </Form.Control.Feedback>
-        </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Display name</Form.Label>
+            <Form.Control type="text" placeholder="Enter pseudonyme" value={name} onChange={onNameInput} isInvalid={nameFeedback?.type == "invalid"}/>
+            <Form.Control.Feedback type="invalid">
+              {nameFeedback?.content}
+            </Form.Control.Feedback>
+          </Form.Group>
 
-        <Form.Group className="mb-3">
-          <Form.Label>Display name</Form.Label>
-          <Form.Control type="text" placeholder="Enter pseudonyme" value={name} onChange={onNameInput} isInvalid={nameFeedback?.type == "invalid"}/>
-          <Form.Control.Feedback type="invalid">
-            {nameFeedback?.content}
-          </Form.Control.Feedback>
-        </Form.Group>
+          <Form.Group className="mb-3" >
+            <Form.Label>Password</Form.Label>
+            <Form.Control type="password" placeholder="Password" value={password} onChange={onPasswordInput} isInvalid={passwordFeedback?.type == "invalid"}/>
+            <Form.Control.Feedback type="invalid">
+              {passwordFeedback?.content}
+            </Form.Control.Feedback>
+          </Form.Group>
 
-        <Form.Group className="mb-3" >
-          <Form.Label>Password</Form.Label>
-          <Form.Control type="password" placeholder="Password" value={password} onChange={onPasswordInput} isInvalid={passwordFeedback?.type == "invalid"}/>
-          <Form.Control.Feedback type="invalid">
-            {passwordFeedback?.content}
-          </Form.Control.Feedback>
-        </Form.Group>
-
-        <Form.Group className="mb-3">
-          <Form.Check type="checkbox" label="Stay signed-in" checked={staySignedIn} onChange={onStaySingedInput}/>
-        </Form.Group>
-        
-        { 
-          feedback === null ? null : (
-            <Alert variant={feedback.alert}>
-              {feedback?.content}
-            </Alert>
-          )
-        }
-        <Button variant="primary" type="submit">
-          Submit
-        </Button>
-      </Form>
+          <Form.Group className="mb-3">
+            <Form.Check type="checkbox" label="Stay signed-in" checked={staySignedIn} onChange={onStaySingedInput}/>
+          </Form.Group>
+          
+          { 
+            feedback === null ? null : (
+              <Alert variant={feedback.alert}>
+                {feedback?.content}
+              </Alert>
+            )
+          }
+          <Button variant="primary" type="submit">
+            Submit
+          </Button>
+          <div className="mt-3">Already have an account?<Link className="ms-3" to="/login">Sign-In</Link></div>
+        </Form>
       </div>
     </Container>
   );

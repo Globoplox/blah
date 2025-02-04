@@ -8,7 +8,7 @@ module.exports = {
   entry: './src/main.tsx',
 
   resolve: {
-    extensions: ['.js', '.jsx', '.tsx', '.ts'],
+    extensions: ['.js', '.jsx', '.tsx', '.ts', '.d.ts'],
     modules: ['node_modules'],
   },
   

@@ -65,7 +65,8 @@ class Repositories::Users::Database < Repositories::Users
         users.allowed_project,                                                                                                                          
         users.allowed_blob_size,                                                                                                                        
         users.allowed_concurrent_job,                                                                                                                  
-        users.allowed_concurrent_tty,                                                                                                                   
+        users.allowed_concurrent_tty,   
+        users.created_at,                                                                                                                
         credentials.email,                                                                                                                                       
         credentials.password_hash,                                                                                                                                       
         credentials.id as credential_id                                                                                                                                    

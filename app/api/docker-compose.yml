@@ -5,6 +5,7 @@ services:
       - ENV
       - BIND_URI=tcp://0.0.0.0:3000
       - DB_URI=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgsql:5432/${POSTGRES_DB}
+      - CLIENT_ORIGIN=http://localhost:8080
       - S3_REGION
       - S3_KEY
       - S3_SECRET

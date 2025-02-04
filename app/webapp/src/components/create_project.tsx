@@ -5,30 +5,30 @@ import Container from 'react-bootstrap/Container';
 import Alert from 'react-bootstrap/Alert';
 import { ErrorCode, Api, Error, ParameterError } from "../api";
 import { ChangeEvent,useState } from 'react'
+import { useNavigate } from "react-router";
 
 export default function CreateProject({api}: {api: Api}) {
+  const navigate = useNavigate();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [description, setDescription] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
   const [name, setName] = useState("");
 
-  const [staySignedIn, setStaySignedIn] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [nameFeedback, setNameFeedback] = useState(null);
-  const [emailFeedback, setEmailFeedback] = useState(null);
-  const [passwordFeedback, setPasswordFeedback] = useState(null);
+  const [descriptionFeedback, setDescriptionFeedback] = useState(null);
 
-  const parameterFeedbacks : Record<string, Dispatch<string>> = {
+  const parameterFeedbacks : Record<string, Dispatch<{type: string, content: string, alert: string}>> = {
     "name": setNameFeedback,
-    "email": setEmailFeedback,
-    "password": setPasswordFeedback,
+    "description": setDescriptionFeedback,
   };
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     
-    api.register(email, name, password, staySignedIn).then(_ => {
-      setFeedback({type: "valid", content: "Successfully logged in", alert: "success"});
+    api.create_project(name, isPublic, description).then(project => {
+      setFeedback({type: "valid", content: "Project successfully created", alert: "success"});
+      setTimeout(() => { navigate(`/projects/${project.id}`) }, 1000)
     }).catch((error: Error) => {
       if (error.code === ErrorCode.BadParameter) {
         (error as ParameterError).parameters.forEach(parameter => {
@@ -41,70 +41,55 @@ export default function CreateProject({api}: {api: Api}) {
     return false;
   }
 
-  function onEmailInput(event: ChangeEvent<HTMLInputElement>) {
-    setEmail(event.target.value);
+  function onDescriptionInput(event: ChangeEvent<HTMLInputElement>) {
+    setDescription(event.target.value);
   }
 
   function onNameInput(event: ChangeEvent<HTMLInputElement>) {
     setName(event.target.value);
   }
 
-  function onPasswordInput(event: ChangeEvent<HTMLInputElement>) {
-    setPassword(event.target.value);
-  }
-
-  function onStaySingedInput(event: ChangeEvent<HTMLInputElement>) {
-    setStaySignedIn(event.target.checked);
+  function onIsPublicInput(event: ChangeEvent<HTMLInputElement>) {
+    setIsPublic(event.target.checked);
   }
 
   return (
     <Container className="flex-flex">
-      <div className="flex-flex center-center">
-      <Form onSubmit={onSubmit}>
+      <div className="flex-flex center-center" >
+        <Form onSubmit={onSubmit} style={{minWidth: "50%"}}>
+          <h3 className="pb-3">Create a new project</h3>
 
-        <Form.Group className="mb-3">
-          <Form.Label>Email address</Form.Label>
-          {/* Not using type="email" because something then mess up the form by adding random validation popup */}
-          <Form.Control type="text" placeholder="Enter email" value={email} onChange={onEmailInput} isInvalid={emailFeedback?.type == "invalid"}/>
-          <Form.Text className="text-muted">
-            We'll never share your email with anyone else.
-          </Form.Text>
-          <Form.Control.Feedback type="invalid">
-            {emailFeedback?.content}
-          </Form.Control.Feedback>
-        </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Name</Form.Label>
+            <Form.Control type="text" placeholder="Enter project name" value={name} onChange={onNameInput} isInvalid={nameFeedback?.type == "invalid"}/>
+            <Form.Control.Feedback type="invalid">
+              {nameFeedback?.content}
+            </Form.Control.Feedback>
+          </Form.Group>
 
-        <Form.Group className="mb-3">
-          <Form.Label>Display name</Form.Label>
-          <Form.Control type="text" placeholder="Enter pseudonyme" value={name} onChange={onNameInput} isInvalid={nameFeedback?.type == "invalid"}/>
-          <Form.Control.Feedback type="invalid">
-            {nameFeedback?.content}
-          </Form.Control.Feedback>
-        </Form.Group>
+          <Form.Group className="mb-3" >
+            <Form.Label>Description</Form.Label>
+            <Form.Control as="textarea" rows={3} value={description} onChange={onDescriptionInput} isInvalid={descriptionFeedback?.type == "invalid"}/>
+            <Form.Control.Feedback type="invalid">
+              {descriptionFeedback?.content}
+            </Form.Control.Feedback>
+          </Form.Group>
 
-        <Form.Group className="mb-3" >
-          <Form.Label>Password</Form.Label>
-          <Form.Control type="password" placeholder="Password" value={password} onChange={onPasswordInput} isInvalid={passwordFeedback?.type == "invalid"}/>
-          <Form.Control.Feedback type="invalid">
-            {passwordFeedback?.content}
-          </Form.Control.Feedback>
-        </Form.Group>
-
-        <Form.Group className="mb-3">
-          <Form.Check type="checkbox" label="Stay signed-in" checked={staySignedIn} onChange={onStaySingedInput}/>
-        </Form.Group>
-        
-        { 
-          feedback === null ? null : (
-            <Alert variant={feedback.alert}>
-              {feedback?.content}
-            </Alert>
-          )
-        }
-        <Button variant="primary" type="submit">
-          Submit
-        </Button>
-      </Form>
+          <Form.Group className="mb-3">
+            <Form.Check type="checkbox" label="This is a public project" checked={isPublic} onChange={onIsPublicInput}/>
+          </Form.Group>
+          
+          { 
+            feedback === null ? null : (
+              <Alert variant={feedback.alert}>
+                {feedback?.content}
+              </Alert>
+            )
+          }
+          <Button variant="primary" type="submit">
+            Submit
+          </Button>
+        </Form>
       </div>
     </Container>
   );

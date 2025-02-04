@@ -21,15 +21,19 @@ Schema.migrate database, schema: "main"
 
 # Back to dependencies
 users = Repositories::Users::Database.new database
+projects = Repositories::Projects::Database.new database
 
-# NOTE that vinding must be explicitely using tcp or tls to enable port reuse for horizontal scaling purposes
+# NOTE that binding must be explicitely using tcp or tls to enable port reuse for horizontal scaling purposes
 bind = ENV["BIND_URI"]
+cors_origin = ENV["CLIENT_ORIGIN"]
 
 Api.new(
   storage: storage,
   cache: cache,
   users: users,
-  bind: bind
+  projects: projects,
+  bind: bind,
+  cors_origin: cors_origin
 ).tap do |api|
   Signal::TERM.trap do
     Log.info &.emit "Received sigterm, gracefully shutting down"

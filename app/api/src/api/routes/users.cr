@@ -36,7 +36,7 @@ class Api
       value: session_id.to_s,
       secure: true,
       http_only: true,
-      samesite: HTTP::Cookie::SameSite::Strict,
+      samesite: HTTP::Cookie::SameSite::None,
       max_age: stay_signed.try { 8.hours }
     )
   end
@@ -47,7 +47,7 @@ class Api
       value: "",
       secure: true,
       http_only: true,
-      samesite: HTTP::Cookie::SameSite::Strict,
+      samesite: HTTP::Cookie::SameSite::None,
       max_age: Time::Span::ZERO
     )
   end
@@ -81,7 +81,7 @@ class Api
       password_hash: Crypto::Bcrypt::Password.create(
         registration.password,
         cost: REGISTER_PASSWORD_BCRYPT_COST
-      ).digest,
+      ).to_s,
       tag: "0000", 
       allowed_projects: 5, 
       allowed_blob_size: 1_000_000, 
@@ -110,6 +110,8 @@ class Api
       raise Error::InvalidCredential.new
     end
     
+    pp user_and_credentials.password_hash
+
     unless Crypto::Bcrypt::Password.new(user_and_credentials.password_hash).verify(login.password)
       raise Error::InvalidCredential.new
     end

@@ -19,8 +19,9 @@ class Api
   @storage : Storage
   @cache : Cache
   @users : Repositories::Users
+  @projects : Repositories::Projects
 
-  def initialize(@storage, @cache, @users, bind)    
+  def initialize(@storage, @cache, @users, @projects, bind, cors_origin)
     @server = uninitialized HTTP::Server
     @server = HTTP::Server.new([
       HTTP::CompressHandler.new
@@ -31,7 +32,7 @@ class Api
       ctx.response.headers["Access-Control-Max-Age"] = "3600"
       ctx.response.headers["Access-Control-Allow-Credentials"] = "true"
       ctx.response.headers["Access-Control-Allow-Headers"] = "Authorization,Content-Type"
-      ctx.response.headers["Access-Control-Allow-Origin"] = "*"
+      ctx.response.headers["Access-Control-Allow-Origin"] = cors_origin
 
       if ctx.request.method == "OPTIONS"
         ctx.response.status_code = 204

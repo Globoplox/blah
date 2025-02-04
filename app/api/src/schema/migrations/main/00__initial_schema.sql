@@ -1,7 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 COMMENT ON EXTENSION pgcrypto IS 'cryptographic functions';
 
-
 CREATE TABLE blobs
 (
     id              UUID PRIMARY KEY        NOT NULL DEFAULT gen_random_uuid(),
@@ -37,14 +36,13 @@ CREATE TABLE projects
     id          UUID PRIMARY KEY                    NOT NULL DEFAULT gen_random_uuid(),
     name        VARCHAR(50)                         NOT NULL,
     description VARCHAR(1000)                       DEFAULT NULL,
-    user_id     UUID REFERENCES users               NOT NULL,
+    owner_id     UUID REFERENCES users               NOT NULL,
     public      BOOLEAN                             NOT NULL,
     avatar_blob_id  UUID REFERENCES blobs           DEFAULT NULL,
-    blob_size_sum            INT                    NOT NULL,
     allowed_blob_size        INT                    NOT NULL,
     allowed_file_amount      INT                    NOT NULL,
     created_at  TIMESTAMPTZ                         NOT NULL DEFAULT NOW(),
-    UNIQUE(user_id, name)
+    UNIQUE(owner_id, name)
 );
 
 CREATE TABLE project_files

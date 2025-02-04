@@ -19,6 +19,7 @@ class Api
 
     def self.status_for(code : Code) : HTTP::Status
       case code
+      when Code::SERVER_ERROR then HTTP::Status::INTERNAL_SERVER_ERROR
       else HTTP::Status::UNPROCESSABLE_ENTITY
       end
     end

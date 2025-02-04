@@ -1,6 +1,4 @@
 @import "bootstrap";
-$bootstrap-icons-font-src: url("bootstrap-icons/font/fonts/bootstrap-icons.woff2") format("woff2");
-@import 'bootstrap-icons/font/bootstrap-icons.scss';
 
 html, body {
   width: 100%;
@@ -24,4 +22,14 @@ html, body {
 .center-center {
   align-items: center;
   margin: auto;
+}
+
+.soft-link {
+  color: black;
+  text-decoration: none;
+
+}
+
+.soft-link:hover {
+  text-decoration: underline;
 }

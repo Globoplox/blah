@@ -50,5 +50,17 @@ module Validations
       return "must not be one of the most commons weak passwords" if password.in? BANNED_PASSWORDS
     end
    
+    def check_project_description(description) : String?
+      return "must be at least 3 character" if description.size < 3
+      return "must be at most 50 character" if description.size > 1000
+    end
+
+    def check_project_name(name) : String?
+      return "must be at least 3 character" if name.size < 3
+      return "must be at most 50 character" if name.size > 50
+      return "must only contains printable character" if name.chars.any? { |c| !c.printable? }
+      return "cannot contains whitespace" if name.chars.any? { |c| c.whitespace? }
+    end
+
   end
 end
