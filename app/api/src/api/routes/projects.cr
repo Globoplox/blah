@@ -30,7 +30,6 @@ class Api
       allowed_file_amount: 50
     )
 
-
     ctx.response.status = HTTP::Status::CREATED
     ctx << Response::ID.new project_id
   end
@@ -43,15 +42,31 @@ class Api
     property description : String?
     property created_at : Time
     property owner_name : String
+    property files : Array(File)?
     
-    def initialize(@id, @name, @public, @description, @created_at, @owner_name)
+    class File
+      include JSON::Serializable
+      property path : String
+      property content_uri : String
+      property created_at : Time
+      property file_edited_at : Time
+      property author_name : String
+      property editor_name : String
+
+      def initialize(@path, @content_uri, @created_at, @file_edited_at, @author_name, @editor_name)
+      end
+    end
+
+    def initialize(@id, @name, @public, @description, @created_at, @owner_name, @files = nil)
     end
   end
 
   route GET, "/projects/:id", def read_project(ctx)
     user_id = authenticate(ctx)
+    project_id = UUID.new ctx.path_parameter "id"
 
-    project = @projects.read(user_id)
+    project = @projects.read(project_id)
+    files = @files.list(project_id)
 
     ctx << Response::Project.new(
       id: project.id,
@@ -59,7 +74,17 @@ class Api
       public: project.public,
       description: project.description,
       created_at: project.created_at,
-      owner_name: project.owner_name
+      owner_name: project.owner_name,
+      files: files.map do |file|
+        Response::Project::File.new(
+          path: file.path,
+          created_at: file.created_at,
+          file_edited_at: file.file_edited_at,
+          author_name: file.author_name,
+          editor_name: file.editor_name,
+          content_uri: @storage.uri(file.blob_id.to_s)
+        )
+      end
     )
   end
 

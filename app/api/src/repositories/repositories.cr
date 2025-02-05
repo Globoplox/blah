@@ -63,4 +63,30 @@ module Repositories
     abstract def read(id  : UUID) : Project
 
   end
+
+  abstract class Blobs
+    abstract def insert(content_type : String, size : Int32) : UUID
+    abstract def delete(blob_id : UUID,)
+  end
+
+  abstract class Files
+    class File
+      include DB::Serializable
+      property id : UUID
+      property path : String
+      property author_id : UUID
+      property editor_id : UUID
+      property blob_id : UUID
+      property created_at : Time
+      property file_edited_at : Time
+      property author_name : String
+      property editor_name : String
+    end
+
+    abstract def insert(project_id : UUID, blob_id : UUID, path : String, author_id : String)
+    abstract def delete(project_id : UUID, path : String)
+    abstract def move(project_id : UUID, from_path : String, to_path : String, editor_id : String)
+    abstract def edit(project_id : UUID, path : String, editor_id : String)    
+    abstract def list(project_id : UUID) : Array(File)
+  end
 end

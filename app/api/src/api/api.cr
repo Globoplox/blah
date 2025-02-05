@@ -20,8 +20,10 @@ class Api
   @cache : Cache
   @users : Repositories::Users
   @projects : Repositories::Projects
+  @files : Repositories::Files
+  @blobs : Repositories::Blobs
 
-  def initialize(@storage, @cache, @users, @projects, bind, cors_origin)
+  def initialize(@storage, @cache, @users, @projects, @files, @blobs, bind, cors_origin)
     @server = uninitialized HTTP::Server
     @server = HTTP::Server.new([
       HTTP::CompressHandler.new

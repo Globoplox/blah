@@ -1,10 +1,11 @@
 require "./repositories"
+require "./database_repository"
 
 # Database based implementation of the user repository.
 class Repositories::Projects::Database < Repositories::Projects
-  @connexion : DB::Database
+  include Repositories::Database
 
-  def initialize(@connexion)
+  def initialize(@connection)
   end
 
   def insert(
@@ -28,7 +29,7 @@ class Repositories::Projects::Database < Repositories::Projects
       allowed_blob_size,
     }
 
-    @connexion.exec <<-SQL, *project                                                                                                               
+    @connection.exec <<-SQL, *project                                                                                                               
       INSERT INTO projects (
         id, 
         name, 
@@ -44,7 +45,8 @@ class Repositories::Projects::Database < Repositories::Projects
   end
 
   def read(id  : UUID) : Project
-    Project.from_rs(@connexion.query(<<-SQL, id)).first
+    # TODO: acl
+    Project.from_rs(@connection.query(<<-SQL, id)).first
       SELECT 
         projects.id,
         projects.name,
@@ -58,12 +60,11 @@ class Repositories::Projects::Database < Repositories::Projects
       FROM projects
       LEFT JOIN users ON users.id = projects.owner_id
       WHERE projects.id = $1
-      END
     SQL
   end
 
   def search_public(query  : String?) : Array(Project)
-    Project.from_rs @connexion.query <<-SQL, query
+    Project.from_rs @connection.query <<-SQL, query
       SELECT 
         projects.id,
         projects.name,
@@ -85,7 +86,7 @@ class Repositories::Projects::Database < Repositories::Projects
   end
 
   def search_owned(owner_id : UUID, query  : String?) : Array(Project)
-    Project.from_rs @connexion.query <<-SQL, query, owner_id
+    Project.from_rs @connection.query <<-SQL, query, owner_id
       SELECT 
         projects.id,
         projects.name,

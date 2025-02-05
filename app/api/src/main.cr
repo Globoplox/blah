@@ -22,6 +22,8 @@ Schema.migrate database, schema: "main"
 # Back to dependencies
 users = Repositories::Users::Database.new database
 projects = Repositories::Projects::Database.new database
+files = Repositories::Files::Database.new database
+blobs = Repositories::Blobs::Database.new database
 
 # NOTE that binding must be explicitely using tcp or tls to enable port reuse for horizontal scaling purposes
 bind = ENV["BIND_URI"]
@@ -32,6 +34,8 @@ Api.new(
   cache: cache,
   users: users,
   projects: projects,
+  files: files,
+  blobs: blobs,
   bind: bind,
   cors_origin: cors_origin
 ).tap do |api|

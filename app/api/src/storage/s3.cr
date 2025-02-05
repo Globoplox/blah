@@ -47,7 +47,7 @@ class Storage::S3 < Storage
       scheme = uri.scheme || "https"
     end
     
-    S3::Signer::V4.sign(
+    ::S3::Signer::V4.sign(
       path: "/#{name}",
       bucket: @bucket_name,
       key: @key,

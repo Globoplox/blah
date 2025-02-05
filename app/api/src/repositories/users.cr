@@ -1,10 +1,11 @@
 require "./repositories"
+require "./database_repository"
 
 # Database based implementation of the user repository.
 class Repositories::Users::Database < Repositories::Users
-  @connexion : DB::Database
+  include Repositories::Database
 
-  def initialize(@connexion)
+  def initialize(@connection)
   end
 
   def insert(
@@ -21,7 +22,7 @@ class Repositories::Users::Database < Repositories::Users
     credential_id = UUID.random
     user_id = UUID.random
 
-    @connexion.transaction do |transaction|
+    @connection.transaction do |transaction|
     
       user = {
         user_id, 
@@ -56,7 +57,7 @@ class Repositories::Users::Database < Repositories::Users
   end
 
   def get_by_email_with_credentials(email : String) : UserWithCredentials?
-    UserWithCredentials.from_rs(@connexion.query <<-SQL, email).first?                                   
+    UserWithCredentials.from_rs(@connection.query <<-SQL, email).first?                                   
       SELECT                                                                                                                                                  
         credentials.password_hash,                                                                                                                            
         users.id,                                                                                                                                             

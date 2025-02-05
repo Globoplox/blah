@@ -55,5 +55,6 @@ CREATE TABLE project_files
     editor_id     UUID REFERENCES users         NOT NULL,    
     authored_at   TIMESTAMPTZ                   NOT NULL DEFAULT NOW(),
     file_edited_at  TIMESTAMPTZ                 NOT NULL DEFAULT NOW(),
-    created_at  TIMESTAMPTZ                     NOT NULL DEFAULT NOW()
+    created_at  TIMESTAMPTZ                     NOT NULL DEFAULT NOW(),
+    UNIQUE(project_id, path)
 );
