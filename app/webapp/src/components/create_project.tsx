@@ -28,7 +28,7 @@ export default function CreateProject({api}: {api: Api}) {
     
     api.create_project(name, isPublic, description).then(project => {
       setFeedback({type: "valid", content: "Project successfully created", alert: "success"});
-      setTimeout(() => { navigate(`/projects/${project.id}`) }, 1000)
+      setTimeout(() => { navigate(`/project/${project.id}`) }, 1000)
     }).catch((error: Error) => {
       if (error.code === ErrorCode.BadParameter) {
         (error as ParameterError).parameters.forEach(parameter => {

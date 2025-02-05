@@ -21,6 +21,16 @@ import "prism-react-editor/themes/github-light.css"
 export default function Project({api} : {api: Api}) {
 
   const {projectId} = useParams();
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [project, setProject] = useState(null);
+  const loadProjects = useEffect(() => load(), []);
+
+  function load() {
+    api.read_project(projectId).then(project => {
+      setIsLoaded(true);
+      setProject(project);
+    });
+  }
 
   function onUpdate() {}
 
@@ -29,9 +39,18 @@ export default function Project({api} : {api: Api}) {
     <Navigation></Navigation>
     <hr style={{margin: 0}}/>
     <Stack direction="horizontal" style={{height: "100%", width: "100%"}}>
+
       <div style={{width: "17.5%", height: "100%"}}>
-        <Filetree api={api}/>
+        {
+          isLoaded
+          ? <Filetree api={api} project={project}/>
+          : <div className="d-flex align-items-center mt-3" style={{width: "100%"}}>
+              <Spinner size="sm" className="ms-auto"/>
+              <strong className="ms-2 me-auto">Loading...</strong>
+            </div>
+        }
       </div>
+
       <div className="vr" />
 
       <div style={{overflowY: "auto", height: "calc(100vh - 0.5in - 1px)", width: "calc(82.5% - 1px)", display: "inline-block"}}>

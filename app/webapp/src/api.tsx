@@ -15,15 +15,27 @@ type BaseError = {code: ErrorCode, error: string, message: string | null}
 
 export type ParameterError = {code: ErrorCode.BadParameter, error: string, message: string | null, parameters : {name: string, issue: string}[]}
 export type Error = ParameterError | BaseError
+
+export type File = {
+  path: string,
+  content_uri: string,
+  created_at: string,
+  file_edited_at: string,
+  author_name: string,
+  editor_name: string
+}
+
 export type Project = {
   id: string,
   name: string,
   public: boolean,
   description: string | null,
   created_at: string,
-  owner_name: string
+  owner_name: string,
+  files?: File[]
 }
 export type IDResponse = {id: string}
+
 export class Api {
 
   #headers = new Headers({'content-type': 'application/json'})
@@ -85,6 +97,17 @@ export class Api {
   owned_projects(query : string) : Promise<Project[]> {
     return fetch(
       `${API_SERVER_URI}/projects/owned?query=${query}`, {method: "GET", headers: this.#headers, credentials: 'include'}
+    ).then(response => {
+        if (response.ok)
+          return response.json()
+        else 
+          return response.json().then(_ => Promise.reject(_))
+    }, this.mapNetworkError)
+  }
+
+  read_project(project_id: string) : Promise<Project> {
+    return fetch(
+      `${API_SERVER_URI}/projects/${project_id}`, {method: "GET", headers: this.#headers, credentials: 'include'}
     ).then(response => {
         if (response.ok)
           return response.json()
