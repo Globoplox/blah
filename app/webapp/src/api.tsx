@@ -17,12 +17,14 @@ export type ParameterError = {code: ErrorCode.BadParameter, error: string, messa
 export type Error = ParameterError | BaseError
 
 export type File = {
+  id: string,
   path: string,
   content_uri: string,
   created_at: string,
   file_edited_at: string,
   author_name: string,
-  editor_name: string
+  editor_name: string,
+  is_directory: boolean
 }
 
 export type Project = {
@@ -115,6 +117,13 @@ export class Api {
           return response.json().then(_ => Promise.reject(_))
     }, this.mapNetworkError)
   }
+
+  //create_file(project_id: string, path: string) : Promise<IDResponse> {}
+
+  //delete_file(project_id: string, file_id: string) {}
+
+  //Write_file(project_id: string, file_id: string) {}
+
 }
 
 export default Api;

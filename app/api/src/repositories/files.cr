@@ -7,7 +7,7 @@ class Repositories::Files::Database < Repositories::Files
   def initialize(@connection)
   end
 
-  def insert(project_id : UUID, blob_id : UUID, path : String, author_id : String)
+  def insert(project_id : UUID, blob_id : UUID?, path : String, author_id : UUID) : UUID
     file_id = UUID.random
     file = {file_id, project_id, blob_id, path, author_id}
 
@@ -17,15 +17,17 @@ class Repositories::Files::Database < Repositories::Files
       ) VALUES ($1, $2, $3, $4, $5, $5)
     SQL
     # $5 twice is not a typo, editor = author at creation
+
+    file_id
   end
   
-  def delete(project_id : UUID, path : String)
-    @connection.exec <<-SQL, project_id, path
-      DELETE FROM project_files WHERE project_id = $1 AND path = $2
+  def delete(file_id : UUID)
+    @connection.exec <<-SQL, file_id
+      DELETE FROM project_files WHERE id = $1
     SQL
   end
   
-  def move(project_id : UUID, from_path : String, to_path : String, editor_id : String)
+  def move(project_id : UUID, from_path : String, to_path : String, editor_id : UUID)
     @connection.exec <<-SQL, project_id, from_path, editor_id, to_path                                                                                                         
       UPDATE project_files SET 
         editor_id = $3,
@@ -35,12 +37,18 @@ class Repositories::Files::Database < Repositories::Files
     SQL
   end
   
-  def edit(project_id : UUID, path : String, editor_id : String)
-    @connection.exec <<-SQL, project_id, path, editor_id                                                                                                         
+  def edit(file_id : UUID, editor_id : UUID)
+    @connection.exec <<-SQL, file_id, editor_id                                                                                                         
       UPDATE project_files SET 
-        editor_id = $3,
+        editor_id = $2,
         file_edited_at = NOW()
-      WHERE project_id = $1 AND path = $2
+      WHERE id = $1
+    SQL
+  end
+
+  def get_blob_id(file_id : UUID) : UUID?
+    @connection.scalar(<<-SQL, file_id).as(UUID?)
+      SELECT blob_id FROM project_file WHERE id = $1
     SQL
   end
 
@@ -54,6 +62,7 @@ class Repositories::Files::Database < Repositories::Files
         project_files.blob_id,
         project_files.created_at,
         project_files.file_edited_at,
+        project_files.is_directory,
         author_users.name as author_name,
         editor_users.name as editor_name
       FROM project_files

@@ -14,9 +14,12 @@ class Api
 
     project = ctx >> Request::CreateProject
 
+    description = project.description
+    description = nil if description.try &.empty?
+
     Validations.validate! do
       accumulate "name", check_project_name project.name
-      if description = project.description
+      if description = description
         accumulate "description", check_project_description description 
       end
     end
@@ -25,7 +28,7 @@ class Api
       name: project.name,
       owner_id: user_id,
       public: project.public,
-      description: project.description,
+      description: description,
       allowed_blob_size: 1_000_000,
       allowed_file_amount: 50
     )
@@ -46,14 +49,16 @@ class Api
     
     class File
       include JSON::Serializable
+      property id : UUID
       property path : String
-      property content_uri : String
+      property is_directory : Bool
+      property content_uri : String?
       property created_at : Time
       property file_edited_at : Time
       property author_name : String
       property editor_name : String
 
-      def initialize(@path, @content_uri, @created_at, @file_edited_at, @author_name, @editor_name)
+      def initialize(@id, @path, @is_directory, @content_uri, @created_at, @file_edited_at, @author_name, @editor_name)
       end
     end
 
@@ -77,12 +82,14 @@ class Api
       owner_name: project.owner_name,
       files: files.map do |file|
         Response::Project::File.new(
+          id: file.id,
           path: file.path,
           created_at: file.created_at,
           file_edited_at: file.file_edited_at,
           author_name: file.author_name,
           editor_name: file.editor_name,
-          content_uri: @storage.uri(file.blob_id.to_s)
+          is_directory: file.is_directory,
+          content_uri: file.blob_id.try { |blob_id| @storage.uri(blob_id.to_s) } 
         )
       end
     )

@@ -14,6 +14,14 @@ class Repositories::Blobs::Database < Repositories::Blobs
     @connection.exec <<-SQL, *blob                                                                                                               
       INSERT INTO blobs (id, content_type, size) VALUES ($1, $2, $3)                                                                               
     SQL
+
+    blob_id
+  end
+
+  def update(blob_id : UUID, size : Int32)
+    @connection.exec <<-SQL, blob_id, size                                                                                                 
+      UPDATE blobs SET sier = $2 WHERE id = $1                                                                               
+    SQL
   end
 
   def delete(blob_id : UUID)

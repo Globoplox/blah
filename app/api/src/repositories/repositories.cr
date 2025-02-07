@@ -67,6 +67,7 @@ module Repositories
   abstract class Blobs
     abstract def insert(content_type : String, size : Int32) : UUID
     abstract def delete(blob_id : UUID,)
+    abstract def update(blob_id : UUID, size : Int32)
   end
 
   abstract class Files
@@ -76,17 +77,19 @@ module Repositories
       property path : String
       property author_id : UUID
       property editor_id : UUID
-      property blob_id : UUID
+      property blob_id : UUID?
       property created_at : Time
       property file_edited_at : Time
       property author_name : String
       property editor_name : String
+      property is_directory : Bool
     end
 
-    abstract def insert(project_id : UUID, blob_id : UUID, path : String, author_id : String)
-    abstract def delete(project_id : UUID, path : String)
-    abstract def move(project_id : UUID, from_path : String, to_path : String, editor_id : String)
-    abstract def edit(project_id : UUID, path : String, editor_id : String)    
+    abstract def insert(project_id : UUID, blob_id : UUID?, path : String, author_id : UUID) : UUID
+    abstract def delete(file_id : UUID)
+    abstract def move(project_id : UUID, from_path : String, to_path : String, editor_id : UUID)
+    abstract def edit(file_id : UUID, editor_id : UUID)
     abstract def list(project_id : UUID) : Array(File)
+    abstract def get_blob_id(file_id : UUID) : UUID?
   end
 end

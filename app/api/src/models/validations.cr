@@ -62,5 +62,32 @@ module Validations
       return "cannot contains whitespace" if name.chars.any? { |c| c.whitespace? }
     end
 
+    def check_file_path(path) : String?
+      return "must be at most 50 character" if path.size > 1000
+      return "must starts with a /" unless path.starts_with? '/'
+      return "must not end with a /" if path.ends_with? '/'
+      path.scan("//") do
+        return "must not have several repeated /"
+      end
+      alloweds = "azertyuiopqsdfghjklmwxcvbnAZERTYUIOPQSDFGHJKLMWXCVBN-_./".chars
+      path.chars.each do |char|
+        return "must only contain alphanumeric or '/-_.' characters, " unless char.in? alloweds
+      end
+    end
+
+    def check_directory_path(path) : String?
+      return "cannot be the root ('/') direcotry" if path = "/"
+      return "must be at most 50 character" if path.size > 1000
+      return "must starts with a /" unless path.starts_with? '/'
+      return "must end with a /" unless path.ends_with? '/'
+      path.scan("//") do
+        return "must not have several repeated /"
+      end
+      alloweds = "azertyuiopqsdfghjklmwxcvbnAZERTYUIOPQSDFGHJKLMWXCVBN-_./".chars
+      path.chars.each do |char|
+        return "must only contain alphanumeric or '/-_.' characters, " unless char.in? alloweds
+      end
+    end
+
   end
 end
