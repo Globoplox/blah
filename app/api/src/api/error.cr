@@ -74,6 +74,10 @@ class Api
       end
     end
 
+    def self.bad_parameter(name, issue)
+      BadParameter.new [BadParameter::Parameter.new name, issue]
+    end
+
     class BadParameter < Error
       class Parameter
         include JSON::Serializable

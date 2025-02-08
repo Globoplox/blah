@@ -1,6 +1,13 @@
 # Interfaces for repositories.
 module Repositories
+
   abstract class Users
+
+    class DuplicateNameError
+    end
+
+    class DuplicateEmailError
+    end
 
     abstract def insert(
       email : String,
@@ -11,7 +18,7 @@ module Repositories
       allowed_blob_size : Int32,
       allowed_concurrent_job : Int32,
       allowed_concurrent_tty : Int32
-    ) : UUID
+    ) : UUID | DuplicateNameError | DuplicateEmailError
 
     class UserWithCredentials
       include DB::Serializable
@@ -34,6 +41,9 @@ module Repositories
 
   abstract class Projects
     
+    class DuplicateNameError
+    end
+
     abstract def insert(
       name : String,
       owner_id : UUID,
@@ -41,7 +51,7 @@ module Repositories
       description : String?,
       allowed_blob_size : UInt32,
       allowed_file_amount : UInt32
-    ) : UUID
+    ) : UUID | DuplicateNameError
   
     class Project
       include DB::Serializable
@@ -71,6 +81,10 @@ module Repositories
   end
 
   abstract class Files
+
+    class DuplicatePathError
+    end
+
     class File
       include DB::Serializable
       property id : UUID
@@ -85,9 +99,9 @@ module Repositories
       property is_directory : Bool
     end
 
-    abstract def insert(project_id : UUID, blob_id : UUID?, path : String, author_id : UUID) : UUID
+    abstract def insert(project_id : UUID, blob_id : UUID?, path : String, author_id : UUID) : UUID | DuplicatePathError
     abstract def delete(file_id : UUID)
-    abstract def move(file_id : UUID, to_path : String, editor_id : UUID)
+    abstract def move(file_id : UUID, to_path : String, editor_id : UUID) : DuplicatePathError?
     abstract def edit(file_id : UUID, editor_id : UUID)
     abstract def list(project_id : UUID) : Array(File)
     abstract def get_blob_id(file_id : UUID) : UUID?

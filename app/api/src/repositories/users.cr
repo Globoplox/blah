@@ -17,7 +17,7 @@ class Repositories::Users::Database < Repositories::Users
     allowed_blob_size : Int32,
     allowed_concurrent_job : Int32,
     allowed_concurrent_tty : Int32
-  ) : UUID
+  ) : UUID | DuplicateNameError | DuplicateEmailError
   
     credential_id = UUID.random
     user_id = UUID.random
@@ -54,6 +54,10 @@ class Repositories::Users::Database < Repositories::Users
     end
 
     user_id
+  rescue ex : PQ::PQError
+    return DuplicateNameError.new if ex.fields.any? { |field| field.name == :constraint_name && field.message == "users_name_key" }
+    return DuplicateEmailError.new if ex.fields.any? { |field| field.name == :constraint_name && field.message == "users_email_key" }
+    raise ex
   end
 
   def get_by_email_with_credentials(email : String) : UserWithCredentials?

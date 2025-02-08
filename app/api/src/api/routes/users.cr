@@ -89,6 +89,14 @@ class Api
       allowed_concurrent_tty: 10
     )
     
+
+    case user_id
+    when Repositories::Users::DuplicateNameError
+      raise Error.bad_parameter "name", "a users with the same name already exists"
+    when Repositories::Users::DuplicateEmailError
+      raise Error.bad_parameter "email", "a users with the same email already exists"
+    end
+
     session_id = open_session(user_id)
     set_session_cookie(ctx, session_id, registration.stay_signed)
 

@@ -7,7 +7,7 @@ class Repositories::Files::Database < Repositories::Files
   def initialize(@connection)
   end
 
-  def insert(project_id : UUID, blob_id : UUID?, path : String, author_id : UUID) : UUID
+  def insert(project_id : UUID, blob_id : UUID?, path : String, author_id : UUID) : UUID | DuplicatePathError
     file_id = UUID.random
     file = {file_id, project_id, blob_id, path, author_id}
 
@@ -19,6 +19,9 @@ class Repositories::Files::Database < Repositories::Files
     # $5 twice is not a typo, editor = author at creation
 
     file_id
+  rescue ex : PQ::PQError
+    return DuplicatePathError.new if ex.fields.any? { |field| field.name == :constraint_name && field.message }
+    raise ex
   end
   
   def delete(file_id : UUID)
@@ -27,7 +30,7 @@ class Repositories::Files::Database < Repositories::Files
     SQL
   end
   
-  def move(file_id : UUID, to_path : String, editor_id : UUID)
+  def move(file_id : UUID, to_path : String, editor_id : UUID) : DuplicatePathError?
     @connection.exec <<-SQL, file_id, editor_id, to_path                                                                                                         
       UPDATE project_files SET 
         editor_id = $2,
@@ -35,6 +38,10 @@ class Repositories::Files::Database < Repositories::Files
         path = $3
       WHERE id = $1
     SQL
+    return
+  rescue ex : PQ::PQError
+    return DuplicatePathError.new if ex.fields.any? { |field| field.name == :constraint_name && field.message == "project_files_path_key" }
+    raise ex
   end
   
   def edit(file_id : UUID, editor_id : UUID)

@@ -13,10 +13,10 @@ import ProjectExplorer from "./project_explorer";
 import { ErrorCode, Api, Error, ParameterError, Project, File as ProjectFile } from "../api";
 import { useParams } from "react-router";
 import React, {MouseEvent, FormEvent} from "react";
-import { DiCss3, DiJavascript, DiNpm } from "react-icons/di";
-import { FaList, FaRegFolder, FaRegFolderOpen } from "react-icons/fa";
-import { TfiPlus } from "react-icons/tfi";
 import { Tree, NodeApi, NodeRendererProps } from 'react-arborist';
+import { RiArrowDownSLine } from "react-icons/ri";
+import { RiArrowRightSLine } from "react-icons/ri";
+import useResizeObserver from "use-resize-observer";
 import "./filetree.scss";
 
 /*
@@ -25,13 +25,12 @@ import "./filetree.scss";
  - styling
   - height
   - validation feedback not having own space
- - proper api validation error handling
  - drag n drop but it will probably be hard so let do it later
 */
 
 export type Path = string
 
-type NodeData = {id: string, name: string, children: NodeData[]}
+type NodeData = {id: string, name: string, children: NodeData[], isRoot?: boolean}
 
 export default function Filetree({api, project, onCreate = null, onMove = null, onDelete = null, onOpen = null}: {
     api: Api, 
@@ -42,9 +41,14 @@ export default function Filetree({api, project, onCreate = null, onMove = null, 
     onOpen?: (path: Path) => void 
 }) {
 
-  function projectToTree(project : Project, files: ProjectFile[]) : any[] {
+  function traverse(node: NodeData, proc: (_: NodeData) => void) {
+    proc(node);
+    node.children?.forEach(_ => traverse(_, proc));
+  }
+
+  function projectToTree(project : Project, files: ProjectFile[]) : NodeData[] {
     const rootName = `${project.owner_name} / ${project.name}`;
-    const root = {id: "/", name: rootName, children: [] as any[]};
+    const root = {id: "/", name: rootName, children: [] as any[], isRoot: true};
     const hash : Record<string, any> = {}; // Hashmap of directory nodes indexed by full path
     hash["/"] = root;
 
@@ -69,6 +73,10 @@ export default function Filetree({api, project, onCreate = null, onMove = null, 
       }
     });
 
+    // Put directories first for comfort
+    traverse(root, _=> {
+      _.children?.sort((a, b) => ((a.children != null) === (b.children != null))? 0 : (a.children != null)? -1 : 1);
+    });
 
     return [root];
   }
@@ -126,7 +134,7 @@ export default function Filetree({api, project, onCreate = null, onMove = null, 
 
   function FolderArrow({node}: {node: NodeApi<NodeData>}) {
     if (node.isLeaf) return <span></span>;
-    return (<span>{node.isOpen ? <FaRegFolderOpen/> : <FaRegFolder/>}</span>);
+    return (<span>{node.isOpen ? <RiArrowRightSLine/> : <RiArrowDownSLine/>}</span>);
   }
 
   function Input({ node }: { node: NodeApi<NodeData> }) {
@@ -157,7 +165,10 @@ export default function Filetree({api, project, onCreate = null, onMove = null, 
               api.move_file(project.id, file.id, path).then(_ => {
                 node.submit(name);
               }).catch(error => {
-                setEditFeedback(error.message);
+                if (error.code == ErrorCode.BadParameter)
+                  setEditFeedback(error.parameters[0].issue);
+                else
+                  setEditFeedback(error.message);
               });
             }
           }}
@@ -170,11 +181,13 @@ export default function Filetree({api, project, onCreate = null, onMove = null, 
   }
 
   function Node({node, tree, style, dragHandle}: NodeRendererProps<NodeData>) {
+    const rootClassName = node.data.isRoot == true ? "root-item" : "";
     return (
       <div
         ref={dragHandle}
         style={style}
         onClick={() => node.isInternal && node.toggle()}
+        className={rootClassName}
       >
         <FolderArrow node={node} />
         <span>{node.isEditing ? <Input node={node}/> : node.data.name}</span>
@@ -182,9 +195,13 @@ export default function Filetree({api, project, onCreate = null, onMove = null, 
     );
   }
 
+  const { ref, width, height } = useResizeObserver();
+
   return (
-    <div className="directory mt-2">
+    <div style={{height: "100%"}} ref={ref}>
       <Tree 
+        height={height} 
+        width={width}
         data={tree}
         onCreate={onCreateInternal}
         onRename={onEditInternal}

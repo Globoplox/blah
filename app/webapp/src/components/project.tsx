@@ -40,7 +40,7 @@ export default function Project({api} : {api: Api}) {
     <hr style={{margin: 0}}/>
     <Stack direction="horizontal" style={{height: "100%", width: "100%"}}>
 
-      <div style={{width: "17.5%", height: "100%"}}>
+      <div style={{width: "17.5%", height: "calc(100vh - 0.5in - 1px)"}}>
         {
           isLoaded
           ? <Filetree api={api} project={project}/>

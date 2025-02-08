@@ -33,6 +33,11 @@ class Api
       allowed_file_amount: 50
     )
 
+    case project_id
+    when Repositories::Projects::DuplicateNameError
+      raise Error.bad_parameter "name", "a project with the same name already exists"
+    end
+
     ctx.response.status = HTTP::Status::CREATED
     ctx << Response::ID.new project_id
   end

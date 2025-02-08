@@ -15,7 +15,7 @@ class Repositories::Projects::Database < Repositories::Projects
     description : String?,
     allowed_blob_size : UInt32,
     allowed_file_amount : UInt32
-  ) : UUID
+  ) : UUID  | DuplicateNameError
 
     project_id = UUID.random    
     
@@ -42,6 +42,9 @@ class Repositories::Projects::Database < Repositories::Projects
     SQL
 
     project_id
+  rescue ex : PQ::PQError
+    return DuplicateNameError.new if ex.fields.any? { |field| field.name == :constraint_name && field.message == "projects_name_key" }
+    raise ex
   end
 
   def read(id  : UUID) : Project

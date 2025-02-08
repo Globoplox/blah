@@ -41,6 +41,11 @@ class Api
       path: file.path
     )
 
+    case file_id
+    when Repositories::Files::DuplicatePathError
+      raise Error.bad_parameter "path", "a file with the same path already exists"
+    end
+
     ctx.response.status = HTTP::Status::CREATED
     ctx << Response::ID.new file_id
   end
@@ -64,6 +69,11 @@ class Api
       blob_id: nil,
       path: file.path
     )
+
+    case file_id
+    when Repositories::Files::DuplicatePathError
+      raise Error.bad_parameter "path", "a directory with the same path already exists"
+    end
 
     ctx.response.status = HTTP::Status::CREATED
     ctx << Response::ID.new file_id
@@ -128,8 +138,12 @@ class Api
     project_id = UUID.new ctx.path_parameter "project_id"
     file_id = UUID.new ctx.path_parameter "file_id"
     file = ctx >> Request::MoveFile
-    @files.move(file_id, file.new_path, user_id)
-    ctx.response.status = HTTP::Status::NO_CONTENT
+    duplicate = @files.move(file_id, file.new_path, user_id)
+    if duplicate
+      raise Error.bad_parameter "new_path", "a file with the same path already exists"
+    else
+      ctx.response.status = HTTP::Status::NO_CONTENT
+    end
   end
 
 end

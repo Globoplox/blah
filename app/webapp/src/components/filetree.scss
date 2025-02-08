@@ -1,0 +1,32 @@
+
+[role="treeitem"] {
+    color: black;
+    cursor: pointer;
+    font-weight: 400;
+    font-size: 14px;
+    user-select: none;border: 1px dashed transparent;
+}
+
+[role="treeitem"]:focus-visible {
+    background-color: rgba(255,255,255,.2);
+    outline: none;
+}
+
+[role="treeitem"][aria-selected="true"]:focus-visible {
+    background-color: rgba(255,255,255,.4);
+    outline: none;
+}
+
+[role="treeitem"]:hover {
+    background-color: rgba(206, 206, 206, 0.39);
+    outline: 1px solid grey;
+}
+
+[role="treeitem"][aria-selected="true"] {
+    background-color: rgba(173, 216, 230, 0.39);
+    outline: 1px solid grey;
+}
+
+.root-item {
+    font-weight: 700;
+}
