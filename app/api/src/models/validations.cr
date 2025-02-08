@@ -76,7 +76,7 @@ module Validations
     end
 
     def check_directory_path(path) : String?
-      return "cannot be the root ('/') direcotry" if path = "/"
+      return "cannot be the root ('/') direcotry" if path == "/"
       return "must be at most 50 character" if path.size > 1000
       return "must starts with a /" unless path.starts_with? '/'
       return "must end with a /" unless path.ends_with? '/'

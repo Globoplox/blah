@@ -80,9 +80,11 @@ class Api
     file_id = UUID.new ctx.path_parameter "file_id"
     file = ctx >> Request::UpdateFile
     
+    # if path has base dir, check that this dir exists
+
     blob_id = @files.get_blob_id(file_id)
 
-    raise "No a file, cannot put content in a direcotry" unless blob_id
+    raise "No a file, cannot put content in a directory" unless blob_id
 
     content_type = "text/plain"
     size = file.content.size
@@ -118,14 +120,16 @@ class Api
 
   class Request::MoveFile
     include JSON::Serializable
-    property from : String
-    property to : String
+    property new_path : String
   end
 
-  route PUT, "/projects/:project_id/files/move", def move_file(ctx)
+  route PUT, "/projects/:project_id/files/move/:file_id", def move_file(ctx)
     user_id = authenticate(ctx)
     project_id = UUID.new ctx.path_parameter "project_id"
-    raise NotImplementedError.new "Feature not implemented"
+    file_id = UUID.new ctx.path_parameter "file_id"
+    file = ctx >> Request::MoveFile
+    @files.move(file_id, file.new_path, user_id)
+    ctx.response.status = HTTP::Status::NO_CONTENT
   end
 
 end

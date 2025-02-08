@@ -16,10 +16,22 @@ import React, {MouseEvent, FormEvent} from "react";
 import { DiCss3, DiJavascript, DiNpm } from "react-icons/di";
 import { FaList, FaRegFolder, FaRegFolderOpen } from "react-icons/fa";
 import { TfiPlus } from "react-icons/tfi";
-import { Tree, NodeApi } from 'react-arborist';
+import { Tree, NodeApi, NodeRendererProps } from 'react-arborist';
 import "./filetree.scss";
 
+/*
+ TODO:
+ - delete
+ - styling
+  - height
+  - validation feedback not having own space
+ - proper api validation error handling
+ - drag n drop but it will probably be hard so let do it later
+*/
+
 export type Path = string
+
+type NodeData = {id: string, name: string, children: NodeData[]}
 
 export default function Filetree({api, project, onCreate = null, onMove = null, onDelete = null, onOpen = null}: {
     api: Api, 
@@ -61,7 +73,7 @@ export default function Filetree({api, project, onCreate = null, onMove = null, 
     return [root];
   }
 
-  // Used as a cache to prevent having to rquery the project at every file tree modification
+  // Used as a cache to prevent having to re query the project at every file tree modification
   const projectFiles = useRef(project.files);
   const [tree, setTree] = useState(projectToTree(project, projectFiles.current));
 
@@ -73,12 +85,12 @@ export default function Filetree({api, project, onCreate = null, onMove = null, 
     else
       components[components.length - 1] = name;
     file.path = components.join('/');
+
     const newTree = projectToTree(project, projectFiles.current);
     setTree(newTree);
   }
 
-  // Can return a promise !
-  function onCreateInternal({parentNode, type, parentId}: {parentId: string, parentNode: NodeApi<any>, index: number, type: "internal" | "leaf"}) : {id: string}  {    
+  function onCreateInternal({parentNode, type, parentId}: {parentId: string, parentNode: NodeApi<any>, index: number, type: "internal" | "leaf"}) : Promise<{id: string}>  {    
     if (parentNode === null || parentNode.isRoot) // Not the same as isRoot from projectToTree
       parentId = "/";
 
@@ -86,23 +98,88 @@ export default function Filetree({api, project, onCreate = null, onMove = null, 
       let name = "file";
       while (projectFiles.current.find(_ => _.path == `${parentId}${name}`))
         name = `new_${name}`;
-      const file : ProjectFile = {id: "stuff", path: `${parentId}${name}`, content_uri: "", created_at: "", file_edited_at: "", author_name: "", editor_name: "", is_directory: false};
-      // API request, along or instead of the projectFiles ref
-      projectFiles.current = [...projectFiles.current, file];
-      const newTree = projectToTree(project, projectFiles.current);
-      setTree(newTree);
-      return {id: file.path};
+      const path = `${parentId}${name}`;
+      return api.create_file(project.id, path).then(response => {
+        const file : ProjectFile = {id: response.id, path, content_uri: "", created_at: "", file_edited_at: "", author_name: "", editor_name: "", is_directory: false};
+        projectFiles.current = [...projectFiles.current, file];
+        const newTree = projectToTree(project, projectFiles.current);
+        console.log(path)
+        setTree(newTree);
+        return {id: file.path};
+      });  
     } else {
       let name = "directory";
       while (projectFiles.current.find(_ => _.path == `${parentId}${name}/`) != undefined)
         name = `new_${name}`;
-      const file : ProjectFile = {id: "stuff", path: `${parentId}${name}/`, content_uri: "", created_at: "", file_edited_at: "", author_name: "", editor_name: "", is_directory: true};
-      // API request, along or instead of the projectFiles ref
-      projectFiles.current = [...projectFiles.current, file];
-      const newTree = projectToTree(project, projectFiles.current);
-      setTree(newTree);
-      return {id: file.path};
+      const path = `${parentId}${name}/`;
+
+      return api.create_directory(project.id, path).then(response => {
+        // Todo Full file response
+        const file : ProjectFile = {id: response.id, path, content_uri: "", created_at: "", file_edited_at: "", author_name: "", editor_name: "", is_directory: true};
+        projectFiles.current = [...projectFiles.current, file];
+        const newTree = projectToTree(project, projectFiles.current);
+        setTree(newTree);
+        return {id: file.path};  
+      });
     }
+  }
+
+  function FolderArrow({node}: {node: NodeApi<NodeData>}) {
+    if (node.isLeaf) return <span></span>;
+    return (<span>{node.isOpen ? <FaRegFolderOpen/> : <FaRegFolder/>}</span>);
+  }
+
+  function Input({ node }: { node: NodeApi<NodeData> }) {
+    const [editFeedback, setEditFeedback] = useState(null);
+
+    return (
+      <Form.Group className="mb-3">
+        <Form.Control
+          isInvalid={editFeedback != null}
+          autoFocus
+          type="text"
+          defaultValue={node.data.name}
+          onFocus={(e) => e.currentTarget.select()}
+          onBlur={() => node.reset()}
+          onKeyDown={(e) => {
+            if (e.key === "Escape")
+              node.reset();
+            if (e.key === "Enter") {
+              const file = projectFiles.current.find(_ => _.path == node.data.id);
+              const name = e.currentTarget.value;
+              const components = file.path.split('/');
+              if (file.is_directory)
+                components[components.length - 2] = name;
+              else
+                components[components.length - 1] = name;
+              const path = components.join('/');
+
+              api.move_file(project.id, file.id, path).then(_ => {
+                node.submit(name);
+              }).catch(error => {
+                setEditFeedback(error.message);
+              });
+            }
+          }}
+        />
+        <Form.Control.Feedback type="invalid">
+          {editFeedback}
+        </Form.Control.Feedback>
+      </Form.Group>
+    );
+  }
+
+  function Node({node, tree, style, dragHandle}: NodeRendererProps<NodeData>) {
+    return (
+      <div
+        ref={dragHandle}
+        style={style}
+        onClick={() => node.isInternal && node.toggle()}
+      >
+        <FolderArrow node={node} />
+        <span>{node.isEditing ? <Input node={node}/> : node.data.name}</span>
+      </div>
+    );
   }
 
   return (
@@ -113,7 +190,7 @@ export default function Filetree({api, project, onCreate = null, onMove = null, 
         onRename={onEditInternal}
         disableEdit={_ => _.isRoot === true}
         disableDrag={_ => _.isRoot === true}
-      />;
+      >{Node}</Tree>
     </div>
   );
 }

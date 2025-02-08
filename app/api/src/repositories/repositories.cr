@@ -87,7 +87,7 @@ module Repositories
 
     abstract def insert(project_id : UUID, blob_id : UUID?, path : String, author_id : UUID) : UUID
     abstract def delete(file_id : UUID)
-    abstract def move(project_id : UUID, from_path : String, to_path : String, editor_id : UUID)
+    abstract def move(file_id : UUID, to_path : String, editor_id : UUID)
     abstract def edit(file_id : UUID, editor_id : UUID)
     abstract def list(project_id : UUID) : Array(File)
     abstract def get_blob_id(file_id : UUID) : UUID?

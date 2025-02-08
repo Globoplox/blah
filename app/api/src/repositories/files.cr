@@ -27,13 +27,13 @@ class Repositories::Files::Database < Repositories::Files
     SQL
   end
   
-  def move(project_id : UUID, from_path : String, to_path : String, editor_id : UUID)
-    @connection.exec <<-SQL, project_id, from_path, editor_id, to_path                                                                                                         
+  def move(file_id : UUID, to_path : String, editor_id : UUID)
+    @connection.exec <<-SQL, file_id, editor_id, to_path                                                                                                         
       UPDATE project_files SET 
-        editor_id = $3,
+        editor_id = $2,
         file_edited_at = NOW(),
-        path = $4
-      WHERE project_id = $1 AND path = $2
+        path = $3
+      WHERE id = $1
     SQL
   end
   

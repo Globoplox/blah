@@ -19,7 +19,7 @@ class Api
 
     Validations.validate! do
       accumulate "name", check_project_name project.name
-      if description = description
+      if description
         accumulate "description", check_project_description description 
       end
     end
