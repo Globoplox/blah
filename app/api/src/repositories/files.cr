@@ -23,11 +23,36 @@ class Repositories::Files::Database < Repositories::Files
     return DuplicatePathError.new if ex.fields.any? { |field| field.name == :constraint_name && field.message }
     raise ex
   end
+
+  def directory_exists?(path : String) : Bool
+    return true if path = "/"
+    @connection.scalar(<<-SQL, path).as(Bool)
+      SELECT EXISTS(SELECT 1 FROM project_files WHERE path = $1)
+    SQL
+  end
+
+  def is_directory?(file_id : UUID) : Bool
+    @connection.scalar(<<-SQL, file_id).as(Bool)
+      SELECT is_directory FROM project_files WHERE id = $1
+    SQL
+  end
   
   def delete(file_id : UUID)
-    @connection.exec <<-SQL, file_id
-      DELETE FROM project_files WHERE id = $1
+    path = @connection.scalar(<<-SQL, file_id).as(String)
+      SELECT path FROM project_files WHERE id = $1
     SQL
+
+    if path.ends_with? '/'
+      @connection.exec <<-SQL, file_id, path
+        DELETE FROM project_files 
+        WHERE id = $1 OR starts_with(path, $2)
+      SQL
+    else
+      @connection.exec <<-SQL, file_id
+        DELETE FROM project_files 
+        WHERE id = $1
+      SQL
+    end
   end
   
   def move(file_id : UUID, to_path : String, editor_id : UUID) : DuplicatePathError?
@@ -40,7 +65,7 @@ class Repositories::Files::Database < Repositories::Files
     SQL
     return
   rescue ex : PQ::PQError
-    return DuplicatePathError.new if ex.fields.any? { |field| field.name == :constraint_name && field.message == "project_files_path_key" }
+    return DuplicatePathError.new if ex.fields.any? { |field| field.name == :constraint_name && field.message == "project_files_project_id_path_key" }
     raise ex
   end
   
@@ -55,7 +80,7 @@ class Repositories::Files::Database < Repositories::Files
 
   def get_blob_id(file_id : UUID) : UUID?
     @connection.scalar(<<-SQL, file_id).as(UUID?)
-      SELECT blob_id FROM project_file WHERE id = $1
+      SELECT blob_id FROM project_files WHERE id = $1
     SQL
   end
 

@@ -71,7 +71,7 @@ module Validations
       end
       alloweds = "azertyuiopqsdfghjklmwxcvbnAZERTYUIOPQSDFGHJKLMWXCVBN-_./".chars
       path.chars.each do |char|
-        return "must only contain alphanumeric or '/-_.' characters, " unless char.in? alloweds
+        return "must only contain alphanumeric or '/-_.' characters" unless char.in? alloweds
       end
     end
 
@@ -85,7 +85,7 @@ module Validations
       end
       alloweds = "azertyuiopqsdfghjklmwxcvbnAZERTYUIOPQSDFGHJKLMWXCVBN-_./".chars
       path.chars.each do |char|
-        return "must only contain alphanumeric or '/-_.' characters, " unless char.in? alloweds
+        return "must only contain alphanumeric or '/-_.' characters" unless char.in? alloweds
       end
     end
 

@@ -11,12 +11,17 @@ class Api
     user_id = authenticate(ctx)
     project_id = UUID.new ctx.path_parameter "project_id"
 
-    # if path has base dir, check that this dir exists
-
     file = ctx >> Request::CreateFile
 
     Validations.validate! do
       accumulate "path", check_file_path file.path
+    end
+
+    # Check that parent directory exists
+    components = file.path.split('/')
+    base = (components[0...(components.size - 1)] + [""]).join "/"
+    unless @files.directory_exists?(base)
+      raise Error.bad_parameter "path", "parent directory '#{base}' does not exist"
     end
 
     content_type = "text/plain"
@@ -55,13 +60,18 @@ class Api
     user_id = authenticate(ctx)
     project_id = UUID.new ctx.path_parameter "project_id"
 
-    # if path has base dir, check that this dir exists
-
     file = ctx >> Request::CreateFile
 
     Validations.validate! do
       accumulate "path", check_directory_path file.path
     end
+
+    # Check that parent directory exists
+    components = file.path.split('/')
+    base = (components[0...(components.size - 2)] + [""]).join "/"
+    unless @files.directory_exists?(base)
+      raise Error.bad_parameter "path", "parent directory '#{base}' does not exist"
+    end    
 
     file_id = @files.insert(
       project_id: project_id,
@@ -113,7 +123,7 @@ class Api
     ctx.response.status = HTTP::Status::NO_CONTENT
   end
 
-  route DELETE, "/projects/:project_id/file/:file_id", def delete_file(ctx)
+  route DELETE, "/projects/:project_id/files/:file_id", def delete_file(ctx)
     user_id = authenticate(ctx)
     project_id = UUID.new ctx.path_parameter "project_id"
     file_id = UUID.new ctx.path_parameter "file_id"
@@ -133,11 +143,37 @@ class Api
     property new_path : String
   end
 
-  route PUT, "/projects/:project_id/files/move/:file_id", def move_file(ctx)
+  route PUT, "/projects/:project_id/files/:file_id/move", def move_file(ctx)
     user_id = authenticate(ctx)
     project_id = UUID.new ctx.path_parameter "project_id"
     file_id = UUID.new ctx.path_parameter "file_id"
     file = ctx >> Request::MoveFile
+
+    if @files.is_directory? file_id      
+      # Check path is a valid file path
+      Validations.validate! do
+        accumulate "path", check_directory_path file.new_path
+      end
+      # Check that parent directory exists
+      components = file.new_path.split('/')
+      base = (components[0...(components.size - 2)] + [""]).join "/"
+      unless @files.directory_exists?(base)
+        raise Error.bad_parameter "path", "parent directory '#{base}' does not exist"
+      end
+
+    else
+      # Check path is a valid directory path
+      Validations.validate! do
+        accumulate "path", check_file_path file.new_path
+      end
+      # Check that parent directory exists
+      components = file.new_path.split('/')
+      base = (components[0...(components.size - 1)] + [""]).join "/"
+      unless @files.directory_exists?(base)
+        raise Error.bad_parameter "path", "parent directory '#{base}' does not exist"
+      end
+    end
+
     duplicate = @files.move(file_id, file.new_path, user_id)
     if duplicate
       raise Error.bad_parameter "new_path", "a file with the same path already exists"

@@ -105,5 +105,7 @@ module Repositories
     abstract def edit(file_id : UUID, editor_id : UUID)
     abstract def list(project_id : UUID) : Array(File)
     abstract def get_blob_id(file_id : UUID) : UUID?
+    abstract def directory_exists?(path : String) : Bool
+    abstract def is_directory?(file_id : UUID) : Bool
   end
 end

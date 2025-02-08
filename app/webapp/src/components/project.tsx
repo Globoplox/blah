@@ -43,7 +43,7 @@ export default function Project({api} : {api: Api}) {
       <div style={{width: "17.5%", height: "calc(100vh - 0.5in - 1px)"}}>
         {
           isLoaded
-          ? <Filetree api={api} project={project}/>
+          ? <Filetree api={api} project={project} onDelete={console.log} onOpen={console.log}/>
           : <div className="d-flex align-items-center mt-3" style={{width: "100%"}}>
               <Spinner size="sm" className="ms-auto"/>
               <strong className="ms-2 me-auto">Loading...</strong>

@@ -43,7 +43,7 @@ class Repositories::Projects::Database < Repositories::Projects
 
     project_id
   rescue ex : PQ::PQError
-    return DuplicateNameError.new if ex.fields.any? { |field| field.name == :constraint_name && field.message == "projects_name_key" }
+    return DuplicateNameError.new if ex.fields.any? { |field| field.name == :constraint_name && field.message == "projects_owner_id_name_key" }
     raise ex
   end
 

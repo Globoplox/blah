@@ -51,7 +51,7 @@ CREATE TABLE project_files
     project_id      UUID REFERENCES projects        NOT NULL,
     blob_id         UUID REFERENCES blobs           UNIQUE,
     is_directory    BOOLEAN                         GENERATED ALWAYS AS (blob_id IS NULL) STORED,
-    path            VARCHAR(1000)                   UNIQUE DEFAULT NULL,
+    path            VARCHAR(1000)                   NOT NULL,
     author_id       UUID REFERENCES users           NOT NULL,
     editor_id       UUID REFERENCES users           NOT NULL,    
     authored_at     TIMESTAMPTZ                     NOT NULL DEFAULT NOW(),

@@ -145,7 +145,7 @@ export class Api {
   move_file(project_id: string, file_id: string, path: string) : Promise<null> {
     const body = {new_path: path};
     return fetch(
-      `${API_SERVER_URI}/projects/${project_id}/files/move/${file_id}`, {method: "PUT", headers: this.#headers, credentials: 'include', body: JSON.stringify(body)}
+      `${API_SERVER_URI}/projects/${project_id}/files/${file_id}/move`, {method: "PUT", headers: this.#headers, credentials: 'include', body: JSON.stringify(body)}
     ).then(response => {
         if (response.ok)
           return null
@@ -154,6 +154,16 @@ export class Api {
     }, this.mapNetworkError) as unknown as Promise<null>
   }
 
+  delete_file(project_id: string, file_id: string) : Promise<null> {
+    return fetch(
+      `${API_SERVER_URI}/projects/${project_id}/files/${file_id}`, {method: "DELETE", headers: this.#headers, credentials: 'include'}
+    ).then(response => {
+        if (response.ok)
+          return null
+        else 
+          return response.json().then(_ => Promise.reject(_))
+    }, this.mapNetworkError) as unknown as Promise<null>
+  }
 }
 
 export default Api;

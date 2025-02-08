@@ -27,6 +27,32 @@
     outline: 1px solid grey;
 }
 
+[role="treeitem"] .will-receive-drop-item {
+    background-color: rgba(173, 216, 230, 0.39);
+}
+
 .root-item {
     font-weight: 700;
 }
+
+.edit-item input {
+    position: relative;
+    top: -4px;
+    border-radius: 0;
+    width: 90%;
+    margin-top: 0;
+}
+
+.edit-item .invalid-feedback {
+    position: relative;
+    background-color: rgba(255, 255, 255, 0.942);
+    margin: 5px;
+    top: -5px;
+    left: -5px;
+    z-index: 10000;
+}
+
+.edit-item input:focus {
+    box-shadow: none;
+}
+    // role treeitem.edit-item / div / input 
