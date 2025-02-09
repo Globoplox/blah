@@ -16,6 +16,10 @@ import { Editor, PrismEditor } from "prism-react-editor";
 import { BasicSetup } from "prism-react-editor/setups";
 import Filetree from "./filetree";
 import { BrowserRouter, Routes, Route, useBeforeUnload } from "react-router";
+import "prism-react-editor/prism/languages/ini";
+import "prism-react-editor/prism/languages/clike";
+import "./prism_language_blah";
+import "./prism_language_stacklang";
 import "prism-react-editor/layout.css";
 import "prism-react-editor/themes/github-light.css"
 
@@ -94,6 +98,8 @@ export default function Project({api} : {api: Api}) {
     }
   }
 
+  console.log(file)
+
   return (
     <Stack style={{width: "100%"}}>
     <Navigation></Navigation>
@@ -116,7 +122,7 @@ export default function Project({api} : {api: Api}) {
       <div style={{overflowY: "auto", height: "calc(100vh - 0.5in - 1px)", width: "calc(82.5% - 1px)", display: "inline-block"}}>
         {
           file != null ?
-          <Editor language={file?.type} value={file.content} onUpdate={onUpdate} >
+          <Editor language={file.type} value={file.content} onUpdate={onUpdate} >
             {(editor: any) => <BasicSetup editor={editor}/>}
           </Editor> :
           <></>

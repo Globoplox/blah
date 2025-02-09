@@ -12,7 +12,7 @@ const api = new Api();
   TODO:
   - Running
   - TTY
-  - Syntax highlighting 
+  - File id in project routing ?
   - Filetree create file and directory buttons
   - Project page global toast
   - All auth related chore (reset, doube auth, email verification, oauth, device kick, ...)
