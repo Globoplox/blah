@@ -107,5 +107,6 @@ module Repositories
     abstract def get_blob_id(file_id : UUID) : UUID?
     abstract def directory_exists?(path : String) : Bool
     abstract def is_directory?(file_id : UUID) : Bool
+    abstract def read(file_id : UUID) : File
   end
 end

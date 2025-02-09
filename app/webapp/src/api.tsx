@@ -118,7 +118,7 @@ export class Api {
     }, this.mapNetworkError)
   }
 
-  create_file(project_id: string, path: string) : Promise<IDResponse> {
+  create_file(project_id: string, path: string) : Promise<File> {
     const body = {path};
     return fetch(
       `${API_SERVER_URI}/projects/${project_id}/file`, {method: "POST", headers: this.#headers, credentials: 'include', body: JSON.stringify(body)}
@@ -130,7 +130,7 @@ export class Api {
     }, this.mapNetworkError)
   }
 
-  create_directory(project_id: string, path: string) : Promise<IDResponse> {
+  create_directory(project_id: string, path: string) : Promise<File> {
     const body = {path};
     return fetch(
       `${API_SERVER_URI}/projects/${project_id}/directory`, {method: "POST", headers: this.#headers, credentials: 'include', body: JSON.stringify(body)}
@@ -160,6 +160,18 @@ export class Api {
     ).then(response => {
         if (response.ok)
           return null
+        else 
+          return response.json().then(_ => Promise.reject(_))
+    }, this.mapNetworkError) as unknown as Promise<null>
+  }
+
+  update_file(project_id: string, file_id: string, content: string) : Promise<File> {
+    const body = {content};
+    return fetch(
+      `${API_SERVER_URI}/projects/${project_id}/files/${file_id}`, {method: "PUT", headers: this.#headers, credentials: 'include', body: JSON.stringify(body)}
+    ).then(response => {
+        if (response.ok)
+          return response.json()
         else 
           return response.json().then(_ => Promise.reject(_))
     }, this.mapNetworkError) as unknown as Promise<null>

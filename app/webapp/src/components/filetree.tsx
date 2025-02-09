@@ -1,18 +1,6 @@
-import Container from 'react-bootstrap/Container';
-import Navbar from 'react-bootstrap/Navbar';
-import Stack from 'react-bootstrap/Stack';
-import { ChangeEvent, useState, useEffect, FocusEvent, KeyboardEvent, useRef } from 'react';
+import { useState, useRef } from 'react';
 import Form from 'react-bootstrap/Form';
-import Accordion from 'react-bootstrap/Accordion';
-import Button from 'react-bootstrap/Button';
-import InputGroup from 'react-bootstrap/InputGroup';
-import { Link } from "react-router";
-import Spinner from 'react-bootstrap/Spinner';
-import Navigation from "./navigation";
-import ProjectExplorer from "./project_explorer";
-import { ErrorCode, Api, Error, ParameterError, Project, File as ProjectFile } from "../api";
-import { useParams } from "react-router";
-import React, {MouseEvent, FormEvent} from "react";
+import { ErrorCode, Api, Project, File as ProjectFile } from "../api";
 import { Tree, NodeApi, NodeRendererProps } from 'react-arborist';
 import { RiArrowDownSLine } from "react-icons/ri";
 import { RiArrowRightSLine } from "react-icons/ri";
@@ -21,22 +9,13 @@ import Toast from 'react-bootstrap/Toast';
 import ToastContainer from 'react-bootstrap/ToastContainer';
 import "./filetree.scss";
 
-/*
- TODO:
- - delete
- - styling
-  - height
-  - validation feedback not having own space
- - drag n drop but it will probably be hard so let do it later
-*/
-
 type NodeData = {id: string, name: string, children: NodeData[], isRoot?: boolean, apiId?: string}
 type Toast = {id: number, body: string}
 
 export default function Filetree({api, project, onOpen = null, onDelete = null}: {
     api: Api, 
     project: Project,
-    onOpen?: (id: string) => void, 
+    onOpen?: (id: ProjectFile) => void,
     onDelete?: (id: string) => void,  
 }) {
 
@@ -92,7 +71,7 @@ export default function Filetree({api, project, onOpen = null, onDelete = null}:
 
   function onClickInternal(node: NodeApi<NodeData>) {
     if (node.isLeaf)
-      onOpen?.(node.data.apiId);
+      onOpen?.(projectFiles.current.find(_ => _.path == node.data.id));
   }
 
   function onDeleteInternal({ids, nodes}: {ids: string[], nodes: NodeApi<NodeData>[]}) {
@@ -156,8 +135,7 @@ export default function Filetree({api, project, onOpen = null, onDelete = null}:
       while (projectFiles.current.find(_ => _.path == `${parentId}${name}`))
         name = `new_${name}`;
       const path = `${parentId}${name}`;
-      return api.create_file(project.id, path).then(response => {
-        const file : ProjectFile = {id: response.id, path, content_uri: "", created_at: "", file_edited_at: "", author_name: "", editor_name: "", is_directory: false};
+      return api.create_file(project.id, path).then(file => {
         projectFiles.current = [...projectFiles.current, file];
         const newTree = projectToTree(project, projectFiles.current);
         setTree(newTree);
@@ -169,9 +147,7 @@ export default function Filetree({api, project, onOpen = null, onDelete = null}:
         name = `new_${name}`;
       const path = `${parentId}${name}/`;
 
-      return api.create_directory(project.id, path).then(response => {
-        // Todo Full file response
-        const file : ProjectFile = {id: response.id, path, content_uri: "", created_at: "", file_edited_at: "", author_name: "", editor_name: "", is_directory: true};
+      return api.create_directory(project.id, path).then(file => {
         projectFiles.current = [...projectFiles.current, file];
         const newTree = projectToTree(project, projectFiles.current);
         setTree(newTree);

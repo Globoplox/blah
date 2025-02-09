@@ -20,7 +20,7 @@ class Repositories::Blobs::Database < Repositories::Blobs
 
   def update(blob_id : UUID, size : Int32)
     @connection.exec <<-SQL, blob_id, size                                                                                                 
-      UPDATE blobs SET sier = $2 WHERE id = $1                                                                               
+      UPDATE blobs SET size = $2 WHERE id = $1                                                                               
     SQL
   end
 

@@ -51,10 +51,19 @@ class Api
       raise Error.bad_parameter "path", "a file with the same path already exists"
     end
 
+    file = @files.read file_id
     ctx.response.status = HTTP::Status::CREATED
-    ctx << Response::ID.new file_id
+    ctx << Response::Project::File.new(
+      id: file.id,
+      path: file.path,
+      created_at: file.created_at,
+      file_edited_at: file.file_edited_at,
+      author_name: file.author_name,
+      editor_name: file.editor_name,
+      is_directory: file.is_directory,
+      content_uri: file.blob_id.try { |blob_id| @storage.uri(blob_id.to_s) } 
+    )
   end
-
 
   route POST, "/projects/:project_id/directory", def create_directory(ctx)
     user_id = authenticate(ctx)
@@ -85,8 +94,18 @@ class Api
       raise Error.bad_parameter "path", "a directory with the same path already exists"
     end
 
+    file = @files.read file_id
     ctx.response.status = HTTP::Status::CREATED
-    ctx << Response::ID.new file_id
+    ctx << Response::Project::File.new(
+      id: file.id,
+      path: file.path,
+      created_at: file.created_at,
+      file_edited_at: file.file_edited_at,
+      author_name: file.author_name,
+      editor_name: file.editor_name,
+      is_directory: file.is_directory,
+      content_uri: file.blob_id.try { |blob_id| @storage.uri(blob_id.to_s) } 
+    )
   end
 
   class Request::UpdateFile
@@ -94,14 +113,12 @@ class Api
     property content : String
   end
 
-  route PUT, "/projects/:project_id/files/:id", def update_file(ctx)
+  route PUT, "/projects/:project_id/files/:file_id", def update_file(ctx)
     user_id = authenticate(ctx)
     project_id = UUID.new ctx.path_parameter "project_id"
     file_id = UUID.new ctx.path_parameter "file_id"
     file = ctx >> Request::UpdateFile
     
-    # if path has base dir, check that this dir exists
-
     blob_id = @files.get_blob_id(file_id)
 
     raise "No a file, cannot put content in a directory" unless blob_id
@@ -120,7 +137,18 @@ class Api
 
     @files.edit(file_id: file_id, editor_id: user_id)
 
-    ctx.response.status = HTTP::Status::NO_CONTENT
+    file = @files.read file_id
+    ctx.response.status = HTTP::Status::CREATED
+    ctx << Response::Project::File.new(
+      id: file.id,
+      path: file.path,
+      created_at: file.created_at,
+      file_edited_at: file.file_edited_at,
+      author_name: file.author_name,
+      editor_name: file.editor_name,
+      is_directory: file.is_directory,
+      content_uri: file.blob_id.try { |blob_id| @storage.uri(blob_id.to_s) } 
+    )
   end
 
   route DELETE, "/projects/:project_id/files/:file_id", def delete_file(ctx)

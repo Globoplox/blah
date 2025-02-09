@@ -84,6 +84,26 @@ class Repositories::Files::Database < Repositories::Files
     SQL
   end
 
+  def read(file_id : UUID) : File
+    File.from_rs(@connection.query <<-SQL, file_id).first
+      SELECT 
+        project_files.id,
+        project_files.path,
+        project_files.author_id,
+        project_files.editor_id,
+        project_files.blob_id,
+        project_files.created_at,
+        project_files.file_edited_at,
+        project_files.is_directory,
+        author_users.name as author_name,
+        editor_users.name as editor_name
+      FROM project_files
+      LEFT JOIN users author_users ON author_users.id = project_files.author_id
+      LEFT JOIN users editor_users ON editor_users.id = project_files.editor_id
+      WHERE project_files.id = $1
+    SQL
+  end
+
   def list(project_id : UUID) : Array(File)
     File.from_rs @connection.query <<-SQL, project_id
       SELECT 

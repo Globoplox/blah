@@ -88,7 +88,6 @@ class Api
       allowed_concurrent_job: 1,
       allowed_concurrent_tty: 10
     )
-    
 
     case user_id
     when Repositories::Users::DuplicateNameError

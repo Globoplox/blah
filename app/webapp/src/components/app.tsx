@@ -8,6 +8,18 @@ import Project from "./project";
 
 const api = new Api();
 
+/*
+  TODO:
+  - Running
+  - TTY
+  - Syntax highlighting 
+  - Filetree create file and directory buttons
+  - Project page global toast
+  - All auth related chore (reset, doube auth, email verification, oauth, device kick, ...)
+  - Notifications for collaboration
+  - Port sharing and scaling
+*/
+
 export default function App() {
   return <BrowserRouter>
 
