@@ -1,6 +1,8 @@
 services:
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: app/api/Dockerfile
     environment:
       - ENV
       - BIND_URI=tcp://0.0.0.0:3000
