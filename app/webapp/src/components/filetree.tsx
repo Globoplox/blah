@@ -70,8 +70,12 @@ export default function Filetree({api, project, onOpen = null, onDelete = null}:
   }
 
   function onClickInternal(node: NodeApi<NodeData>) {
-    if (node.isLeaf)
-      onOpen?.(projectFiles.current.find(_ => _.path == node.data.id));
+    if (node.isLeaf) {
+      const  file = projectFiles.current.find(_ => _.path == node.data.id)
+      if (file)
+        onOpen?.(file);
+
+    }
   }
 
   function onDeleteInternal({ids, nodes}: {ids: string[], nodes: NodeApi<NodeData>[]}) {

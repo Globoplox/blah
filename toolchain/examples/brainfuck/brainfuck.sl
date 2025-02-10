@@ -19,10 +19,10 @@ var ram: [20]
 fun main:_ {
   var pc = 0
   var ptr = 0
-  var program_size = load_io(&__io_brainfuck, &program, 0x100)
+  var program_size = load_io(&__io_brainfuck, &program, 110)
   var loop_count = 0
 
-  if (program_size == 0x100) /* If we have not loaded the whole program because we ran out of space */
+  if (program_size == 110) /* If we have not loaded the whole program because we ran out of space */
      return 1
 
   while (1) {

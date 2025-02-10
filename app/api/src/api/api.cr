@@ -11,10 +11,11 @@ require "../models/validations"
 
 class Api
   VERSION = {{ `shards version #{__DIR__}`.chomp.stringify }}
+  
   @@router = Cradix((Api, Context) -> Nil).new
+  @@websockets_router = Cradix((Api, HTTP::WebSocket, Context) -> Nil).new
   @@debug = ENV["ENV"]?.in?({"dev", "local"})
   class_getter debug
-
   @server : HTTP::Server
   @storage : Storage
   @cache : Cache
@@ -22,11 +23,39 @@ class Api
   @projects : Repositories::Projects
   @files : Repositories::Files
   @blobs : Repositories::Blobs
+  @websockets : HTTP::WebSocketHandler
 
   def initialize(@storage, @cache, @users, @projects, @files, @blobs, bind, cors_origin)
     @server = uninitialized HTTP::Server
+    @websockets = uninitialized HTTP::WebSocketHandler
+    
+    @websockets = HTTP::WebSocketHandler.new do |socket, ctx|
+      t = Time.monotonic
+      Log.info &.emit "Websocket #{ctx.request.path.rstrip '/'}"
+
+      routes = @@websockets_router.search ctx.request.path.rstrip '/'
+      ctx = Context.new ctx
+      if routes.empty?
+        ctx << Error::NotFound.new "Websocket #{ctx.request.path}"
+        socket.close
+      else
+        handler, path_parameters = routes.first
+        ctx.path_parameters = path_parameters
+        begin
+          handler.call self, socket, ctx
+        rescue error : Error
+          ctx << error
+        rescue ex
+          Log.error exception: ex, &.emit "Exception handling websocket#{ctx.request.path.rstrip '/'}"
+          ctx << Error::ServerError.new ex.message
+        end
+      end
+      Log.info &.emit "Took: #{(Time.monotonic - t).total_milliseconds}ms"
+    end
+
     @server = HTTP::Server.new([
-      HTTP::CompressHandler.new
+      HTTP::CompressHandler.new,
+      @websockets
     ]) do |ctx|
       t = Time.monotonic
       Log.info &.emit "#{ctx.request.method} #{ctx.request.path.rstrip '/'}"
@@ -70,6 +99,11 @@ class Api
 
   def close
     @server.close
+  end
+
+  macro websocket(http_method, path, method_def)
+    {{method_def}}
+    @@websockets_router.add {{path}}.strip('/'), ->(api: Api, socket : HTTP::WebSocket, context: Context) { api.{{method_def.name}}(socket, context) }
   end
 
   macro route(http_method, path, method_def)

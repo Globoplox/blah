@@ -108,5 +108,6 @@ module Repositories
     abstract def directory_exists?(path : String) : Bool
     abstract def is_directory?(file_id : UUID) : Bool
     abstract def read(file_id : UUID) : File
+    abstract def read_by_path(path : String) : File?
   end
 end

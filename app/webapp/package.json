@@ -24,8 +24,10 @@
     "webpack-dev-server": "^5.2.0"
   },
   "dependencies": {
+    "@pablo-lion/xterm-react": "^1.1.2",
     "@types/react": "^18.2.65",
     "@types/react-dom": "^18.2.21",
+    "@xterm/addon-attach": "^0.11.0",
     "bootstrap": "5.3.3",
     "prism-react-editor": "^1.1.0",
     "react": "^18.2.0",

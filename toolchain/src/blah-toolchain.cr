@@ -155,11 +155,10 @@ class Toolchain
   end
 
   def initialize(@debug, spec_file : String, macros : Hash(String, String), @fs, @events)
-    @spec = spec_file.try do |file|
-      @fs.read file, ->(io : IO) do
-        @events.with_context "Configuring specification '#{@events.emphasis(spec_file)}'" do 
-          RiSC16::Spec.open io, macros, @fs.normalize(spec_file), @events
-        end
+    @spec = uninitialized RiSC16::Spec
+    @events.with_context "Configuring specification '#{@events.emphasis(spec_file)}'" do 
+      @spec = @fs.read spec_file do |io|
+        RiSC16::Spec.open io, macros, @fs.normalize(spec_file), @events
       end
     end
   end

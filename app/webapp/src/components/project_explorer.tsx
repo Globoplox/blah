@@ -10,6 +10,7 @@ import InputGroup from 'react-bootstrap/InputGroup';
 import { Link } from "react-router";
 import Spinner from 'react-bootstrap/Spinner';
 import { FaSearch } from "react-icons/fa";
+import { useNavigate, useSearchParams, useLocation } from "react-router";
 
 export default function ProjectExplorer({api, style} : {api: Api, style: React.CSSProperties}) {
 
@@ -33,11 +34,16 @@ export default function ProjectExplorer({api, style} : {api: Api, style: React.C
   const [entries, setEntries] = useState([] as Project[]);
   const [isLoaded, setIsLoaded] = useState(false);
   const loadProjects = useEffect(() => search(""), []);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   function search(query: string) {
     api.owned_projects(query).then(projects => {
       setIsLoaded(true);
       setEntries(projects);
+    }).catch(error => {
+      if (error.code === ErrorCode.Unauthorized)
+        navigate(`/login?redirectTo=${location.pathname}`);
     });
   }
 

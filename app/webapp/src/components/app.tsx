@@ -5,8 +5,8 @@ import Register from "./register";
 import Index from "./index";
 import CreateProject from "./create_project";
 import Project from "./project";
+import { useNavigate } from "react-router";
 
-const api = new Api();
 
 /*
   TODO:
@@ -21,15 +21,17 @@ const api = new Api();
 */
 
 export default function App() {
-  return <BrowserRouter>
+  const api = new Api();
 
+  return <BrowserRouter>
     <Routes>
       <Route index element={<Index api={api} />} />
-      <Route path="login" element={<Login api={api} redirectTo={null}/>} />
-      <Route path="register" element={<Register api={api} redirectTo={null}/>} />
+      <Route path="login" element={<Login api={api}/>} />
+      <Route path="register" element={<Register api={api}/>} />
       <Route path="project">
         <Route path="create" element={<CreateProject api={api} />} />
         <Route path=":projectId" element={<Project api={api} />} />
+        <Route path=":projectId/file/:fileId" element={<Project api={api} />} />
       </Route>
     </Routes>
   </BrowserRouter>;

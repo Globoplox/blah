@@ -5,16 +5,19 @@ import Container from 'react-bootstrap/Container';
 import Alert from 'react-bootstrap/Alert';
 import { ErrorCode, Api, Error, ParameterError } from "../api";
 import { ChangeEvent, useState } from 'react'
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { Link } from "react-router";
 
-export default function Login({api, redirectTo}: {api: Api, redirectTo: string | null}) {
+export default function Login({api}: {api: Api}) {
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [staySignedIn, setStaySignedIn] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  
+  let [parameters, _] = useSearchParams();
+  const redirectTo = parameters.get("redirectTo");
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -22,7 +25,7 @@ export default function Login({api, redirectTo}: {api: Api, redirectTo: string |
       setFeedback({type: "valid", content: "Successfully logged in", alert: "success"});
       setTimeout(() => { navigate(redirectTo || "/") }, 1000)
     }).catch(error => {
-      if (error.code === ErrorCode.InvalidCrdentials)
+      if (error.code === ErrorCode.InvalidCredentials)
         setFeedback({type: "invalid", content: error.message || error.error, alert: "warning"});
       else
         setFeedback({type: "invalid", content: error.message || error.error, alert: "danger"});

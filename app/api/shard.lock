@@ -8,6 +8,10 @@ shards:
     git: https://github.com/taylorfinnell/awscr-signer.git
     version: 0.8.2
 
+  blah-toolchain:
+    path: ./TMP-TOOLCHAIN
+    version: 1.0.0
+
   cradix:
     git: https://github.com/globoplox/cradix.git
     version: 1.0.0

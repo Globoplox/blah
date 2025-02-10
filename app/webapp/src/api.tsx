@@ -3,7 +3,7 @@ const API_SERVER_URI = process.env.API_SERVER_URI;
 // Api error codes
 export enum ErrorCode {
   Unauthorized = "unauthorized",
-  InvalidCrdentials = "invalid_credentials",
+  InvalidCredentials = "invalid_credentials",
   BadParameter = "bad_parameter",
   BadRequest = "bad_request",
   ServerError = "server_error",
@@ -36,11 +36,23 @@ export type Project = {
   owner_name: string,
   files?: File[]
 }
+
+export type Job = {
+  id: string,
+  success: boolean,
+  completed: boolean,
+  started: boolean
+}
+
 export type IDResponse = {id: string}
 
 export class Api {
 
   #headers = new Headers({'content-type': 'application/json'})
+
+  handleError(error: Error) {
+    return Promise.reject(error)
+  }
 
   mapNetworkError(error: unknown): Promise<Error> {
       return Promise.reject({code: ErrorCode.NetworkError, error: "Network error", message: JSON.stringify(error)})
@@ -52,10 +64,10 @@ export class Api {
     return fetch(
       `${API_SERVER_URI}/login`, {method: "PUT", headers: this.#headers, body: JSON.stringify(body), credentials: 'include'}
     ).then(response => {
-        if (response.ok)
-          return null
-        else 
-          return response.json().then(_ => Promise.reject(_))
+      if (response.ok)
+        return null
+      else 
+        return response.json().then(this.handleError.bind(this))
     }, this.mapNetworkError)
   }
 
@@ -65,10 +77,10 @@ export class Api {
     return fetch(
       `${API_SERVER_URI}/register`, {method: "POST", headers: this.#headers, body: JSON.stringify(body), credentials: 'include'}
     ).then(response => {
-        if (response.ok)
-          return null
-        else 
-          return response.json().then(_ => Promise.reject(_))
+      if (response.ok)
+        return null
+      else 
+        return response.json().then(this.handleError.bind(this))
     }, this.mapNetworkError) as unknown as Promise<null>
   }
 
@@ -78,10 +90,10 @@ export class Api {
     return fetch(
       `${API_SERVER_URI}/projects/create`, {method: "POST", headers: this.#headers, body: JSON.stringify(body), credentials: 'include'}
     ).then(response => {
-        if (response.ok)
-          return response.json()
-        else 
-          return response.json().then(_ => Promise.reject(_))
+      if (response.ok)
+        return response.json()
+      else 
+        return response.json().then(this.handleError.bind(this))
     }, this.mapNetworkError)
   }
 
@@ -89,10 +101,10 @@ export class Api {
     return fetch(
       `${API_SERVER_URI}/projects/public?query=${query}`, {method: "GET", headers: this.#headers, credentials: 'include'}
     ).then(response => {
-        if (response.ok)
-          return response.json()
-        else 
-          return response.json().then(_ => Promise.reject(_))
+      if (response.ok)
+        return response.json()
+      else 
+        return response.json().then(this.handleError.bind(this))
     }, this.mapNetworkError)
   }
 
@@ -100,10 +112,10 @@ export class Api {
     return fetch(
       `${API_SERVER_URI}/projects/owned?query=${query}`, {method: "GET", headers: this.#headers, credentials: 'include'}
     ).then(response => {
-        if (response.ok)
-          return response.json()
-        else 
-          return response.json().then(_ => Promise.reject(_))
+      if (response.ok)
+        return response.json()
+      else 
+        return response.json().then(this.handleError.bind(this))
     }, this.mapNetworkError)
   }
 
@@ -111,10 +123,10 @@ export class Api {
     return fetch(
       `${API_SERVER_URI}/projects/${project_id}`, {method: "GET", headers: this.#headers, credentials: 'include'}
     ).then(response => {
-        if (response.ok)
-          return response.json()
-        else 
-          return response.json().then(_ => Promise.reject(_))
+      if (response.ok)
+        return response.json()
+      else 
+        return response.json().then(this.handleError.bind(this))
     }, this.mapNetworkError)
   }
 
@@ -123,10 +135,10 @@ export class Api {
     return fetch(
       `${API_SERVER_URI}/projects/${project_id}/file`, {method: "POST", headers: this.#headers, credentials: 'include', body: JSON.stringify(body)}
     ).then(response => {
-        if (response.ok)
-          return response.json()
-        else 
-          return response.json().then(_ => Promise.reject(_))
+      if (response.ok)
+        return response.json()
+      else 
+        return response.json().then(this.handleError.bind(this))
     }, this.mapNetworkError)
   }
 
@@ -135,10 +147,10 @@ export class Api {
     return fetch(
       `${API_SERVER_URI}/projects/${project_id}/directory`, {method: "POST", headers: this.#headers, credentials: 'include', body: JSON.stringify(body)}
     ).then(response => {
-        if (response.ok)
-          return response.json()
-        else 
-          return response.json().then(_ => Promise.reject(_))
+      if (response.ok)
+        return response.json()
+      else 
+        return response.json().then(this.handleError.bind(this))
     }, this.mapNetworkError)
   }
 
@@ -147,10 +159,10 @@ export class Api {
     return fetch(
       `${API_SERVER_URI}/projects/${project_id}/files/${file_id}/move`, {method: "PUT", headers: this.#headers, credentials: 'include', body: JSON.stringify(body)}
     ).then(response => {
-        if (response.ok)
-          return null
-        else 
-          return response.json().then(_ => Promise.reject(_))
+      if (response.ok)
+        return null
+      else 
+        return response.json().then(this.handleError.bind(this))
     }, this.mapNetworkError) as unknown as Promise<null>
   }
 
@@ -158,10 +170,10 @@ export class Api {
     return fetch(
       `${API_SERVER_URI}/projects/${project_id}/files/${file_id}`, {method: "DELETE", headers: this.#headers, credentials: 'include'}
     ).then(response => {
-        if (response.ok)
-          return null
-        else 
-          return response.json().then(_ => Promise.reject(_))
+      if (response.ok)
+        return null
+      else 
+      return response.json().then(this.handleError.bind(this))
     }, this.mapNetworkError) as unknown as Promise<null>
   }
 
@@ -170,10 +182,30 @@ export class Api {
     return fetch(
       `${API_SERVER_URI}/projects/${project_id}/files/${file_id}`, {method: "PUT", headers: this.#headers, credentials: 'include', body: JSON.stringify(body)}
     ).then(response => {
-        if (response.ok)
-          return response.json()
-        else 
-          return response.json().then(_ => Promise.reject(_))
+      if (response.ok)
+        return response.json()
+      else 
+        return response.json().then(this.handleError.bind(this))
+    }, this.mapNetworkError) as unknown as Promise<null>
+  }
+
+  run_file(project_id: string, path: string, handler: (socket: WebSocket) => void) : Promise<File> {
+    return fetch(
+      `${API_SERVER_URI}/job/create`, {method: "POST", headers: this.#headers, credentials: 'include', body: JSON.stringify({path})}
+    ).then(response => {
+      if (response.ok)
+        response.json().then((job: Job) => {
+          const socket = new WebSocket(`${API_SERVER_URI}/project/${project_id}/job/${job.id}/initialize`);
+          socket.addEventListener("open", _ => {
+            fetch( `${API_SERVER_URI}/job/${job.id}/start`, {method: "PUT", headers: this.#headers, credentials: 'include'}).then(response => {
+              if (!response.ok)
+                return response.json().then(this.handleError.bind(this));
+            });
+          });
+          handler(socket);
+        });
+      else 
+        return response.json().then(this.handleError.bind(this))
     }, this.mapNetworkError) as unknown as Promise<null>
   }
 }

@@ -5,10 +5,10 @@ import Container from 'react-bootstrap/Container';
 import Alert from 'react-bootstrap/Alert';
 import { ErrorCode, Api, Error, ParameterError } from "../api";
 import { ChangeEvent,useState } from 'react'
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { Link } from "react-router";
 
-export default function Register({api, redirectTo}: {api: Api, redirectTo: string | null}) {
+export default function Register({api}: {api: Api}) {
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
@@ -20,6 +20,9 @@ export default function Register({api, redirectTo}: {api: Api, redirectTo: strin
   const [nameFeedback, setNameFeedback] = useState(null);
   const [emailFeedback, setEmailFeedback] = useState(null);
   const [passwordFeedback, setPasswordFeedback] = useState(null);
+
+  let [parameters, _] = useSearchParams();
+  const redirectTo = parameters.get("redirectTo");
 
   const parameterFeedbacks : Record<string, Dispatch<{type: string, content: string, alert: string}>> = {
     "name": setNameFeedback,
