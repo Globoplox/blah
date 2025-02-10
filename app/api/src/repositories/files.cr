@@ -104,8 +104,8 @@ class Repositories::Files::Database < Repositories::Files
     SQL
   end
 
-  def read_by_path(path : String) : File?
-    File.from_rs(@connection.query <<-SQL, path).first?
+  def read_by_path(project_id : UUID, path : String) : File?
+    File.from_rs(@connection.query <<-SQL, path, project_id).first?
       SELECT 
         project_files.id,
         project_files.path,
@@ -120,7 +120,7 @@ class Repositories::Files::Database < Repositories::Files
       FROM project_files
       LEFT JOIN users author_users ON author_users.id = project_files.author_id
       LEFT JOIN users editor_users ON editor_users.id = project_files.editor_id
-      WHERE project_files.path = $1
+      WHERE project_files.path = $1 and project_files.project_id = $2
     SQL
   end
 

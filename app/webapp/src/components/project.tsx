@@ -37,7 +37,11 @@ export default function Project({api} : {api: Api}) {
   const editorContent = useRef("");
   const syncTimeoutId = useRef(null);
   const loadProjects = useEffect(() => load(), [projectId, fileId]);
-  
+  const [socket, setSocket] = useState(null);
+
+  console.log(`LOADING PROJECT, HAS SOCKET: ${socket != null}`)
+  console.log(project?.files)
+
   useEffect(() => {
     function onMayLeavePage() {
       if (syncTimeoutId.current != null) {
@@ -79,6 +83,8 @@ export default function Project({api} : {api: Api}) {
     }
   }
 
+  // TODO: onFileTree move, to refresh
+
   function fileType(file : ProjectFile) : string {
     if (file.path.endsWith(".sl"))
       return "stacklang";
@@ -86,7 +92,7 @@ export default function Project({api} : {api: Api}) {
       return "blah";
     else if (file.path.endsWith(".ini"))
       return "ini";
-    else if (file.path.endsWith(".recipe"))
+    else if (file.path.endsWith(".recipe") || file.path.endsWith(".json"))
       return "json";
     return "txt";
   }
@@ -119,7 +125,6 @@ export default function Project({api} : {api: Api}) {
     }
   }
 
-  const [socket, setSocket] = useState(null);
 
   function onRunFile(fileId : string) {
     // Flush
@@ -132,14 +137,19 @@ export default function Project({api} : {api: Api}) {
     const fileToRun = project.files?.find(_ => _.id == fileId)
     api.run_file(project.id, fileToRun.path, (newSocket: WebSocket) => {
       (socket as WebSocket)?.close();
-      newSocket.onopen = () => setSocket(newSocket);
+      newSocket.onopen = () => {
+        console.log("SET NEW SOCKET");
+        setSocket(newSocket)
+      };
     });
   }
 
   function NoFileOpened() {
     return <Container className="flex-flex" style={{height: "100%"}}>
       <div className="flex-flex center-center" >
+        <div>
         <h4>No file opened</h4>
+        <br/>
         <p>
           Select a file on the explorer to start editing.
         </p>
@@ -149,6 +159,7 @@ export default function Project({api} : {api: Api}) {
           <li>Delete a file or directory: Return</li>
           <li>Rename a file or directory: Enter</li>
         </ul>
+        </div>
       </div>
     </Container>;
   }
@@ -172,24 +183,29 @@ export default function Project({api} : {api: Api}) {
 
       <div className="vr" />
 
-      <Stack direction="vertical">
+      <Stack direction="vertical" style={{height: "calc(100vh - 0.5in - 1px)"}}>
         {
           (file != null && file.type == "json") ?
           <Button style={{position: "absolute", top: 0, right: 0}} onClick={() => onRunFile(file.id)}>Run</Button> :
           <></>
         }
 
-        <div style={{overflowY: "auto", height: "calc(100vh - 0.5in - 1px)", display: "inline-block"}}>
-          {
-            file != null ?
-            <Editor language={file.type} value={file.content} onUpdate={onUpdate} >
-              {(editor: any) => <BasicSetup editor={editor}/>}
-            </Editor> :
-            <NoFileOpened/>
-          }
-    
-          { socket ? <Terminal socket={socket}/> : <></>}
-        </div>
+        {
+          file != null ?
+          <Editor language={file.type} value={file.content} onUpdate={onUpdate} >
+            {(editor: any) => <BasicSetup editor={editor}/>}
+          </Editor> :
+          (isLoaded ? <NoFileOpened/> : <></>)
+        }
+  
+        { 
+          socket != null ? 
+          <div className="mt-auto">
+            <hr style={{margin: 0}}/>
+            <Terminal socket={socket}/>
+          </div> : 
+          <></>
+        }
 
 
       </Stack>

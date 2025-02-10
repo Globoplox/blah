@@ -30,6 +30,7 @@ module Clients::Cli
         in Level::Error then level.colorize(:red).bold
         in Level::Fatal then level.colorize(:red).bold
         in Level::Context then level.colorize(:grey).bold
+        in Level::Success then level.colorize(:green).bold
       end
     
       STDERR << ": "

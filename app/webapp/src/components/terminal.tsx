@@ -22,11 +22,14 @@ import { AttachAddon } from '@xterm/addon-attach';
 import "./terminal.scss";
 
 export default function Terminal({socket}: {socket: WebSocket}) {
+
   const theme = {
     background: '#F8F8F8',
     foreground: '#2D2E2C',
     selectionBackground: '#5DA5D533',
     selectionInactiveBackground: '#555555AA',
+    cursorAccent: "#1E1E1D",
+    cursor: "#1E1E1D",
     black: '#1E1E1D',
     brightBlack: '#262625',
     red: '#CE5C5C',
@@ -45,24 +48,18 @@ export default function Terminal({socket}: {socket: WebSocket}) {
     brightWhite: '#FFFFFF'
   };
 
-  const terminal : React.MutableRefObject<any> = useRef();
+  const ref = useRef(null);
 
-  function onData(data: string) {
-    if (terminal.current) {
-      if (data == '\x7F')
-        terminal.current.write('\b \b');
-      else
-        terminal.current.write(data);
-    }
-  }
-
-  return <XTerm ref={terminal} options={{
+  // key used to force recreation of the terminal, react might try to be smarter than it is otherwise 
+  return <XTerm ref={ref} key={socket.url} options={{
     convertEol: true,
-    cursorStyle: "bar",
-    cursorInactiveStyle: "none",
+    scrollback: 1000,
+    rows: 15,
+    cursorStyle: "block",
+    cursorInactiveStyle: "underline",
     theme, 
     fontWeight: 400, 
     fontSize: 18, 
     fontFamily: "Consolas, Monaco, Andale Mono, Ubuntu Mono, monospace"
-  }} addons={[new AttachAddon(socket)]} />;
+  }} addons={[new AttachAddon(socket, {bidirectional: true})]} />;
 }

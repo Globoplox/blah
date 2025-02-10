@@ -63,6 +63,7 @@ class Toolchain
       Error
       Fatal
       Context
+      Success
     end
 
     class HandledFatalException < ::Exception
@@ -75,6 +76,10 @@ class Toolchain
     def event(level : Level, title : String, body : String?, locations : Array({String?, Int32?, Int32?}))
       @errored = true if level.error? || level.fatal?
       event_impl level, title, body, locations
+    end
+
+    def event(level : Level, title : String)
+      event level, title, nil, [] of {String?, Int32?, Int32?}
     end
 
     protected abstract def event_impl(level : Level, title : String, body : String?, locations : Array({String?, Int32?, Int32?}))
@@ -182,6 +187,7 @@ class Toolchain
         object.to_io(output)
       end
     end
+    @events.event(:success, "Succesfully assembled #{@events.emphasis(@fs.normalize source)} into '#{@fs.normalize destination}'")
   end
 
   def compile(source : String, destination : String)
@@ -194,6 +200,7 @@ class Toolchain
         object.to_io(output)
       end
     end
+    @events.event(:success, "Succesfully compiled #{@events.emphasis(@fs.normalize source)} into '#{@fs.normalize destination}'")
   end
 
   def lib(sources : Indexable(String), destination : String)
@@ -216,6 +223,7 @@ class Toolchain
         libfile.to_io(output)
       end
     end
+    @events.event(:success, "Succesfully built lib '#{@events.emphasis(@fs.normalize destination)}'")
   end
 
   def merge(sources : Indexable(String), destination : String, dce : Bool = true) 
@@ -240,6 +248,7 @@ class Toolchain
         object.to_io(output)
       end
     end
+    @events.event(:success, "Succesfully merged '#{@events.emphasis(@fs.normalize destination)}'")
   end
 
   def link(source : String, destination : String)
@@ -260,6 +269,7 @@ class Toolchain
         IO.copy src: raw, dst: output
       end
     end
+    @events.event(:success, "Succesfully linked '#{@events.emphasis(@fs.normalize destination)}'")
   end
  
   def run(source : String, io_mapping : Hash(String, {IO, IO})) : Void
@@ -268,7 +278,13 @@ class Toolchain
         input.getb_to_end
       end
         
-      RiSC16::VM.from_spec(spec, @fs, io_mapping).tap(&.load(bytes, at: 0)).tap(&.run).close
+      RiSC16::VM.from_spec(spec, @fs, io_mapping).tap do |vm|
+        vm.load(bytes, at: 0)
+        @events.event(:success, "Running ... '#{@events.emphasis(@fs.normalize destination)}'")
+        vm.run
+        @events.event(:success, "Ran '#{@events.emphasis(@fs.normalize destination)}'")
+        vm.close
+      end
     end
   end
 end

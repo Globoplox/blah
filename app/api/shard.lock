@@ -9,7 +9,7 @@ shards:
     version: 0.8.2
 
   blah-toolchain:
-    path: ./TMP-TOOLCHAIN
+    path: ../../toolchain
     version: 1.0.0
 
   cradix:

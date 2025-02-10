@@ -80,4 +80,36 @@ class Repositories::Users::Database < Repositories::Users
       WHERE credentials.email = $1                                                                                                                            
     SQL
   end
+
+  def read(id : UUID) : User
+    User.from_rs(@connection.query <<-SQL, id).first                                  
+      SELECT                                                                                                                                                  
+        users.id,                                                                                                                                             
+        users.name,                                                                                                                                           
+        users.tag,                                                                                                                                            
+        users.allowed_project,                                                                                                                          
+        users.allowed_blob_size,                                                                                                                        
+        users.allowed_concurrent_job,                                                                                                                  
+        users.allowed_concurrent_tty,   
+        users.created_at
+      FROM users                                                                                                                                                                                                              
+      WHERE users.id = $1                                                                                                                            
+    SQL
+  end
+
+  def get_by_name(name : String) : User?
+    User.from_rs(@connection.query <<-SQL, name).first?                                   
+      SELECT                                                                                                                                                  
+        users.id,                                                                                                                                             
+        users.name,                                                                                                                                           
+        users.tag,                                                                                                                                            
+        users.allowed_project,                                                                                                                          
+        users.allowed_blob_size,                                                                                                                        
+        users.allowed_concurrent_job,                                                                                                                  
+        users.allowed_concurrent_tty,   
+        users.created_at      
+      FROM users                                                                                                                                                                                                           
+      WHERE users.name = $1                                                                                                                            
+    SQL
+  end
 end

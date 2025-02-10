@@ -48,7 +48,6 @@ class Repositories::Projects::Database < Repositories::Projects
   end
 
   def read(id  : UUID) : Project
-    # TODO: acl
     Project.from_rs(@connection.query(<<-SQL, id)).first
       SELECT 
         projects.id,
@@ -64,6 +63,25 @@ class Repositories::Projects::Database < Repositories::Projects
       LEFT JOIN users ON users.id = projects.owner_id
       WHERE projects.id = $1
     SQL
+  end
+
+  def get_by_user_and_name(user_id : UUID, name : String) : Project?
+    Project.from_rs(@connection.query(<<-SQL, user_id, name)).first?
+      SELECT 
+        projects.id,
+        projects.name,
+        projects.public,
+        projects.description,
+        projects.owner_id,
+        projects.allowed_file_amount,
+        projects.allowed_blob_size,
+        projects.created_at,
+        users.name as owner_name
+      FROM projects
+      LEFT JOIN users ON users.id = projects.owner_id
+      WHERE projects.owner_id = $1 AND projects.name = $2
+    SQL
+    
   end
 
   def search_public(query  : String?) : Array(Project)

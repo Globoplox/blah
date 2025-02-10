@@ -37,6 +37,22 @@ module Repositories
     end
 
     abstract def get_by_email_with_credentials(email : String) : UserWithCredentials?
+
+    class User
+      include DB::Serializable
+      property id : UUID
+      property name : String
+      property tag : String
+      property avatar_id : UUID?
+      property allowed_blob_size : Int32
+      property allowed_project : Int32
+      property allowed_concurrent_job : Int32
+      property allowed_concurrent_tty : Int32
+      property created_at : Time
+    end
+
+    abstract def read(id : UUID) : User
+    abstract def get_by_name(name : String) : User?
   end
 
   abstract class Projects
@@ -67,10 +83,9 @@ module Repositories
     end
 
     abstract def search_public(query  : String?) : Array(Project)
-
     abstract def search_owned(owner_id : UUID, query  : String?) : Array(Project)
-
     abstract def read(id  : UUID) : Project
+    abstract def get_by_user_and_name(user_id : UUID, name : String) : Project?
 
   end
 
@@ -108,6 +123,6 @@ module Repositories
     abstract def directory_exists?(path : String) : Bool
     abstract def is_directory?(file_id : UUID) : Bool
     abstract def read(file_id : UUID) : File
-    abstract def read_by_path(path : String) : File?
+    abstract def read_by_path(project_id : UUID, path : String) : File?
   end
 end
