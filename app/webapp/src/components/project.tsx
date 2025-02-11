@@ -38,8 +38,6 @@ export default function Project({api} : {api: Api}) {
     filePath = null;
   else
     filePath = `/${filePath}`;
-
-  console.log("PARAMS", params);
   
   const [project, setProject] = useState(null as Project);
   const [file, setFile] = useState(null as {content: string, type: string, path: string});
@@ -78,11 +76,8 @@ export default function Project({api} : {api: Api}) {
   }
 
   function doLoadFile() {
-    console.log("ON DO LOAD FILE", project, filePath)
-
     if (project != null && filePath != null) {
       const fileToOpen = project.files?.find(_ => _.path == filePath)
-      console.log("FOUND FILE", fileToOpen)
 
       if (fileToOpen != null && !fileToOpen.is_directory) {
         const type = fileType(fileToOpen);
@@ -103,10 +98,16 @@ export default function Project({api} : {api: Api}) {
       syncTimeoutId.current = null;
       editorContent.current = "";
       setFile(null);
+      navigate(`/project/${projectId}`);
     }
   }
 
-  // TODO: onFileTree move, to refresh
+  function onFileTreeCreate(file: ProjectFile) {
+    const existing = project.files?.find(_ => _.path == file.path);
+    // Edit project in place, no need to re-render
+    if (existing == null || existing == undefined)
+      project.files = [...project.files, file];
+  }
 
   function fileType(file : ProjectFile) : string {
     if (file.path.endsWith(".sl"))
@@ -121,7 +122,6 @@ export default function Project({api} : {api: Api}) {
   }
   
   function onFileTreeOpen(fileToOpen: ProjectFile) {
-    console.log("ON FILE OPEN", file, fileToOpen)
     if (file != null && fileToOpen.path == file.path)
       return;
    
@@ -149,7 +149,6 @@ export default function Project({api} : {api: Api}) {
     }
   }
 
-
   function onRunFile(filePath : string) {
     // Flush
     if (syncTimeoutId.current != null) {
@@ -162,7 +161,6 @@ export default function Project({api} : {api: Api}) {
     api.run_file(project.id, fileToRun.path, (newSocket: WebSocket) => {
       (socket as WebSocket)?.close();
       newSocket.onopen = () => {
-        console.log("SET NEW SOCKET");
         setSocket(newSocket)
       };
     });
@@ -197,7 +195,7 @@ export default function Project({api} : {api: Api}) {
       <div style={{width: "17.5%", height: "calc(100vh - 0.5in - 1px)"}}>
         {
           project != null
-          ? <Filetree api={api} project={project} onDelete={onFileTreeDelete} onOpen={onFileTreeOpen}/>
+          ? <Filetree api={api} project={project} onDelete={onFileTreeDelete} onOpen={onFileTreeOpen} onCreate={onFileTreeCreate}/>
           : <div className="d-flex align-items-center mt-3" style={{width: "100%"}}>
               <Spinner size="sm" className="ms-auto"/>
               <strong className="ms-2 me-auto">Loading...</strong>

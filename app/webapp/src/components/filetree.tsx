@@ -12,10 +12,12 @@ import "./filetree.scss";
 type NodeData = {id: string, name: string, children: NodeData[], isRoot?: boolean}
 type Toast = {id: number, body: string}
 
-export default function Filetree({api, project, onOpen = null, onDelete = null}: {
+export default function Filetree({api, project, onOpen = null, onDelete = null, onCreate = null, onMove = null}: {
     api: Api, 
     project: Project,
-    onOpen?: (id: ProjectFile) => void,
+    onOpen?: (file: ProjectFile) => void,
+    onCreate?: (file: ProjectFile) => void,
+    onMove?: (file: ProjectFile, to: string) => void,
     onDelete?: (id: string) => void,  
 }) {
 
@@ -74,7 +76,6 @@ export default function Filetree({api, project, onOpen = null, onDelete = null}:
       const  file = projectFiles.current.find(_ => _.path == node.data.id)
       if (file)
         onOpen?.(file);
-
     }
   }
 
@@ -97,7 +98,6 @@ export default function Filetree({api, project, onOpen = null, onDelete = null}:
   }
 
   function onMoveInternal({dragIds, dragNodes, parentId, parentNode}: {dragIds: string[], dragNodes: NodeApi<NodeData>[], parentId: string | null, parentNode: NodeApi<NodeData> | null}) {
-    console.log({dragIds, dragNodes, parentId, parentNode});
     if (parentNode === null || parentNode.isRoot) // Not the same as isRoot from projectToTree
       parentId = "/";
 
@@ -140,6 +140,7 @@ export default function Filetree({api, project, onOpen = null, onDelete = null}:
         name = `new_${name}`;
       const path = `${parentId}${name}`;
       return api.create_file(project.id, path).then(file => {
+        onCreate?.(file);
         projectFiles.current = [...projectFiles.current, file];
         const newTree = projectToTree(project, projectFiles.current);
         setTree(newTree);
@@ -152,6 +153,7 @@ export default function Filetree({api, project, onOpen = null, onDelete = null}:
       const path = `${parentId}${name}/`;
 
       return api.create_directory(project.id, path).then(file => {
+        onCreate?.(file);
         projectFiles.current = [...projectFiles.current, file];
         const newTree = projectToTree(project, projectFiles.current);
         setTree(newTree);

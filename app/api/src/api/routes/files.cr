@@ -155,7 +155,6 @@ class Api
     user_id = authenticate(ctx)
     project_id = UUID.new ctx.path_parameter "project_id"
     file_path = ctx.path_wildcard
-
     blob_id = @files.get_blob_id(project_id: project_id, path: file_path)
     @files.delete(project_id: project_id, path: file_path)
     blob_id.try do |blob_id|

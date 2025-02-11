@@ -31,9 +31,9 @@ class Api
     
     @websockets = HTTP::WebSocketHandler.new do |socket, ctx|
       t = Time.monotonic
-      Log.info &.emit "Websocket #{ctx.request.path.rstrip '/'}"
+      Log.info &.emit "Websocket #{ctx.request.path}"
 
-      routes = @@websockets_router.search ctx.request.path.rstrip '/'
+      routes = @@websockets_router.search ctx.request.path
       ctx = Context.new ctx
       if routes.empty?
         ctx << Error::NotFound.new "Websocket #{ctx.request.path}"
@@ -47,7 +47,7 @@ class Api
         rescue error : Error
           ctx << error
         rescue ex
-          Log.error exception: ex, &.emit "Exception handling websocket#{ctx.request.path.rstrip '/'}"
+          Log.error exception: ex, &.emit "Exception handling websocket#{ctx.request.path}"
           ctx << Error::ServerError.new ex.message
         end
       end
@@ -59,7 +59,7 @@ class Api
       @websockets
     ]) do |ctx|
       t = Time.monotonic
-      Log.info &.emit "#{ctx.request.method} #{ctx.request.path.rstrip '/'}"
+      Log.info &.emit "#{ctx.request.method} #{ctx.request.path}"
       ctx.response.headers["Access-Control-Allow-Methods"] = "POST,DELETE,PUT,PATCH,GET,HEAD,OPTIONS"
       ctx.response.headers["Access-Control-Max-Age"] = "3600"
       ctx.response.headers["Access-Control-Allow-Credentials"] = "true"
@@ -69,20 +69,24 @@ class Api
       if ctx.request.method == "OPTIONS"
         ctx.response.status_code = 204
       else
-        routes = @@router.search "#{ctx.request.method}#{ctx.request.path.rstrip '/'}"
+        routes = @@router.search "#{ctx.request.method}#{ctx.request.path}"
         ctx = Context.new ctx
         if routes.empty?
           ctx << Error::NotFound.new "Route #{ctx.request.method} #{ctx.request.path}"
         else
           handler, path_parameters, wildcard = routes.first
           ctx.path_parameters = path_parameters
+          # cradix bug fix:
+          if wildcard && ctx.request.path.ends_with?("/") && !wildcard.ends_with?("/")
+            wildcard = "#{wildcard}/"
+          end
           ctx.path_wildcard = wildcard
           begin
             handler.call self, ctx
           rescue error : Error
             ctx << error
           rescue ex
-            Log.error exception: ex, &.emit "Exception handling route #{ctx.request.method}#{ctx.request.path.rstrip '/'}"
+            Log.error exception: ex, &.emit "Exception handling route #{ctx.request.method}#{ctx.request.path}"
             ctx << Error::ServerError.new ex.message
           end
         end
@@ -105,12 +109,12 @@ class Api
 
   macro websocket(http_method, path, method_def)
     {{method_def}}
-    @@websockets_router.add {{path}}.strip('/'), ->(api: Api, socket : HTTP::WebSocket, context: Context) { api.{{method_def.name}}(socket, context) }
+    @@websockets_router.add {{path}}, ->(api: Api, socket : HTTP::WebSocket, context: Context) { api.{{method_def.name}}(socket, context) }
   end
 
   macro route(http_method, path, method_def)
     {{method_def}}
-    @@router.add "#{{{http_method}}}/#{{{path}}.strip '/'}", ->(api: Api, context: Context) { api.{{method_def.name}}(context) }
+    @@router.add "#{{{http_method}}}/#{{{path}}}", ->(api: Api, context: Context) { api.{{method_def.name}}(context) }
   end
 
   GET    = "GET"

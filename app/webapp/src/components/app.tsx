@@ -12,7 +12,7 @@ import { useNavigate } from "react-router";
   - ACL
   - mkdir -p 
   - All commands
-  - Notification for file move/add/del
+  - Serverside Notification for file move/add/del
   - Markdown
   - Debugger might actually works as is with xtermjs
   - Might need a bigger tty for this
