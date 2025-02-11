@@ -31,17 +31,25 @@ export default function Project({api} : {api: Api}) {
   const navigate = useNavigate();
 
   const {projectId, fileId} = useParams();
-  const [isLoaded, setIsLoaded] = useState(false);
+  
   const [project, setProject] = useState(null as Project);
   const [file, setFile] = useState(null as {content: string, type: string, id: string});
+
+  // Editor content. The deitor is NOT controlled, so this is a ref.
   const editorContent = useRef("");
+
+  // ID of the timeout to persist the document changes.
+  // It is null when the document is not dirty.
   const syncTimeoutId = useRef(null);
-  const loadProjects = useEffect(() => load(), [projectId, fileId]);
+  
+  // When the project change, load the project
+  const loadProject = useEffect(() => doLoadProject(), [projectId]);
+  // When the project file change, or a project is loaded, load the file
+  const loadFile = useEffect(() => doLoadFile(), [project, fileId]);
+  // Terminal job socket
   const [socket, setSocket] = useState(null);
 
-  console.log(`LOADING PROJECT, HAS SOCKET: ${socket != null}`)
-  console.log(project?.files)
-
+  // Save the document when dirty and mouse leav the document
   useEffect(() => {
     function onMayLeavePage() {
       if (syncTimeoutId.current != null) {
@@ -54,23 +62,25 @@ export default function Project({api} : {api: Api}) {
     return () => document.body.removeEventListener("mouseleave", onMayLeavePage);
   }, [project, file]);
 
-  function load() {
+  function doLoadProject() {
     api.read_project(projectId).then(project => {
-      setIsLoaded(true);
       setProject(project);
-      if (fileId != null) {
-        const fileToOpen = project.files?.find(_ => _.id == fileId)
-        if (fileToOpen != null && !fileToOpen.is_directory) {
-          const type = fileType(fileToOpen);
-          fetch(fileToOpen.content_uri).then(_ => _.text().then(text => {
-            editorContent.current = text;
-            setFile({id: fileToOpen.id, content: text, type});
-          }));
-        } else {
-          navigate(`/project/${projectId}`);
-        }
-      }
     });
+  }
+
+  function doLoadFile() {
+    if (project != null && fileId != null) {
+      const fileToOpen = project.files?.find(_ => _.id == fileId)
+      if (fileToOpen != null && !fileToOpen.is_directory) {
+        const type = fileType(fileToOpen);
+        fetch(fileToOpen.content_uri).then(_ => _.text().then(text => {
+          editorContent.current = text;
+          setFile({id: fileToOpen.id, content: text, type});
+        }));
+      } else {
+        navigate(`/project/${projectId}`);
+      }
+    }
   }
 
   function onFileTreeDelete(fileId: string) {
@@ -172,7 +182,7 @@ export default function Project({api} : {api: Api}) {
 
       <div style={{width: "17.5%", height: "calc(100vh - 0.5in - 1px)"}}>
         {
-          isLoaded
+          project != null
           ? <Filetree api={api} project={project} onDelete={onFileTreeDelete} onOpen={onFileTreeOpen}/>
           : <div className="d-flex align-items-center mt-3" style={{width: "100%"}}>
               <Spinner size="sm" className="ms-auto"/>
@@ -195,7 +205,7 @@ export default function Project({api} : {api: Api}) {
           <Editor language={file.type} value={file.content} onUpdate={onUpdate} >
             {(editor: any) => <BasicSetup editor={editor}/>}
           </Editor> :
-          (isLoaded ? <NoFileOpened/> : <></>)
+          (project != null ? <NoFileOpened/> : <></>)
         }
   
         { 
@@ -209,8 +219,6 @@ export default function Project({api} : {api: Api}) {
 
 
       </Stack>
-
-
     </Stack>
   </Stack>
   );

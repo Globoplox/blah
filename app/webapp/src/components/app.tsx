@@ -9,6 +9,7 @@ import { useNavigate } from "react-router";
 
 /*
   TODO:
+  - USE PATH instead onf file id, remove file ids entierly and use project_id + path
   - ACL
   - mkdir -p 
   - All commands
