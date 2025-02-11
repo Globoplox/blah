@@ -59,13 +59,28 @@ class JobFileSystem < Toolchain::Filesystem
   end
 
   def absolute(path : String, root = nil) : String
-    newPath = if root
-      Path[path].expand(base: root).to_s
+    components = path.split(":")
+    if components.size == 1
+      user_id = @user_name
+      project_id = @project_name
+      path = components[0]
+    elsif components.size == 2
+      user_id = @user_name
+      project_id = components[0]
+      path = components[1]
+    elsif components.size == 3
+      user_id = components[0]
+      project_id = components[1]
+      path = components[2]
     else
-      Path[path].expand.to_s
+      @events.fatal!("Invalid path #{path}") {}
     end
-    newPath = newPath.lstrip "/" if newPath.includes? ':'
-    newPath
+
+    if path.starts_with? "/"
+      [user_id, project_id, path].compact.join ':'
+    else
+      [user_id, project_id, Path[root || "/"].join(Path[path].relative_to(root || "/")).normalize.to_s].compact.join ':'
+    end
   end
   
   # TODO limit maximum individual file size
@@ -80,7 +95,7 @@ class JobFileSystem < Toolchain::Filesystem
       rewind
       content_type = "text/plain"
       
-      file = @files.read_by_path(@project_id, @path)
+      file = @files.read(@project_id, @path)
       if file
         blob_id = file.blob_id
         if blob_id
@@ -114,46 +129,40 @@ class JobFileSystem < Toolchain::Filesystem
   end
 
   def open(path : String, mode : String) : IO
-    pp "OPENIN #{path} #{mode} (#{@user_name}, #{@project_name})"
 
+    pp "OPEN PATH: '#{path}'"
 
-    components = path.split(":")
-    user_id = @user_id
-    project_id = @project_id
+    user_name, project_name, path = absolute(path, "/").split(":")
 
-    if components.size == 2
+    pp "TRANSLATED TO: '#{user_name}' '#{project_name}' '#{path}'"
+
+    if user_name == @user_name
       user_id = @user_id
-      project = @projects.get_by_user_and_name(user_id, components[0])
-      if project.nil?
-        @events.with_context "Opening '#{path}'" do
-          @events.fatal!("Project '#{components[0]}' not found") {}
-        end
-      end
-      project_id = project.id
-      path = components[1]
-    
-    elsif components.size == 3
-      user = @users.get_by_name(components[0])
+    else
+      user = @users.get_by_name(user_name)
       if user.nil?
         @events.with_context "Opening '#{path}'" do
-          @events.fatal!("User '#{components[0]}' not found") {}
+          @events.fatal!("User '#{user_name}' not found") {}
         end
       end
       user_id = user.id
+    end
 
-      project = @projects.get_by_user_and_name(user_id, components[1])
+    if user_id == @user_id && project_name == @project_name
+      project_id = @project_id
+    else
+      project = @projects.get_by_user_and_name(user_id, project_name)
       if project.nil?
         @events.with_context "Opening '#{path}'" do
-          @events.fatal!("Project '#{components[1]}' not found") {}
+          @events.fatal!("Project '#{project_name}' not found") {}
         end
       end
       project_id = project.id
-      path = components[2]
     end
 
     case mode
     when "r"
-      file = @files.read_by_path(project_id, path)
+      file = @files.read(project_id, path)
 
       if file.nil?
         @events.fatal!(title: "File '#{path}' does not exists") {}

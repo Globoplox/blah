@@ -47,7 +47,6 @@ CREATE TABLE projects
 
 CREATE TABLE project_files
 (
-    id              UUID PRIMARY KEY                NOT NULL DEFAULT gen_random_uuid(),
     project_id      UUID REFERENCES projects        NOT NULL,
     blob_id         UUID REFERENCES blobs           UNIQUE,
     is_directory    BOOLEAN                         GENERATED ALWAYS AS (blob_id IS NULL) STORED,
@@ -57,5 +56,5 @@ CREATE TABLE project_files
     authored_at     TIMESTAMPTZ                     NOT NULL DEFAULT NOW(),
     file_edited_at  TIMESTAMPTZ                     NOT NULL DEFAULT NOW(),
     created_at      TIMESTAMPTZ                     NOT NULL DEFAULT NOW(),
-    UNIQUE(project_id, path)
+    PRIMARY KEY(project_id, path)
 );

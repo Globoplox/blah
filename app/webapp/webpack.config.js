@@ -46,8 +46,7 @@ module.exports = {
   devServer: {
     hot: true,
     port: 8080,
-    historyApiFallback: true
-
+    historyApiFallback: { index: "/", disableDotRule: true },
 },
 
   plugins: [

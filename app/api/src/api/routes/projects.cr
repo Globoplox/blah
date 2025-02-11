@@ -54,7 +54,7 @@ class Api
     
     class File
       include JSON::Serializable
-      property id : UUID
+      property project_id : UUID
       property path : String
       property is_directory : Bool
       property content_uri : String?
@@ -63,7 +63,7 @@ class Api
       property author_name : String
       property editor_name : String
 
-      def initialize(@id, @path, @is_directory, @content_uri, @created_at, @file_edited_at, @author_name, @editor_name)
+      def initialize(@project_id, @path, @is_directory, @content_uri, @created_at, @file_edited_at, @author_name, @editor_name)
       end
     end
 
@@ -87,7 +87,7 @@ class Api
       owner_name: project.owner_name,
       files: files.map do |file|
         Response::Project::File.new(
-          id: file.id,
+          project_id: file.project_id,
           path: file.path,
           created_at: file.created_at,
           file_edited_at: file.file_edited_at,

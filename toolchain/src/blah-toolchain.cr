@@ -187,7 +187,7 @@ class Toolchain
         object.to_io(output)
       end
     end
-    @events.event(:success, "Succesfully assembled #{@events.emphasis(@fs.normalize source)} into '#{@fs.normalize destination}'")
+    @events.event(:success, "Successfully assembled #{@events.emphasis(@fs.normalize source)} into '#{@fs.normalize destination}'")
   end
 
   def compile(source : String, destination : String)
@@ -200,7 +200,7 @@ class Toolchain
         object.to_io(output)
       end
     end
-    @events.event(:success, "Succesfully compiled #{@events.emphasis(@fs.normalize source)} into '#{@fs.normalize destination}'")
+    @events.event(:success, "Successfully compiled #{@events.emphasis(@fs.normalize source)} into '#{@fs.normalize destination}'")
   end
 
   def lib(sources : Indexable(String), destination : String)
@@ -223,7 +223,7 @@ class Toolchain
         libfile.to_io(output)
       end
     end
-    @events.event(:success, "Succesfully built lib '#{@events.emphasis(@fs.normalize destination)}'")
+    @events.event(:success, "Successfully built lib '#{@events.emphasis(@fs.normalize destination)}'")
   end
 
   def merge(sources : Indexable(String), destination : String, dce : Bool = true) 
@@ -248,7 +248,7 @@ class Toolchain
         object.to_io(output)
       end
     end
-    @events.event(:success, "Succesfully merged '#{@events.emphasis(@fs.normalize destination)}'")
+    @events.event(:success, "Successfully merged '#{@events.emphasis(@fs.normalize destination)}'")
   end
 
   def link(source : String, destination : String)
@@ -269,7 +269,7 @@ class Toolchain
         IO.copy src: raw, dst: output
       end
     end
-    @events.event(:success, "Succesfully linked '#{@events.emphasis(@fs.normalize destination)}'")
+    @events.event(:success, "Successfully linked '#{@events.emphasis(@fs.normalize destination)}'")
   end
  
   def run(source : String, io_mapping : Hash(String, {IO, IO})) : Void

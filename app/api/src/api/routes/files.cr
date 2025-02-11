@@ -20,7 +20,7 @@ class Api
     # Check that parent directory exists
     components = file.path.split('/')
     base = (components[0...(components.size - 1)] + [""]).join "/"
-    unless @files.directory_exists?(base)
+    unless @files.directory_exists?(project_id, base)
       raise Error.bad_parameter "path", "parent directory '#{base}' does not exist"
     end
 
@@ -39,22 +39,22 @@ class Api
       acl: Storage::ACL::Private
     )
 
-    file_id = @files.insert(
+    error = @files.insert(
       project_id: project_id,
       author_id: user_id,
       blob_id: blob_id,
       path: file.path
     )
 
-    case file_id
+    case error
     when Repositories::Files::DuplicatePathError
       raise Error.bad_parameter "path", "a file with the same path already exists"
     end
 
-    file = @files.read file_id
+    file = @files.read(project_id, file.path).not_nil!
     ctx.response.status = HTTP::Status::CREATED
     ctx << Response::Project::File.new(
-      id: file.id,
+      project_id: file.project_id,
       path: file.path,
       created_at: file.created_at,
       file_edited_at: file.file_edited_at,
@@ -78,26 +78,26 @@ class Api
     # Check that parent directory exists
     components = file.path.split('/')
     base = (components[0...(components.size - 2)] + [""]).join "/"
-    unless @files.directory_exists?(base)
+    unless @files.directory_exists?(project_id, base)
       raise Error.bad_parameter "path", "parent directory '#{base}' does not exist"
     end    
 
-    file_id = @files.insert(
+    error = @files.insert(
       project_id: project_id,
       author_id: user_id,
       blob_id: nil,
       path: file.path
     )
 
-    case file_id
+    case error
     when Repositories::Files::DuplicatePathError
       raise Error.bad_parameter "path", "a directory with the same path already exists"
     end
 
-    file = @files.read file_id
+    file = @files.read(project_id, file.path).not_nil!
     ctx.response.status = HTTP::Status::CREATED
     ctx << Response::Project::File.new(
-      id: file.id,
+      project_id: file.project_id,
       path: file.path,
       created_at: file.created_at,
       file_edited_at: file.file_edited_at,
@@ -113,13 +113,13 @@ class Api
     property content : String
   end
 
-  route PUT, "/projects/:project_id/files/:file_id", def update_file(ctx)
+  route PUT, "/projects/:project_id/files/*", def update_file(ctx)
     user_id = authenticate(ctx)
     project_id = UUID.new ctx.path_parameter "project_id"
-    file_id = UUID.new ctx.path_parameter "file_id"
+    file_path = ctx.path_wildcard
     file = ctx >> Request::UpdateFile
     
-    blob_id = @files.get_blob_id(file_id)
+    blob_id = @files.get_blob_id(project_id, file_path)
 
     raise "No a file, cannot put content in a directory" unless blob_id
 
@@ -127,7 +127,7 @@ class Api
     size = file.content.size
 
     @storage.put(
-      data: file.content, 
+      data: file.content,
       mime: content_type, 
       name: blob_id.to_s,
       acl: Storage::ACL::Private
@@ -135,12 +135,12 @@ class Api
 
     @blobs.update(blob_id, size)
 
-    @files.edit(file_id: file_id, editor_id: user_id)
+    @files.edit(project_id: project_id, path: file_path, editor_id: user_id)
 
-    file = @files.read file_id
+    file = @files.read(project_id: project_id, path: file_path).not_nil!
     ctx.response.status = HTTP::Status::CREATED
     ctx << Response::Project::File.new(
-      id: file.id,
+      project_id: file.project_id,
       path: file.path,
       created_at: file.created_at,
       file_edited_at: file.file_edited_at,
@@ -151,13 +151,13 @@ class Api
     )
   end
 
-  route DELETE, "/projects/:project_id/files/:file_id", def delete_file(ctx)
+  route DELETE, "/projects/:project_id/files/*", def delete_file(ctx)
     user_id = authenticate(ctx)
     project_id = UUID.new ctx.path_parameter "project_id"
-    file_id = UUID.new ctx.path_parameter "file_id"
+    file_path = ctx.path_wildcard
 
-    blob_id = @files.get_blob_id(file_id)
-    @files.delete(file_id: file_id)
+    blob_id = @files.get_blob_id(project_id: project_id, path: file_path)
+    @files.delete(project_id: project_id, path: file_path)
     blob_id.try do |blob_id|
       @storage.delete(blob_id.to_s)
       @blobs.delete(blob_id)
@@ -168,16 +168,16 @@ class Api
 
   class Request::MoveFile
     include JSON::Serializable
+    property old_path : String
     property new_path : String
   end
 
-  route PUT, "/projects/:project_id/files/:file_id/move", def move_file(ctx)
+  route PUT, "/projects/:project_id/files/move", def move_file(ctx)
     user_id = authenticate(ctx)
     project_id = UUID.new ctx.path_parameter "project_id"
-    file_id = UUID.new ctx.path_parameter "file_id"
     file = ctx >> Request::MoveFile
 
-    if @files.is_directory? file_id      
+    if @files.is_directory? project_id: project_id, path: file.old_path      
       # Check path is a valid file path
       Validations.validate! do
         accumulate "path", check_directory_path file.new_path
@@ -185,7 +185,7 @@ class Api
       # Check that parent directory exists
       components = file.new_path.split('/')
       base = (components[0...(components.size - 2)] + [""]).join "/"
-      unless @files.directory_exists?(base)
+      unless @files.directory_exists?(project_id, base)
         raise Error.bad_parameter "path", "parent directory '#{base}' does not exist"
       end
 
@@ -197,12 +197,12 @@ class Api
       # Check that parent directory exists
       components = file.new_path.split('/')
       base = (components[0...(components.size - 1)] + [""]).join "/"
-      unless @files.directory_exists?(base)
+      unless @files.directory_exists?(project_id, base)
         raise Error.bad_parameter "path", "parent directory '#{base}' does not exist"
       end
     end
 
-    duplicate = @files.move(file_id, file.new_path, user_id)
+    duplicate = @files.move(project_id, file.old_path, file.new_path, user_id)
     if duplicate
       raise Error.bad_parameter "new_path", "a file with the same path already exists"
     else

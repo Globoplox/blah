@@ -39,8 +39,9 @@ class Api
         ctx << Error::NotFound.new "Websocket #{ctx.request.path}"
         socket.close
       else
-        handler, path_parameters = routes.first
+        handler, path_parameters, wildcard = routes.first
         ctx.path_parameters = path_parameters
+        ctx.path_wildcard = wildcard
         begin
           handler.call self, socket, ctx
         rescue error : Error
@@ -73,8 +74,9 @@ class Api
         if routes.empty?
           ctx << Error::NotFound.new "Route #{ctx.request.method} #{ctx.request.path}"
         else
-          handler, path_parameters = routes.first
+          handler, path_parameters, wildcard = routes.first
           ctx.path_parameters = path_parameters
+          ctx.path_wildcard = wildcard
           begin
             handler.call self, ctx
           rescue error : Error

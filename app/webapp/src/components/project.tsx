@@ -30,10 +30,19 @@ import Terminal from "./terminal";
 export default function Project({api} : {api: Api}) {
   const navigate = useNavigate();
 
-  const {projectId, fileId} = useParams();
+  const params = useParams();
+  const projectId = params["projectId"];
+  let filePath = params["*"];
+
+  if (filePath == undefined)
+    filePath = null;
+  else
+    filePath = `/${filePath}`;
+
+  console.log("PARAMS", params);
   
   const [project, setProject] = useState(null as Project);
-  const [file, setFile] = useState(null as {content: string, type: string, id: string});
+  const [file, setFile] = useState(null as {content: string, type: string, path: string});
 
   // Editor content. The deitor is NOT controlled, so this is a ref.
   const editorContent = useRef("");
@@ -45,7 +54,7 @@ export default function Project({api} : {api: Api}) {
   // When the project change, load the project
   const loadProject = useEffect(() => doLoadProject(), [projectId]);
   // When the project file change, or a project is loaded, load the file
-  const loadFile = useEffect(() => doLoadFile(), [project, fileId]);
+  const loadFile = useEffect(() => doLoadFile(), [project, filePath]);
   // Terminal job socket
   const [socket, setSocket] = useState(null);
 
@@ -55,7 +64,7 @@ export default function Project({api} : {api: Api}) {
       if (syncTimeoutId.current != null) {
         clearTimeout(syncTimeoutId.current);
         syncTimeoutId.current = null;
-        api.update_file(project.id, file.id, editorContent.current);
+        api.update_file(project.id, file.path, editorContent.current);
       }
     }
     document.body.addEventListener("mouseleave", onMayLeavePage);
@@ -69,13 +78,17 @@ export default function Project({api} : {api: Api}) {
   }
 
   function doLoadFile() {
-    if (project != null && fileId != null) {
-      const fileToOpen = project.files?.find(_ => _.id == fileId)
+    console.log("ON DO LOAD FILE", project, filePath)
+
+    if (project != null && filePath != null) {
+      const fileToOpen = project.files?.find(_ => _.path == filePath)
+      console.log("FOUND FILE", fileToOpen)
+
       if (fileToOpen != null && !fileToOpen.is_directory) {
         const type = fileType(fileToOpen);
         fetch(fileToOpen.content_uri).then(_ => _.text().then(text => {
           editorContent.current = text;
-          setFile({id: fileToOpen.id, content: text, type});
+          setFile({path: fileToOpen.path, content: text, type});
         }));
       } else {
         navigate(`/project/${projectId}`);
@@ -83,8 +96,8 @@ export default function Project({api} : {api: Api}) {
     }
   }
 
-  function onFileTreeDelete(fileId: string) {
-    if (fileId === file?.id) {
+  function onFileTreeDelete(filePath: string) {
+    if (filePath === file?.path) {
       if (syncTimeoutId.current)
         clearTimeout(syncTimeoutId.current);
       syncTimeoutId.current = null;
@@ -108,7 +121,8 @@ export default function Project({api} : {api: Api}) {
   }
   
   function onFileTreeOpen(fileToOpen: ProjectFile) {
-    if (file != null && fileToOpen.id == file.id)
+    console.log("ON FILE OPEN", file, fileToOpen)
+    if (file != null && fileToOpen.path == file.path)
       return;
    
     const type = fileType(fileToOpen);
@@ -116,10 +130,10 @@ export default function Project({api} : {api: Api}) {
     if (syncTimeoutId.current != null) {
       clearTimeout(syncTimeoutId.current);
       syncTimeoutId.current = null;
-      api.update_file(project.id, file.id, editorContent.current);
+      api.update_file(project.id, file.path, editorContent.current);
     }
 
-    navigate(`/project/${projectId}/file/${fileToOpen.id}`);
+    navigate(`/project/${projectId}/file${fileToOpen.path}`);
   }
 
   function onUpdate(value: string, editor: PrismEditor) {
@@ -129,22 +143,22 @@ export default function Project({api} : {api: Api}) {
 
     if (syncTimeoutId.current == null) {
       syncTimeoutId.current = setTimeout(() => {
-        api.update_file(project.id, file.id, editorContent.current);
+        api.update_file(project.id, file.path, editorContent.current);
         syncTimeoutId.current = null;
       }, 5000);
     }
   }
 
 
-  function onRunFile(fileId : string) {
+  function onRunFile(filePath : string) {
     // Flush
     if (syncTimeoutId.current != null) {
       clearTimeout(syncTimeoutId.current);
       syncTimeoutId.current = null;
-      api.update_file(project.id, file.id, editorContent.current);
+      api.update_file(project.id, file.path, editorContent.current);
     }
     // Open socket
-    const fileToRun = project.files?.find(_ => _.id == fileId)
+    const fileToRun = project.files?.find(_ => _.path == filePath)
     api.run_file(project.id, fileToRun.path, (newSocket: WebSocket) => {
       (socket as WebSocket)?.close();
       newSocket.onopen = () => {
@@ -196,7 +210,7 @@ export default function Project({api} : {api: Api}) {
       <Stack direction="vertical" style={{height: "calc(100vh - 0.5in - 1px)"}}>
         {
           (file != null && file.type == "json") ?
-          <Button style={{position: "absolute", top: 0, right: 0}} onClick={() => onRunFile(file.id)}>Run</Button> :
+          <Button style={{position: "absolute", top: 0, right: 0}} onClick={() => onRunFile(file.path)}>Run</Button> :
           <></>
         }
 

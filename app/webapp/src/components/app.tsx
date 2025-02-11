@@ -9,7 +9,6 @@ import { useNavigate } from "react-router";
 
 /*
   TODO:
-  - USE PATH instead onf file id, remove file ids entierly and use project_id + path
   - ACL
   - mkdir -p 
   - All commands
@@ -35,7 +34,7 @@ export default function App() {
       <Route path="register" element={<Register api={api}/>} />
       <Route path="project">
         <Route path="create" element={<CreateProject api={api} />} />
-        <Route path=":projectId/file?/:fileId?" element={<Project api={api} />} />
+        <Route path=":projectId/file?/*" element={<Project api={api} />} />
       </Route>
     </Routes>
   </BrowserRouter>;

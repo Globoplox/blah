@@ -9,7 +9,7 @@ import Toast from 'react-bootstrap/Toast';
 import ToastContainer from 'react-bootstrap/ToastContainer';
 import "./filetree.scss";
 
-type NodeData = {id: string, name: string, children: NodeData[], isRoot?: boolean, apiId?: string}
+type NodeData = {id: string, name: string, children: NodeData[], isRoot?: boolean}
 type Toast = {id: number, body: string}
 
 export default function Filetree({api, project, onOpen = null, onDelete = null}: {
@@ -38,13 +38,13 @@ export default function Filetree({api, project, onOpen = null, onDelete = null}:
       if (file.is_directory) {
         const components = file.path.split('/');
         const base = components.slice(0, components.length - 2).join('/');
-        const node = {id: file.path, name: `${components[components.length - 2]}`, children: [] as any[], apiId: file.id};
+        const node = {id: file.path, name: `${components[components.length - 2]}`, children: [] as any[]};
         hash[`${base}/`].children.push(node);
         hash[node.id] = node;
       } else {
         const components = file.path.split('/');
         const base = components.slice(0, components.length - 1).join('/');
-        const node = {id: file.path, name: components[components.length - 1], apiId: file.id};
+        const node = {id: file.path, name: components[components.length - 1]};
         hash[`${base}/`].children.push(node);
         hash[node.id] = node;  
       }
@@ -81,11 +81,11 @@ export default function Filetree({api, project, onOpen = null, onDelete = null}:
   function onDeleteInternal({ids, nodes}: {ids: string[], nodes: NodeApi<NodeData>[]}) {
     nodes.forEach(node => {
       if (node.data.id != "/") {
-        api.delete_file(project.id, node.data.apiId).then(_ => {
+        api.delete_file(project.id, node.data.id).then(_ => {
           const toKeep = projectFiles.current.filter(file => {
             const keep = !((file.path === node.data.id) || (node.isInternal && file.path.startsWith(node.data.id)))
             if (!keep)
-              onDelete?.(file.id);
+              onDelete?.(file.path);
             return keep;
           });
           projectFiles.current = toKeep;
@@ -104,7 +104,7 @@ export default function Filetree({api, project, onOpen = null, onDelete = null}:
     dragNodes.forEach(node => {
       const newPath = `${parentId}${node.data.name}${node.isLeaf ? "" : "/"}`;
 
-      api.move_file(project.id, node.data.apiId, newPath).then(_ => {
+      api.move_file(project.id, node.data.id, newPath).then(_ => {
         projectFiles.current.find(_ => _.path == node.data.id).path = newPath;
         const newTree = projectToTree(project, projectFiles.current);
         setTree(newTree);
@@ -191,7 +191,7 @@ export default function Filetree({api, project, onOpen = null, onDelete = null}:
                 components[components.length - 1] = name;
               const path = components.join('/');
 
-              api.move_file(project.id, file.id, path).then(_ => {
+              api.move_file(project.id, file.path, path).then(_ => {
                 node.submit(name);
               }).catch(error => {
                 if (error.code == ErrorCode.BadParameter)

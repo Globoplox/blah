@@ -7,6 +7,7 @@ class Api
     property request : HTTP::Request
     property response : HTTP::Server::Response
     property path_parameters : Hash(String, String)?
+    property path_wildcard : String?
 
     delegate :status, :status=, to: @response
 
@@ -26,7 +27,11 @@ class Api
     end
 
     def path_parameter(name)
-      path_parameters.not_nil![name]
+      @path_parameters.not_nil![name]
+    end
+
+    def path_wildcard : String
+      @path_wildcard.not_nil!
     end
 
     def initialize(ctx : HTTP::Server::Context)

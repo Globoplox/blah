@@ -102,7 +102,7 @@ module Repositories
 
     class File
       include DB::Serializable
-      property id : UUID
+      property project_id : UUID
       property path : String
       property author_id : UUID
       property editor_id : UUID
@@ -114,15 +114,14 @@ module Repositories
       property is_directory : Bool
     end
 
-    abstract def insert(project_id : UUID, blob_id : UUID?, path : String, author_id : UUID) : UUID | DuplicatePathError
-    abstract def delete(file_id : UUID)
-    abstract def move(file_id : UUID, to_path : String, editor_id : UUID) : DuplicatePathError?
-    abstract def edit(file_id : UUID, editor_id : UUID)
+    abstract def insert(project_id : UUID, blob_id : UUID?, path : String, author_id : UUID) : DuplicatePathError?
+    abstract def delete(project_id : UUID, path : String)
+    abstract def move(project_id : UUID, path : String, to_path : String, editor_id : UUID) : DuplicatePathError?
+    abstract def edit(project_id : UUID, path : String, editor_id : UUID)
     abstract def list(project_id : UUID) : Array(File)
-    abstract def get_blob_id(file_id : UUID) : UUID?
-    abstract def directory_exists?(path : String) : Bool
-    abstract def is_directory?(file_id : UUID) : Bool
-    abstract def read(file_id : UUID) : File
-    abstract def read_by_path(project_id : UUID, path : String) : File?
+    abstract def get_blob_id(project_id : UUID, path : String) : UUID?
+    abstract def directory_exists?(project_id : UUID, path : String) : Bool
+    abstract def is_directory?(project_id : UUID, path : String) : Bool
+    abstract def read(project_id : UUID, path : String) : File?
   end
 end

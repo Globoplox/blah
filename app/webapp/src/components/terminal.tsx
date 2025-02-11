@@ -19,7 +19,6 @@ import { BrowserRouter, Routes, Route, useBeforeUnload } from "react-router";
 import { useNavigate } from "react-router";
 import { XTerm } from "@pablo-lion/xterm-react";
 import { AttachAddon } from '@xterm/addon-attach';
-import "./terminal.scss";
 
 export default function Terminal({socket}: {socket: WebSocket}) {
 

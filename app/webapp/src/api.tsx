@@ -17,7 +17,7 @@ export type ParameterError = {code: ErrorCode.BadParameter, error: string, messa
 export type Error = ParameterError | BaseError
 
 export type File = {
-  id: string,
+  project_id: string,
   path: string,
   content_uri: string,
   created_at: string,
@@ -154,10 +154,10 @@ export class Api {
     }, this.mapNetworkError)
   }
 
-  move_file(project_id: string, file_id: string, path: string) : Promise<null> {
-    const body = {new_path: path};
+  move_file(project_id: string, old_path: string, new_path: string) : Promise<null> {
+    const body = {old_path, new_path};
     return fetch(
-      `${API_SERVER_URI}/projects/${project_id}/files/${file_id}/move`, {method: "PUT", headers: this.#headers, credentials: 'include', body: JSON.stringify(body)}
+      `${API_SERVER_URI}/projects/${project_id}/files/move`, {method: "PUT", headers: this.#headers, credentials: 'include', body: JSON.stringify(body)}
     ).then(response => {
       if (response.ok)
         return null
@@ -166,9 +166,9 @@ export class Api {
     }, this.mapNetworkError) as unknown as Promise<null>
   }
 
-  delete_file(project_id: string, file_id: string) : Promise<null> {
+  delete_file(project_id: string, path: string) : Promise<null> {
     return fetch(
-      `${API_SERVER_URI}/projects/${project_id}/files/${file_id}`, {method: "DELETE", headers: this.#headers, credentials: 'include'}
+      `${API_SERVER_URI}/projects/${project_id}/files${path}`, {method: "DELETE", headers: this.#headers, credentials: 'include'}
     ).then(response => {
       if (response.ok)
         return null
@@ -177,10 +177,10 @@ export class Api {
     }, this.mapNetworkError) as unknown as Promise<null>
   }
 
-  update_file(project_id: string, file_id: string, content: string) : Promise<File> {
+  update_file(project_id: string, path: string, content: string) : Promise<File> {
     const body = {content};
     return fetch(
-      `${API_SERVER_URI}/projects/${project_id}/files/${file_id}`, {method: "PUT", headers: this.#headers, credentials: 'include', body: JSON.stringify(body)}
+      `${API_SERVER_URI}/projects/${project_id}/files${path}`, {method: "PUT", headers: this.#headers, credentials: 'include', body: JSON.stringify(body)}
     ).then(response => {
       if (response.ok)
         return response.json()
