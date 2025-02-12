@@ -10,10 +10,6 @@ import { useNavigate } from "react-router";
 /*
   TODO:
   - ACL
-  - mkdir -p 
-  - All commands
-  - Serverside Notification for file move/add/del => notif works, now need to apply them: 
-    # update project.files
   - Markdown
   - Debugger might actually works as is with xtermjs
   - Might need a bigger tty for this

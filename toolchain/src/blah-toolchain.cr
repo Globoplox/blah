@@ -273,18 +273,25 @@ class Toolchain
   end
  
   def run(source : String, io_mapping : Hash(String, {IO, IO})) : Void
+    run(source, io_mapping) {}
+  end
+
+  def run(source : String, io_mapping : Hash(String, {IO, IO}), &) : Void
+    vm = nil  
     @events.with_context "running '#{@fs.normalize source}'" do 
       bytes = @fs.read source do |input|
         input.getb_to_end
       end
-        
-      RiSC16::VM.from_spec(spec, @fs, io_mapping).tap do |vm|
-        vm.load(bytes, at: 0)
-        @events.event(:success, "Running ... '#{@events.emphasis(@fs.normalize destination)}'")
-        vm.run
-        @events.event(:success, "Ran '#{@events.emphasis(@fs.normalize destination)}'")
-        vm.close
-      end
+      vm = RiSC16::VM.from_spec(spec, @fs, io_mapping)
+      vm.load(bytes, at: 0)
     end
+    return unless vm
+    @events.event(:success, "Running ... '#{@events.emphasis(@fs.normalize source)}'")
+    @events.with_context "running '#{@fs.normalize source}'" do 
+      vm.run
+      yield
+    end
+    @events.event(:success, "Ran '#{@events.emphasis(@fs.normalize source)}'")
+    vm.close
   end
 end

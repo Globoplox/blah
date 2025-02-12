@@ -20,7 +20,7 @@ class Api
     # Check that parent directory exists
     components = file.path.split('/')
     base = (components[0...(components.size - 1)] + [""]).join "/"
-    unless @files.is_directory?(project_id, base)
+    unless base == "/" || @files.is_directory?(project_id, base)
       raise Error.bad_parameter "path", "parent directory '#{base}' does not exist"
     end
 
@@ -80,7 +80,7 @@ class Api
     # Check that parent directory exists
     components = file.path.split('/')
     base = (components[0...(components.size - 2)] + [""]).join "/"
-    unless @files.is_directory?(project_id, base)
+    unless base == "/" || @files.is_directory?(project_id, base)
       raise Error.bad_parameter "path", "parent directory '#{base}' does not exist"
     end    
 
@@ -202,7 +202,7 @@ class Api
       # Check that parent directory exists
       components = file.new_path.split('/')
       base = (components[0...(components.size - 1)] + [""]).join "/"
-      unless @files.is_directory?(project_id, base)
+      unless base == "/" || @files.is_directory?(project_id, base)
         raise Error.bad_parameter "path", "parent directory '#{base}' does not exist"
       end
     end

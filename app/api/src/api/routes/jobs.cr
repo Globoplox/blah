@@ -92,6 +92,20 @@ class Api
     ctx << job
   end
 
+  # A write only IO that wrap a socket.
+  class SocketIO < ::IO
+    def initialize(@socket : HTTP::WebSocket)
+    end
+
+    def read(slices : Bytes) : Int32
+      0
+    end
+
+    def write(slice : Bytes) : Nil
+      @socket.send slice
+    end
+  end
+
   # Job create put the job on redis
   # initialize bind the receiving api and the job
   # status read redis
@@ -99,7 +113,6 @@ class Api
   # stop check and broadcast
   # pause check and broadcast
   # on broadcast, if api is bound to job, do the task
-
   websocket GET, "/project/:project_id/job/:job_id/initialize", def open_job_tty(socket, ctx)
     user_id = authenticate(ctx)
     project_id = UUID.new ctx.path_parameter "project_id"
@@ -132,7 +145,51 @@ class Api
     
       recipe.commands.each do |command|
         case command
+        when Recipe::Command::Assemble then toolchain.assemble(command.source, command.destination)
         when Recipe::Command::Compile then toolchain.compile(command.source, command.destination)
+        when Recipe::Command::Lib then toolchain.lib(command.sources, command.destination)
+        when Recipe::Command::Merge then toolchain.merge(command.sources, command.destination)
+        when Recipe::Command::Link then toolchain.link(command.source, command.destination)
+        when Recipe::Command::Run
+
+          io_mapping = {} of String => {IO, IO}
+          socket_pipe_output, socket_pipe_input = IO.pipe
+          socket_output = SocketIO.new socket
+          
+          socket.on_message do |message|
+            # The terminal on the other end will automatically transform '\n' it receive from us into '\r\n'
+            # but when end-user hit enter, the terminal send a '\r', not a '\n'
+            message = message.gsub "\r", "\n"
+            eot_index = message.chars.index(&.== '\u{4}')
+            if eot_index
+              socket_pipe_input.write message[start: 0, count: eot_index].to_slice
+              socket_pipe_input.close
+            else
+              socket_pipe_input.write message.to_slice
+            end
+          end
+
+          spawn do
+            socket.run
+            socket_pipe_input.close
+            socket_pipe_output.close
+          end
+
+          toolchain.spec.segments.each do |segment|
+            case segment
+            when RiSC16::Spec::Segment::IO
+              name = segment.name
+              if name && segment.tty && segment.source.nil?
+                io_mapping[name] = {socket_pipe_output, socket_output}
+              end
+            end
+          end
+
+          toolchain.run(command.source, io_mapping) do
+            socket_output.puts
+            socket_output.flush
+          end
+
         end
       end
 
@@ -140,9 +197,11 @@ class Api
       job.success = true
       # remove all local trace (socket, fiber ref)
       # Set to cache, keep for 24 hours
+      socket.close
     rescue ex
       Log.error exception: ex, &.emit "Exception during job start"
       job.completed = true
+      socket.close
       # remove all local trace (socket, fiber ref)
       # Set to cache, keep for 24 hours
     end

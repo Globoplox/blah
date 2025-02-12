@@ -67,7 +67,7 @@ module Clients::Cli
         STDERR << '\n'
       end
      
-      STDERR.puts
+      STDERR.puts if !@context.empty?
     end
   
   end

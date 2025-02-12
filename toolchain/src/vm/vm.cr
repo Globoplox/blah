@@ -89,7 +89,8 @@ class RiSC16::VM
 
       def read(address : Word) : Word
         raise BusError.new address unless address == @start
-        @read.try &.read_byte.try &.to_u16 || EOS
+        value = @read.try &.read_byte.try &.to_u16 || EOS
+        return value
       end
 
       def write(address : Word, value : Word)
