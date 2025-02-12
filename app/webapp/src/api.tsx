@@ -27,6 +27,11 @@ export type File = {
   is_directory: boolean
 }
 
+export type ProjectNotification = 
+  {event: 'created', file: File} | 
+  {event: 'moved', old_path: string, file: File} | 
+  {event: 'deleted', path: string}
+
 export type Project = {
   id: string,
   name: string,
@@ -189,7 +194,14 @@ export class Api {
     }, this.mapNetworkError) as unknown as Promise<null>
   }
 
-  run_file(project_id: string, path: string, handler: (socket: WebSocket) => void) : Promise<File> {
+  register_notification(project_id: string, handler: (socket: WebSocket) => void) : void {
+    const socket = new WebSocket(`${API_SERVER_URI}/projects/${project_id}/notifications`);
+    socket.addEventListener("open", _ => {
+      handler(socket);
+    });
+  }
+
+  run_file(project_id: string, path: string, handler: (socket: WebSocket) => void) : Promise<null> {
     return fetch(
       `${API_SERVER_URI}/job/create`, {method: "POST", headers: this.#headers, credentials: 'include', body: JSON.stringify({path})}
     ).then(response => {

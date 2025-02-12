@@ -20,7 +20,7 @@ class Api
     # Check that parent directory exists
     components = file.path.split('/')
     base = (components[0...(components.size - 1)] + [""]).join "/"
-    unless @files.directory_exists?(project_id, base)
+    unless @files.is_directory?(project_id, base)
       raise Error.bad_parameter "path", "parent directory '#{base}' does not exist"
     end
 
@@ -51,6 +51,8 @@ class Api
       raise Error.bad_parameter "path", "a file with the same path already exists"
     end
 
+    @notifications.create_file(project_id, file.path)
+
     file = @files.read(project_id, file.path).not_nil!
     ctx.response.status = HTTP::Status::CREATED
     ctx << Response::Project::File.new(
@@ -78,7 +80,7 @@ class Api
     # Check that parent directory exists
     components = file.path.split('/')
     base = (components[0...(components.size - 2)] + [""]).join "/"
-    unless @files.directory_exists?(project_id, base)
+    unless @files.is_directory?(project_id, base)
       raise Error.bad_parameter "path", "parent directory '#{base}' does not exist"
     end    
 
@@ -93,6 +95,8 @@ class Api
     when Repositories::Files::DuplicatePathError
       raise Error.bad_parameter "path", "a directory with the same path already exists"
     end
+
+    @notifications.create_file(project_id, file.path)
 
     file = @files.read(project_id, file.path).not_nil!
     ctx.response.status = HTTP::Status::CREATED
@@ -162,6 +166,8 @@ class Api
       @blobs.delete(blob_id)
     end
 
+    @notifications.delete_file(project_id, file_path);
+
     ctx.response.status = HTTP::Status::NO_CONTENT
   end
 
@@ -184,7 +190,7 @@ class Api
       # Check that parent directory exists
       components = file.new_path.split('/')
       base = (components[0...(components.size - 2)] + [""]).join "/"
-      unless @files.directory_exists?(project_id, base)
+      unless @files.is_directory?(project_id, base)
         raise Error.bad_parameter "path", "parent directory '#{base}' does not exist"
       end
 
@@ -196,7 +202,7 @@ class Api
       # Check that parent directory exists
       components = file.new_path.split('/')
       base = (components[0...(components.size - 1)] + [""]).join "/"
-      unless @files.directory_exists?(project_id, base)
+      unless @files.is_directory?(project_id, base)
         raise Error.bad_parameter "path", "parent directory '#{base}' does not exist"
       end
     end
@@ -205,6 +211,8 @@ class Api
     if duplicate
       raise Error.bad_parameter "new_path", "a file with the same path already exists"
     else
+      @notifications.move_file(project_id, file.old_path, file.new_path);
+
       ctx.response.status = HTTP::Status::NO_CONTENT
     end
   end

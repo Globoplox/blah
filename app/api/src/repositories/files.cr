@@ -22,15 +22,8 @@ class Repositories::Files::Database < Repositories::Files
     raise ex
   end
 
-  def directory_exists?(project_id : UUID, path : String) : Bool
-    return true if path = "/"
-    @connection.scalar(<<-SQL, project_id, path).as(Bool)
-      SELECT EXISTS(SELECT 1 FROM project_files WHERE project_id = $1 AND path = $2)
-    SQL
-  end
-
   def is_directory?(project_id : UUID, path : String) : Bool
-    @connection.scalar(<<-SQL, project_id, path).as(Bool)
+    @connection.query_one?(<<-SQL, project_id, path, as: Bool?) || false
       SELECT is_directory FROM project_files WHERE project_id = $1 AND path = $2
     SQL
   end

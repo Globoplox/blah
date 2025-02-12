@@ -94,9 +94,6 @@ class Stacklang::Native::Generator
   def stack_allocate(address)
     meta = @addresses[root_id address]
     if meta.spilled_at
-      pp @codes[@index].ast.token
-      pp @codes[@index].ast
-      pp @codes[@index]
       raise "Already on stack: #{address} #{meta}" 
     end
     meta.spilled_at = @stack.allocate address

@@ -1,8 +1,5 @@
 require "./toolchain"
 
-# TODO: move again project files so docker is in the root
-# TODO: update webapp to have the terminal up project wide , not related to file (rest router outer stuff ?)
-
 class Api
 
   class Recipe
@@ -86,9 +83,22 @@ class Api
     recipe_request = ctx >> Request::RecipePath
     job_id = UUID.random
     job = Job.new job_id, user_id, recipe_request.path
+    # TODO serialize jobs to REDIS instead. Only the hash job_id => (fiber, socket) can stay local to the api 
+    # (because it cant escape the scope of a single api as it's tied to a websocket).
+    # the socket is kept so we can close it ?
+    # DO limit the amout of possible concurrent job
+    # have a route to 
     @jobs << job
     ctx << job
   end
+
+  # Job create put the job on redis
+  # initialize bind the receiving api and the job
+  # status read redis
+  # start check and broadcast
+  # stop check and broadcast
+  # pause check and broadcast
+  # on broadcast, if api is bound to job, do the task
 
   websocket GET, "/project/:project_id/job/:job_id/initialize", def open_job_tty(socket, ctx)
     user_id = authenticate(ctx)
@@ -102,12 +112,15 @@ class Api
 
     Log.info &.emit "Creating job"
 
+    socket.on_close do 
+      # Remove all trace of the job
+    end
+
     fiber = Fiber.new do
-      pp "FIBER STARTED"
       job.started = true
 
       es = JobEventStream.new socket
-      fs = JobFileSystem.new @storage, @users, @projects, @files, @blobs, project_id, user_id, es
+      fs = JobFileSystem.new @storage, @users, @projects, @files, @blobs, @notifications, project_id, user_id, es
 
       recipe = es.with_context "Reading recipe file '#{job.recipe_path}'" do 
         fs.read(job.recipe_path) do |io|
@@ -125,20 +138,28 @@ class Api
 
       job.completed = true
       job.success = true
+      # remove all local trace (socket, fiber ref)
+      # Set to cache, keep for 24 hours
     rescue ex
       Log.error exception: ex, &.emit "Exception during job start"
       job.completed = true
+      # remove all local trace (socket, fiber ref)
+      # Set to cache, keep for 24 hours
     end
 
     job.fiber = fiber
-    
-    Log.info &.emit "Starting job"
   end
 
   route PUT, "/job/:job_id/start", def start_job(ctx)
     user_id = authenticate(ctx)
     job_id = UUID.new ctx.path_parameter "job_id"
+    # check job exists
+    # just boradcast instead
+
+    # On broadcast, of the job is owned by this api
+    
     job = @jobs.find(&.id.== job_id)
+    # read from redis
     raise "No such job" unless job
     raise "Not your job" unless job.owner_id == user_id
     fiber = job.fiber
@@ -161,6 +182,8 @@ class Api
   #   raise "Job not started" unless fiber.running? || fiber.resumable?
   #   fiber.suspend
   #   @jobs.delete job
+
+
   # end
 
   # route PUT, "/job/:job_id/pause", def pause_job(ctx)

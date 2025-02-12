@@ -10,7 +10,7 @@ import { Link } from "react-router";
 import Spinner from 'react-bootstrap/Spinner';
 import Navigation from "./navigation";
 import ProjectExplorer from "./project_explorer";
-import { ErrorCode, Api, Error, ParameterError, Project, File as ProjectFile } from "../api";
+import { ErrorCode, Api, Error, ParameterError, Project, File as ProjectFile, ProjectNotification } from "../api";
 import { useParams } from "react-router";
 import { Editor, PrismEditor } from "prism-react-editor";
 import { BasicSetup } from "prism-react-editor/setups";
@@ -41,6 +41,7 @@ export default function Project({api} : {api: Api}) {
   
   const [project, setProject] = useState(null as Project);
   const [file, setFile] = useState(null as {content: string, type: string, path: string});
+  const currentEditedFilePathRef = useRef(null);
 
   // Editor content. The deitor is NOT controlled, so this is a ref.
   const editorContent = useRef("");
@@ -55,8 +56,8 @@ export default function Project({api} : {api: Api}) {
   const loadFile = useEffect(() => doLoadFile(), [project, filePath]);
   // Terminal job socket
   const [socket, setSocket] = useState(null);
-
-  // Save the document when dirty and mouse leav the document
+ 
+  // Save the document when dirty and mouse leave the document
   useEffect(() => {
     function onMayLeavePage() {
       if (syncTimeoutId.current != null) {
@@ -66,10 +67,13 @@ export default function Project({api} : {api: Api}) {
       }
     }
     document.body.addEventListener("mouseleave", onMayLeavePage);
+
+    // Cleanup
     return () => document.body.removeEventListener("mouseleave", onMayLeavePage);
   }, [project, file]);
 
-  function doLoadProject() {
+
+  function doLoadProject() { 
     api.read_project(projectId).then(project => {
       setProject(project);
     });
@@ -83,16 +87,28 @@ export default function Project({api} : {api: Api}) {
         const type = fileType(fileToOpen);
         fetch(fileToOpen.content_uri).then(_ => _.text().then(text => {
           editorContent.current = text;
+          currentEditedFilePathRef.current = fileToOpen.path;
           setFile({path: fileToOpen.path, content: text, type});
         }));
       } else {
         navigate(`/project/${projectId}`);
       }
+    } else {
+      setFile(null);
+      currentEditedFilePathRef.current = null;
     }
   }
 
-  function onFileTreeDelete(filePath: string) {
-    if (filePath === file?.path) {
+  function onFileTreeMove(oldPath: string, file: ProjectFile) {
+    const index = project.files?.findIndex(_ => _.path == oldPath);
+    if (index != -1) {
+      project.files[index] = file;
+    }
+  }
+
+  // Close currently edited file from editor if it has been deleted 
+  function onFileTreeDelete(deletedFilePath: string) {
+    if (deletedFilePath == currentEditedFilePathRef.current) {
       if (syncTimeoutId.current)
         clearTimeout(syncTimeoutId.current);
       syncTimeoutId.current = null;
@@ -102,11 +118,13 @@ export default function Project({api} : {api: Api}) {
     }
   }
 
+  // Add created file to current cache so we can open it because we have it's content_uri
   function onFileTreeCreate(file: ProjectFile) {
     const existing = project.files?.find(_ => _.path == file.path);
     // Edit project in place, no need to re-render
-    if (existing == null || existing == undefined)
+    if (existing == null || existing == undefined) {
       project.files = [...project.files, file];
+    }
   }
 
   function fileType(file : ProjectFile) : string {
@@ -161,7 +179,7 @@ export default function Project({api} : {api: Api}) {
     api.run_file(project.id, fileToRun.path, (newSocket: WebSocket) => {
       (socket as WebSocket)?.close();
       newSocket.onopen = () => {
-        setSocket(newSocket)
+        setSocket(newSocket);
       };
     });
   }
@@ -195,7 +213,7 @@ export default function Project({api} : {api: Api}) {
       <div style={{width: "17.5%", height: "calc(100vh - 0.5in - 1px)"}}>
         {
           project != null
-          ? <Filetree api={api} project={project} onDelete={onFileTreeDelete} onOpen={onFileTreeOpen} onCreate={onFileTreeCreate}/>
+          ? <Filetree api={api} project={JSON.parse(JSON.stringify(project))} onDelete={onFileTreeDelete} onOpen={onFileTreeOpen} onCreate={onFileTreeCreate} onMove={onFileTreeMove}/>
           : <div className="d-flex align-items-center mt-3" style={{width: "100%"}}>
               <Spinner size="sm" className="ms-auto"/>
               <strong className="ms-2 me-auto">Loading...</strong>

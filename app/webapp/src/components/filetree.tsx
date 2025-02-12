@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Form from 'react-bootstrap/Form';
-import { ErrorCode, Api, Project, File as ProjectFile } from "../api";
+import { ErrorCode, Api, Project, File as ProjectFile, ProjectNotification } from "../api";
 import { Tree, NodeApi, NodeRendererProps } from 'react-arborist';
 import { RiArrowDownSLine } from "react-icons/ri";
 import { RiArrowRightSLine } from "react-icons/ri";
@@ -17,7 +17,7 @@ export default function Filetree({api, project, onOpen = null, onDelete = null, 
     project: Project,
     onOpen?: (file: ProjectFile) => void,
     onCreate?: (file: ProjectFile) => void,
-    onMove?: (file: ProjectFile, to: string) => void,
+    onMove?: (oldPath: string, file: ProjectFile) => void,
     onDelete?: (id: string) => void,  
 }) {
 
@@ -66,6 +66,50 @@ export default function Filetree({api, project, onOpen = null, onDelete = null, 
   const [toasts, setToasts] = useState([] as Toast[]);
   const toastId = useRef(0);
 
+  // Open notification socket
+  const notifications = useRef(null);
+  useEffect(() => {
+    notifications.current?.close();
+    notifications.current = null;
+    api.register_notification(project.id, (socket) => {
+      notifications.current = socket;
+      socket.onmessage = (ev) => {
+        const notification = JSON.parse(ev.data) as ProjectNotification;
+        
+        if (notification.event == "created") {
+          projectFiles.current = [...projectFiles.current, notification.file];
+          onCreate?.(notification.file);
+          const newTree = projectToTree(project, projectFiles.current);
+          setTree(newTree);
+        
+        } else if (notification.event == "deleted") {
+          const toKeep = projectFiles.current.filter(file => {
+            const keep = !((file.path === notification.path) || (notification.path.endsWith("/") && file.path.startsWith(notification.path)))
+            if (!keep) {
+              onDelete?.(file.path);
+            }
+            return keep;
+          });
+          projectFiles.current = toKeep;
+          const newTree = projectToTree(project, projectFiles.current);
+          setTree(newTree);
+        
+        } else if (notification.event == "moved") {
+          onMove?.(notification.old_path, notification.file)
+          projectFiles.current.find(_ => _.path == notification.old_path).path = notification.file.path;
+          const newTree = projectToTree(project, projectFiles.current);
+          setTree(newTree);
+        }
+      }
+    });
+
+    // Cleanup
+    return () => {
+      notifications.current?.close();
+      notifications.current = null; 
+    };
+  }, []);
+
   function toast(message: string) {
     const newToasts = [...toasts, {id: (toastId.current += 1), body: message}];
     setToasts(newToasts);
@@ -83,15 +127,18 @@ export default function Filetree({api, project, onOpen = null, onDelete = null, 
     nodes.forEach(node => {
       if (node.data.id != "/") {
         api.delete_file(project.id, node.data.id).then(_ => {
-          const toKeep = projectFiles.current.filter(file => {
-            const keep = !((file.path === node.data.id) || (node.isInternal && file.path.startsWith(node.data.id)))
-            if (!keep)
-              onDelete?.(file.path);
-            return keep;
-          });
-          projectFiles.current = toKeep;
-          const newTree = projectToTree(project, projectFiles.current);
-          setTree(newTree);
+          /*
+            // Updated asynchronously by notifications
+            const toKeep = projectFiles.current.filter(file => {
+              const keep = !((file.path === node.data.id) || (node.isInternal && file.path.startsWith(node.data.id)))
+              if (!keep)
+                onDelete?.(file.path);
+              return keep;
+            });
+            projectFiles.current = toKeep;
+            const newTree = projectToTree(project, projectFiles.current);
+            setTree(newTree);
+          */
         });  
       }
     });
@@ -105,9 +152,12 @@ export default function Filetree({api, project, onOpen = null, onDelete = null, 
       const newPath = `${parentId}${node.data.name}${node.isLeaf ? "" : "/"}`;
 
       api.move_file(project.id, node.data.id, newPath).then(_ => {
-        projectFiles.current.find(_ => _.path == node.data.id).path = newPath;
-        const newTree = projectToTree(project, projectFiles.current);
-        setTree(newTree);
+        /*
+          // Updated asynchronously by notifications
+          projectFiles.current.find(_ => _.path == node.data.id).path = newPath;
+          const newTree = projectToTree(project, projectFiles.current);
+          setTree(newTree);
+        */
       }).catch(error => {
         if (error.code == ErrorCode.BadParameter)
           toast(error.parameters[0].issue);
@@ -117,17 +167,20 @@ export default function Filetree({api, project, onOpen = null, onDelete = null, 
     });
   };
 
+  // TODO: might be useless with notifications
   function onEditInternal({id, name, node} : {id: string, name: string, node: NodeApi<NodeData>}) {
-    const file = projectFiles.current.find(_ => _.path == id);
-    const components = file.path.split('/');
-    if (file.is_directory)
-      components[components.length - 2] = name;
-    else
-      components[components.length - 1] = name;
-    file.path = components.join('/');
+    /*
+      const file = projectFiles.current.find(_ => _.path == id);
+      const components = file.path.split('/');
+      if (file.is_directory)
+        components[components.length - 2] = name;
+      else
+        components[components.length - 1] = name;
+      file.path = components.join('/');
 
-    const newTree = projectToTree(project, projectFiles.current);
-    setTree(newTree);
+      const newTree = projectToTree(project, projectFiles.current);
+      setTree(newTree);
+    */
   }
 
   function onCreateInternal({parentNode, type, parentId}: {parentId: string, parentNode: NodeApi<NodeData>, index: number, type: "internal" | "leaf"}) : Promise<{id: string}>  {    
@@ -140,10 +193,12 @@ export default function Filetree({api, project, onOpen = null, onDelete = null, 
         name = `new_${name}`;
       const path = `${parentId}${name}`;
       return api.create_file(project.id, path).then(file => {
-        onCreate?.(file);
-        projectFiles.current = [...projectFiles.current, file];
-        const newTree = projectToTree(project, projectFiles.current);
-        setTree(newTree);
+        /*
+          // Updated asynchronously by notifications
+          projectFiles.current = [...projectFiles.current, file];
+          const newTree = projectToTree(project, projectFiles.current);
+          setTree(newTree);
+        */ 
         return {id: file.path};
       });  
     } else {
@@ -153,10 +208,13 @@ export default function Filetree({api, project, onOpen = null, onDelete = null, 
       const path = `${parentId}${name}/`;
 
       return api.create_directory(project.id, path).then(file => {
-        onCreate?.(file);
-        projectFiles.current = [...projectFiles.current, file];
-        const newTree = projectToTree(project, projectFiles.current);
-        setTree(newTree);
+        //onCreate?.(file);
+        /*
+          // Updated asynchronously by notifications
+          projectFiles.current = [...projectFiles.current, file];
+          const newTree = projectToTree(project, projectFiles.current);
+          setTree(newTree);
+        */
         return {id: file.path};  
       });
     }
@@ -193,14 +251,17 @@ export default function Filetree({api, project, onOpen = null, onDelete = null, 
                 components[components.length - 1] = name;
               const path = components.join('/');
 
-              api.move_file(project.id, file.path, path).then(_ => {
+              if (file.path != path)
+                api.move_file(project.id, file.path, path).then(_ => {
+                  node.submit(name);
+                }).catch(error => {
+                  if (error.code == ErrorCode.BadParameter)
+                    setEditFeedback(error.parameters[0].issue);
+                  else
+                    setEditFeedback(error.message);
+                });
+              else
                 node.submit(name);
-              }).catch(error => {
-                if (error.code == ErrorCode.BadParameter)
-                  setEditFeedback(error.parameters[0].issue);
-                else
-                  setEditFeedback(error.message);
-              });
             }
           }}
         />

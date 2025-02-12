@@ -117,8 +117,6 @@ class Api
       raise Error::InvalidCredential.new
     end
     
-    pp user_and_credentials.password_hash
-
     unless Crypto::Bcrypt::Password.new(user_and_credentials.password_hash).verify(login.password)
       raise Error::InvalidCredential.new
     end

@@ -23,9 +23,10 @@ class Api
   @projects : Repositories::Projects
   @files : Repositories::Files
   @blobs : Repositories::Blobs
+  @notifications : Repositories::Notifications
   @websockets : HTTP::WebSocketHandler
 
-  def initialize(@storage, @cache, @users, @projects, @files, @blobs, bind, cors_origin)
+  def initialize(@storage, @cache, @users, @projects, @files, @blobs, @notifications, bind, cors_origin)
     @server = uninitialized HTTP::Server
     @websockets = uninitialized HTTP::WebSocketHandler
     
@@ -36,8 +37,8 @@ class Api
       routes = @@websockets_router.search ctx.request.path
       ctx = Context.new ctx
       if routes.empty?
-        ctx << Error::NotFound.new "Websocket #{ctx.request.path}"
         socket.close
+        ctx << Error::NotFound.new "Websocket #{ctx.request.path}"
       else
         handler, path_parameters, wildcard = routes.first
         ctx.path_parameters = path_parameters
@@ -45,8 +46,10 @@ class Api
         begin
           handler.call self, socket, ctx
         rescue error : Error
+          socket.close
           ctx << error
         rescue ex
+          socket.close
           Log.error exception: ex, &.emit "Exception handling websocket#{ctx.request.path}"
           ctx << Error::ServerError.new ex.message
         end

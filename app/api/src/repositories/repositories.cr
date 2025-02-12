@@ -1,6 +1,11 @@
 # Interfaces for repositories.
 module Repositories
 
+  module Cancelable
+    def cancel
+    end
+  end
+
   abstract class Users
 
     class DuplicateNameError
@@ -120,8 +125,16 @@ module Repositories
     abstract def edit(project_id : UUID, path : String, editor_id : UUID)
     abstract def list(project_id : UUID) : Array(File)
     abstract def get_blob_id(project_id : UUID, path : String) : UUID?
-    abstract def directory_exists?(project_id : UUID, path : String) : Bool
     abstract def is_directory?(project_id : UUID, path : String) : Bool
     abstract def read(project_id : UUID, path : String) : File?
+  end
+
+  abstract class Notifications
+    abstract def create_file(project_id : UUID, path : String)
+    abstract def delete_file(project_id : UUID, path : String)
+    abstract def move_file(project_id : UUID, old_path : String, new_path : String)
+    abstract def on_file_created(project_id : UUID, handler : (String) ->) : Cancelable
+    abstract def on_file_deleted(project_id : UUID, handler : (String) ->)  : Cancelable
+    abstract def on_file_moved(project_id : UUID, handler : (String, String) ->) : Cancelable
   end
 end

@@ -71,6 +71,19 @@ class Api
     end
   end
 
+  def repository_file_to_response_file(file : Repositories::Files::File) : Response::Project::File
+    Response::Project::File.new(
+      project_id: file.project_id,
+      path: file.path,
+      created_at: file.created_at,
+      file_edited_at: file.file_edited_at,
+      author_name: file.author_name,
+      editor_name: file.editor_name,
+      is_directory: file.is_directory,
+      content_uri: file.blob_id.try { |blob_id| @storage.uri(blob_id.to_s) } 
+    )
+  end
+
   route GET, "/projects/:id", def read_project(ctx)
     user_id = authenticate(ctx)
     project_id = UUID.new ctx.path_parameter "id"
@@ -86,16 +99,7 @@ class Api
       created_at: project.created_at,
       owner_name: project.owner_name,
       files: files.map do |file|
-        Response::Project::File.new(
-          project_id: file.project_id,
-          path: file.path,
-          created_at: file.created_at,
-          file_edited_at: file.file_edited_at,
-          author_name: file.author_name,
-          editor_name: file.editor_name,
-          is_directory: file.is_directory,
-          content_uri: file.blob_id.try { |blob_id| @storage.uri(blob_id.to_s) } 
-        )
+        repository_file_to_response_file file
       end
     )
   end
@@ -137,6 +141,33 @@ class Api
         created_at: project.created_at,
         owner_name: project.owner_name
       )
+    end
+  end
+
+  websocket GET, "/projects/:id/notifications", def open_project_notification(socket, ctx)
+    user_id = authenticate(ctx)
+    project_id = UUID.new ctx.path_parameter "id"
+    
+    subscription_creation = @notifications.on_file_created project_id, ->(path : String) do
+      @files.read(project_id, path).try do |file|
+        socket.send({event: "created", file: repository_file_to_response_file(file)}.to_json)
+      end
+    end
+
+    subscription_deleted = @notifications.on_file_moved project_id, ->(old_path : String, new_path : String) do
+      @files.read(project_id, new_path).try do |file|
+        socket.send({event: "moved", old_path: old_path, file: repository_file_to_response_file(file)}.to_json)
+      end
+    end
+
+    subscription_moved = @notifications.on_file_deleted project_id, ->(path : String) do
+      socket.send({event: "deleted", path: path}.to_json)
+    end
+
+    socket.on_close do
+      subscription_creation.cancel
+      subscription_deleted.cancel
+      subscription_moved.cancel
     end
   end
 end

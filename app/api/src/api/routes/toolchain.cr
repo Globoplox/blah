@@ -11,11 +11,12 @@ class JobFileSystem < Toolchain::Filesystem
   @projects : Repositories::Projects
   @files : Repositories::Files
   @blobs : Repositories::Blobs
+  @notifications : Repositories::Notifications
   @project_id : UUID
   @user_id : UUID
   @events : Toolchain::EventStream
 
-  def initialize(@storage, @users, @projects, @files, @blobs, @project_id, @user_id, @events)
+  def initialize(@storage, @users, @projects, @files, @blobs, @notifications, @project_id, @user_id, @events)
     @user_name = @users.read(@user_id).name
     @project_name = @projects.read(@project_id).name
   end
@@ -86,7 +87,15 @@ class JobFileSystem < Toolchain::Filesystem
   # TODO limit maximum individual file size
   # Apply quotas
   class StorageIO < IO::Memory
-    def initialize(@storage : Storage, @blobs : Repositories::Blobs, @files : Repositories::Files, @path : String, @project_id : UUID, @user_id : UUID)
+    @storage : Storage 
+    @blobs : Repositories::Blobs 
+    @files : Repositories::Files 
+    @notifications : Repositories::Notifications 
+    @path : String
+    @project_id : UUID 
+    @user_id : UUID
+
+    def initialize(@storage, @blobs, @files, @notifications, @path, @project_id, @user_id)
       super()
     end
 
@@ -104,6 +113,23 @@ class JobFileSystem < Toolchain::Filesystem
           raise "exists but is a directory"
         end
       else
+        # CREATE ALL SUBDIRECTORIES
+        components = @path.split('/')
+        (1..(components.size - 1)).each do |level|
+          base = (components[0...level] + [""]).join "/"
+          if base == "/" || @files.is_directory?(@project_id, base)
+          else
+            @files.insert(
+              project_id: @project_id,
+              author_id: @user_id,
+              blob_id: nil,
+              path: base
+            )
+
+            @notifications.create_file(@project_id, base)
+          end
+        end
+
         blob_id = @blobs.insert(
           content_type: content_type,
           size: size
@@ -115,6 +141,9 @@ class JobFileSystem < Toolchain::Filesystem
           blob_id: blob_id,
           path: @path
         )
+
+        @notifications.create_file(@project_id, @path)
+
       end
 
       @storage.put(
@@ -129,13 +158,7 @@ class JobFileSystem < Toolchain::Filesystem
   end
 
   def open(path : String, mode : String) : IO
-
-    pp "OPEN PATH: '#{path}'"
-
     user_name, project_name, path = absolute(path, "/").split(":")
-
-    pp "TRANSLATED TO: '#{user_name}' '#{project_name}' '#{path}'"
-
     if user_name == @user_name
       user_id = @user_id
     else
@@ -196,10 +219,9 @@ class JobFileSystem < Toolchain::Filesystem
           @events.fatal!("Path #{error}") {}
         end
       end
-
-      # Create all intermediary subdirecotry if they dont exists
-      return StorageIO.new @storage, @blobs, @files, path, @project_id, @user_id
-
+      
+      # return an handle that will actually write/create the file on close. 
+      return StorageIO.new @storage, @blobs, @files, @notifications, path, @project_id, @user_id
     else raise "bad mode '#{mode}'"
     end
   end
@@ -290,7 +312,6 @@ class JobEventStream < Toolchain::EventStream
       io.puts if !@context.empty?  
     end
 
-    pp str
     @socket.send str
   end
 
