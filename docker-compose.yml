@@ -1,12 +1,11 @@
 services:
-  api:
+  api-1: &api
     build:
       context: .
       dockerfile: app/api/Dockerfile
     environment:
       - ENV
-      - REPLICATION=2
-      - BIND_URI=tcp://0.0.0.0:3000?reuse_port=true
+      - BIND_URI=tcp://0.0.0.0:80
       - DB_URI=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgsql:5432/${POSTGRES_DB}
       - CLIENT_ORIGIN=http://localhost:8080
       - S3_REGION
@@ -30,8 +29,18 @@ services:
         condition: service_started
       s3:
         condition: service_started
-    ports:
-      - "3000:3000"
+  api-2: *api
+  nginx:
+      image: nginx:1.25.1-alpine
+      depends_on:
+        api-1:
+          condition: service_started
+        api-2:
+          condition: service_started  
+      ports:
+      - "80:80"
+      volumes:
+      - "./nginx.conf:/etc/nginx/nginx.conf"
   s3:
     image: minio/minio:latest
     environment:

@@ -101,16 +101,8 @@ class Api
       Log.info &.emit "Took: #{(Time.monotonic - t).total_milliseconds}ms"
     end
 
-    uri = URI.parse bind
-    pp uri.scheme
-    pp uri.query_params["reuse_port"]?
-    if uri.scheme == "tcp" && uri.query_params["reuse_port"]? == "true"
-      Log.info &.emit "Bound to tcp #{uri.host || "localhost"}:#{uri.port || 80}, reuse_port: true"
-      @server.bind_tcp host: uri.host || "localhost", port: uri.port || 80, reuse_port: true
-    else
-      Log.info &.emit "Bound to #{bind}"
-      @server.bind bind
-    end
+    Log.info &.emit "Bound to #{bind}"
+    @server.bind bind
   end
 
   def start

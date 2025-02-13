@@ -52,7 +52,7 @@ module.exports = {
   plugins: [
     
     new webpack.DefinePlugin({
-      "process.env.API_SERVER_URI": JSON.stringify("http://localhost:3000")
+      "process.env.API_SERVER_URI": JSON.stringify("http://localhost")
     }),
 
     new HtmlWebpackPlugin({

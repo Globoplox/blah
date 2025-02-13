@@ -40,7 +40,7 @@ class Repositories::Users::Database < Repositories::Users
           allowed_project,                                                                                                                                    
           allowed_blob_size,                                                                                                                                  
           allowed_concurrent_job                                                                                                                            
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)                                                                               
+        ) VALUES ($1, $2, $3, $4, $5, $6)                                                                               
       SQL
 
       credential = {credential_id, user_id, email, password_hash}

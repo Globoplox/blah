@@ -3,10 +3,5 @@ RUN apk update
 RUN apk add libjpeg-turbo-dev
 RUN apk add libspng-dev
 RUN apk add parallel
-WORKDIR /root
-COPY . .
-WORKDIR /root
-RUN ls
-WORKDIR /root/app/api
-RUN shards build api --verbose --no-color -p -s -t --error-trace
-CMD   ["/root/app/api/bin/api"]
+RUN --mount=type=bind,src=.,dst=/ctx,rw cd /ctx/app/api; shards build api --verbose --no-color -p -s -t --error-trace; cp /ctx/app/api/bin/api /root/api
+CMD /root/api

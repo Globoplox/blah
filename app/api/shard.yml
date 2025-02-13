@@ -19,8 +19,6 @@ dependencies:
   openssl_ext:
     github: spider-gazelle/openssl_ext
     version: ~> 2.3.0
-  blah-toolchain:
-    path: ../../toolchain
 
 targets:
   api:

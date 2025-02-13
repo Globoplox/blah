@@ -1,4 +1,4 @@
-require "blah-toolchain"
+require "../../toolchain"
 require "colorize"
 
 # A fs that use the storage and database
