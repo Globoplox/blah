@@ -7,6 +7,7 @@ require "./linker/linker"
 require "./assembler"
 require "./stacklang/compiler"
 require "./vm"
+require "./debugger"
 
 # Representation and location independant business logic
 class Toolchain
@@ -90,6 +91,7 @@ class Toolchain
       begin
         yield
       rescue ex
+        Log.error exception: ex, &.emit "Exception during toolchain task context"
         fatal! ex
       ensure
         @context.pop
@@ -295,5 +297,19 @@ class Toolchain
     @events.event(:success, "Ran '#{@events.emphasis(@fs.normalize source)}'")
     vm.close
     return step_counter
+  end
+
+  def debug(source : String, symbols_object : String?, input : IO::FileDescriptor, output : IO::FileDescriptor, io_mapping : Hash(String, {IO, IO}))
+    @events.with_context "debugging '#{@fs.normalize source}'" do 
+      object = @fs.read symbols_object do |io|
+        RiSC16::Object.from_io io, name: symbols_object
+      end if symbols_object
+
+      binary = @fs.read source do |io|
+        io.getb_to_end
+      end
+
+      RiSC16::Debugger.new(binary, @fs, spec, input, output, io_mapping, object: object, at: 0).run
+    end
   end
 end

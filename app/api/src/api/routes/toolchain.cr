@@ -4,7 +4,6 @@ require "colorize"
 # A fs that use the storage and database
 #
 # TODO: acl
-# TODO: parent directory on write
 class JobFileSystem < Toolchain::Filesystem
   @storage : Storage
   @users : Repositories::Users
@@ -23,40 +22,6 @@ class JobFileSystem < Toolchain::Filesystem
 
   def normalize(path : String) : String
     path
-  end
-
-  # user, project, base, name, extension
-  protected def components_with_remote(path) : {String?, String?, String?, String?, String?}
-    comps = path.split ':'
-    if comps.size == 1
-      dir = File.dirname(path) || "."
-      ext = File.extname path
-      base = File.basename path, ext
-      base = nil if base.empty?
-      ext = nil if ext.empty?
-      {nil, nil, dir, base, ext}
-    elsif comps.size == 2
-      project = comps[0]
-      path = comps[1]
-      dir = File.dirname(path) || "."
-      ext = File.extname path
-      base = File.basename path, ext
-      base = nil if base.empty?
-      ext = nil if ext.empty?
-      {nil, project, dir, base, ext}
-    elsif comps.size == 3
-      user = comps[0]
-      project = comps[1]
-      path = comps[2]
-      dir = File.dirname(path) || "."
-      ext = File.extname path
-      base = File.basename path, ext
-      base = nil if base.empty?
-      ext = nil if ext.empty?
-      {user, project, dir, base, ext}
-    else
-      @events.fatal!("Invalid path: '#{path}'") {}
-    end
   end
 
   def absolute(path : String, root = nil) : String

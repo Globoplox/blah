@@ -1,9 +1,12 @@
 require "./curses"
+require "./libncurses_ext"
 
 module RiSC16
   class Debugger
     @input = IO::Memory.new
     @output = IO::Memory.new
+    @stdin : IO::FileDescriptor
+    @stdout : IO::FileDescriptor
     @vm : VM
     @cursor = 0
     @spec : Spec
@@ -12,7 +15,7 @@ module RiSC16
     @definitions : Hash(UInt16, {String, Char})
     @references : Hash(UInt16, String)
 
-    def initialize(io, fs, @spec, @object = nil, at = 0)
+    def initialize(io, fs, @spec, @stdin, @stdout, io_mapping, @object = nil, at = 0)
       @section_stack_symbol_value = 0
 
       Linker.symbols_from_spec(@spec).each do |(name, symbol)|
@@ -21,7 +24,7 @@ module RiSC16
         end
       end
 
-      @vm = VM.from_spec(@spec, fs, io_mapping: {"tty" => {@input, @output}}).tap &.load io, at: at
+      @vm = VM.from_spec(@spec, fs, io_mapping: io_mapping).tap &.load io, at: at
       @references = {} of UInt16 => String
       @object.try do |object|
         object.sections.each do |section|
@@ -80,7 +83,9 @@ module RiSC16
     end
 
     def run
-      NCurses.open do
+      @stdout.puts "test"
+
+      NCurses.open(@stdin, @stdout) do
         NCurses.cbreak
         NCurses.noecho
         NCurses.keypad true

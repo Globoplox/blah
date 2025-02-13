@@ -1,6 +1,6 @@
 require "option_parser"
 require "colorize"
-require "blah-toolchain"
+require "./toolchain"
 require "./debugger"
 
 # CLI front for Toolchain.
@@ -225,22 +225,33 @@ module Clients::Cli
           exit 1
         end
 
-        io_mapping = {} of String => {IO, IO}
-        app.spec.segments.each do |segment|
-          case segment
-          when RiSC16::Spec::Segment::IO
-            name = segment.name
-            if name && segment.tty && segment.source.nil?
-              io_mapping[name] = {STDIN, STDOUT}
-            end
-          end
-        end
+       
 
         if !debug
+          io_mapping = {} of String => {IO, IO}
+          app.spec.segments.each do |segment|
+            case segment
+            when RiSC16::Spec::Segment::IO
+              name = segment.name
+              if name && segment.tty && segment.source.nil?
+                io_mapping[name] = {STDIN, STDOUT}
+              end
+            end
+          end
           app.run(sources_files.first, io_mapping)
         else
           fs.read sources_files.first do |input|
-            RiSC16::Debugger.new(input.getb_to_end, fs, app.spec, nil, at: 0).run
+            io_mapping = {} of String => {IO, IO}
+            app.spec.segments.each do |segment|
+              case segment
+              when RiSC16::Spec::Segment::IO
+                name = segment.name
+                if name && segment.tty && segment.source.nil?
+                  io_mapping[name] = {IO::Memory.new, IO::Memory.new}
+                end
+              end
+            end
+            RiSC16::Debugger.new(input.getb_to_end, fs, app.spec, STDIN, STDOUT, io_mapping, object: nil, at: 0).run
           end
         end
 
@@ -289,26 +300,42 @@ module Clients::Cli
           app.link(merge_destination, destination)
 
           if also_run
-            io_mapping = {} of String => {IO, IO}
-            app.spec.segments.each do |segment|
-              case segment
-              when RiSC16::Spec::Segment::IO
-                name = segment.name
-                if name && segment.tty && segment.source.nil?
-                  io_mapping[name] = {STDIN, STDOUT}
+            
+
+            if !debug
+              io_mapping = {} of String => {IO, IO}
+              app.spec.segments.each do |segment|
+                case segment
+                when RiSC16::Spec::Segment::IO
+                  name = segment.name
+                  if name && segment.tty && segment.source.nil?
+                    io_mapping[name] = {STDIN, STDOUT}
+                  end
                 end
               end
-            end
-            if !debug
+              
               app.run(destination, io_mapping)
             else
               binary = fs.read destination do |io|
                 io.getb_to_end
               end
+              
               merged_object = fs.read merge_destination do |io|
                 RiSC16::Object.from_io io, name: merge_destination
               end
-              RiSC16::Debugger.new(binary, fs, app.spec, merged_object, at: 0).run
+
+              io_mapping = {} of String => {IO, IO}
+              app.spec.segments.each do |segment|
+                case segment
+                when RiSC16::Spec::Segment::IO
+                  name = segment.name
+                  if name && segment.tty && segment.source.nil?
+                    io_mapping[name] = {IO::Memory.new, IO::Memory.new}
+                  end
+                end
+              end
+
+              RiSC16::Debugger.new(binary, fs, app.spec, STDIN, STDOUT, io_mapping, object: merged_object, at: 0).run
             end
           end
         end

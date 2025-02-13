@@ -8,6 +8,19 @@ require "./schema"
 require "./repositories/*"
 require "./api"
 
+at_exit do |code, ex|
+  pp "=========================== EXITED"
+  pp code
+  pp ex
+  raise Exception.new "I wanna see the stacktrace"
+rescue ex
+  pp ex
+end
+
+Signal::INT.trap do
+  pp "============================ INT!!"
+end
+
 # Setup all dependencies with a suitable implementation
 
 storage = Storage::S3.from_environnment ENV["BUCKET"]

@@ -18,9 +18,12 @@ import Filetree from "./filetree";
 import { BrowserRouter, Routes, Route, useBeforeUnload } from "react-router";
 import { useNavigate } from "react-router";
 import { XTerm } from "@pablo-lion/xterm-react";
+import { ITerminalOptions } from "@xterm/xterm";
 import { AttachAddon } from '@xterm/addon-attach';
+import "./terminal.scss";
 
-export default function Terminal({socket}: {socket: WebSocket}) {
+
+export default function Terminal({socket, onRequestFullSize}: {socket: WebSocket, onRequestFullSize?: () => void}) {
 
   const theme = {
     background: '#F8F8F8',
@@ -47,18 +50,47 @@ export default function Terminal({socket}: {socket: WebSocket}) {
     brightWhite: '#FFFFFF'
   };
 
-  const ref = useRef(null);
-
-  // key used to force recreation of the terminal, react might try to be smarter than it is otherwise 
-  return <XTerm ref={ref} key={socket.url} options={{
+  const baseOptions : ITerminalOptions = {
     convertEol: true,
     scrollback: 1000,
-    rows: 15,
     cursorStyle: "block",
     cursorInactiveStyle: "underline",
     theme, 
     fontWeight: 400, 
     fontSize: 18, 
     fontFamily: "Consolas, Monaco, Andale Mono, Ubuntu Mono, monospace"
-  }} addons={[new AttachAddon(socket, {bidirectional: true})]} />;
+  };
+
+  const [bigTerminal, setBigTerminal] = useState(false);
+  const [options, setOptions] = useState({...baseOptions, rows: 15, cols: 80});
+  const [key, setKey] = useState(socket.url + options.cols + options.rows);
+  const [onKeyDown,setOnKeyDown] = useState(null);
+
+  socket.onmessage = ((message: MessageEvent<any>) => {
+    if (message.data == "\e?1049h") {
+      setBigTerminal(true);
+      setOptions({...baseOptions, rows: 40, cols: 120});
+      setKey(socket.url + 60 + 120);
+      //setOnKeyDown(() => onKeyDownHandler);
+    } else if (message.data == "\e?1049l") {
+      setBigTerminal(true);
+      setOptions({...baseOptions, rows: 40, cols: 120});
+      setKey(socket.url + 60 + 120);
+    }
+  });
+
+  function onKeyDownHandler(event : KeyboardEvent<HTMLDivElement>) {
+    console.log(event);
+    if (event.key == 'Escape') {
+      setBigTerminal(false);
+      setOptions({...baseOptions, rows: 15, cols: 80});
+      setKey(socket.url + 15 + 80);
+      setOnKeyDown(null);
+    }
+  }
+
+  // key used to force recreation of the terminal, react might try to be smarter than it is otherwise 
+  return <div tabIndex={0} onKeyDown={onKeyDown} className={bigTerminal ? "modal-terminal" : ""}>
+    <XTerm key={key} options={options} addons={[new AttachAddon(socket, {bidirectional: true})]} />
+  </div>;
 }

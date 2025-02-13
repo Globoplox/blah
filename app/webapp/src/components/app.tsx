@@ -15,11 +15,9 @@ import { useNavigate } from "react-router";
   - Debugger might actually works as is with xtermjs
   - Might need a bigger tty for this
   - Filetree create file and directory buttons and maybe RUN on recipe files ?
-  - Api job auto cleaning
   - Project page global toast
   - All auth related chore (reset, doube auth, email verification, oauth, device kick, ...)
   - Notifications for collaboration and diff ?
-  - Port sharing and scaling
 */
 
 export default function App() {
