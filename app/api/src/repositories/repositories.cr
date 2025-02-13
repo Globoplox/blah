@@ -21,8 +21,7 @@ module Repositories
       tag : String,
       allowed_projects : Int32,
       allowed_blob_size : Int32,
-      allowed_concurrent_job : Int32,
-      allowed_concurrent_tty : Int32
+      allowed_concurrent_job : Int32
     ) : UUID | DuplicateNameError | DuplicateEmailError
 
     class UserWithCredentials
@@ -34,7 +33,6 @@ module Repositories
       property allowed_blob_size : Int32
       property allowed_project : Int32
       property allowed_concurrent_job : Int32
-      property allowed_concurrent_tty : Int32
       property created_at : Time
       property credential_id : UUID
       property email : String
@@ -52,7 +50,6 @@ module Repositories
       property allowed_blob_size : Int32
       property allowed_project : Int32
       property allowed_concurrent_job : Int32
-      property allowed_concurrent_tty : Int32
       property created_at : Time
     end
 
@@ -91,7 +88,7 @@ module Repositories
     abstract def search_owned(owner_id : UUID, query  : String?) : Array(Project)
     abstract def read(id  : UUID) : Project
     abstract def get_by_user_and_name(user_id : UUID, name : String) : Project?
-
+    abstract def count_for_user(user_id : UUID) : Int64
   end
 
   abstract class Blobs
@@ -117,6 +114,7 @@ module Repositories
       property author_name : String
       property editor_name : String
       property is_directory : Bool
+      property size : Int32 = 0
     end
 
     abstract def insert(project_id : UUID, blob_id : UUID?, path : String, author_id : UUID) : DuplicatePathError?
@@ -127,6 +125,9 @@ module Repositories
     abstract def get_blob_id(project_id : UUID, path : String) : UUID?
     abstract def is_directory?(project_id : UUID, path : String) : Bool
     abstract def read(project_id : UUID, path : String) : File?
+    abstract def sum_for_user(user_id : UUID) : Int64
+    abstract def sum_for_project(project_id : UUID) : Int64
+    abstract def count_for_project(project_id : UUID) : Int64
   end
 
   abstract class Notifications

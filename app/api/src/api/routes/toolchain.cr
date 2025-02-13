@@ -88,6 +88,8 @@ class JobFileSystem < Toolchain::Filesystem
   # Apply quotas
   class StorageIO < IO::Memory
     @storage : Storage 
+    @users : Repositories::Users
+    @projects : Repositories::Projects
     @blobs : Repositories::Blobs 
     @files : Repositories::Files 
     @notifications : Repositories::Notifications 
@@ -95,7 +97,7 @@ class JobFileSystem < Toolchain::Filesystem
     @project_id : UUID 
     @user_id : UUID
 
-    def initialize(@storage, @blobs, @files, @notifications, @path, @project_id, @user_id)
+    def initialize(@storage, @users, @projects, @blobs, @files, @notifications, @path, @project_id, @user_id)
       super()
     end
 
@@ -108,17 +110,41 @@ class JobFileSystem < Toolchain::Filesystem
       if file
         blob_id = file.blob_id
         if blob_id
+
+          if size >= file.size
+            user = @users.read(@user_id)
+            user_sum = @files.sum_for_user(@user_id)
+            if user_sum + size > user.allowed_blob_size
+              raise "Cannot edit file #{file.path}, total allowed file size sum for user would exceed limit  #{user_sum + size}/#{user.allowed_blob_size}"
+            end
+            project = @projects.read(@project_id)
+            project_sum = @files.sum_for_project(@project_id)
+            if project_sum + size > project.allowed_blob_size
+              raise "Cannot edit file #{file.path}, total allowed file size sum for project would exceed limit  #{project_sum + size}/#{project.allowed_blob_size}"
+            end
+          end
+
           @blobs.update(blob_id, size)
+        
         else
           raise "exists but is a directory"
         end
       else
+
+
+        project = @projects.read(@project_id)
+        count_for_project = @files.count_for_project @project_id
+
         # CREATE ALL SUBDIRECTORIES
         components = @path.split('/')
         (1..(components.size - 1)).each do |level|
           base = (components[0...level] + [""]).join "/"
           if base == "/" || @files.is_directory?(@project_id, base)
           else
+            if count_for_project + 1 > project.allowed_file_amount
+              raise "Cannot create parent directory #{base}, total allowed files count for project would exceed limit  #{count_for_project + 1}/#{project.allowed_file_amount}"
+            end
+            count_for_project += 1
             @files.insert(
               project_id: @project_id,
               author_id: @user_id,
@@ -128,6 +154,22 @@ class JobFileSystem < Toolchain::Filesystem
 
             @notifications.create_file(@project_id, base)
           end
+        end
+
+        if count_for_project + 1 > project.allowed_file_amount
+          raise "Cannot create file #{@path}, total allowed files count for project would exceed limit  #{count_for_project + 1}/#{project.allowed_file_amount}"
+        end
+        count_for_project += 1
+
+        user = @users.read(@user_id)
+        user_sum = @files.sum_for_user(@user_id)
+        if user_sum + size > user.allowed_blob_size
+          raise "Cannot edit file #{@path}, total allowed file size sum for user would exceed limit  #{user_sum + size}/#{user.allowed_blob_size}"
+        end
+        project = @projects.read(@project_id)
+        project_sum = @files.sum_for_project(@project_id)
+        if project_sum + size > project.allowed_blob_size
+          raise "Cannot edit file #{@path}, total allowed file size sum for project would exceed limit  #{project_sum + size}/#{project.allowed_blob_size}"
         end
 
         blob_id = @blobs.insert(
@@ -153,6 +195,7 @@ class JobFileSystem < Toolchain::Filesystem
         acl: Storage::ACL::Private
       )
 
+    ensure
       super()
     end
   end
@@ -221,7 +264,7 @@ class JobFileSystem < Toolchain::Filesystem
       end
       
       # return an handle that will actually write/create the file on close. 
-      return StorageIO.new @storage, @blobs, @files, @notifications, path, @project_id, @user_id
+      return StorageIO.new @storage, @users, @projects, @blobs, @files, @notifications, path, @project_id, @user_id
     else raise "bad mode '#{mode}'"
     end
   end

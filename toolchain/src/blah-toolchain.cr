@@ -276,7 +276,8 @@ class Toolchain
     run(source, io_mapping) {}
   end
 
-  def run(source : String, io_mapping : Hash(String, {IO, IO}), &) : Void
+  def run(source : String, io_mapping : Hash(String, {IO, IO}), step_limit = nil, &) : Int32
+    step_counter = 0
     vm = nil  
     @events.with_context "running '#{@fs.normalize source}'" do 
       bytes = @fs.read source do |input|
@@ -285,13 +286,14 @@ class Toolchain
       vm = RiSC16::VM.from_spec(spec, @fs, io_mapping)
       vm.load(bytes, at: 0)
     end
-    return unless vm
+    return 0 unless vm
     @events.event(:success, "Running ... '#{@events.emphasis(@fs.normalize source)}'")
     @events.with_context "running '#{@fs.normalize source}'" do 
-      vm.run
+      step_counter = vm.run step_limit: step_limit
       yield
     end
     @events.event(:success, "Ran '#{@events.emphasis(@fs.normalize source)}'")
     vm.close
+    return step_counter
   end
 end

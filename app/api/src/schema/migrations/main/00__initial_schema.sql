@@ -18,8 +18,7 @@ CREATE TABLE users
     created_at              TIMESTAMPTZ             NOT NULL DEFAULT NOW(),
     allowed_blob_size       INT                     NOT NULL,
     allowed_project         INT                     NOT NULL,
-    allowed_concurrent_job  INT                     NOT NULL,
-    allowed_concurrent_tty  INT                     NOT NULL,
+    allowed_concurrent_job  INT                     NOT NULL
     UNIQUE(name, tag)
 );
 

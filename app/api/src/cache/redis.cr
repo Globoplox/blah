@@ -20,12 +20,28 @@ class Cache::Redis < Cache
     @redis.set key, value
   end
 
+  def setnx(key : String, value : String)
+    @redis.setnx key, value
+  end
+
+  def incr(key) : Int64
+    @redis.incr key
+  end
+
+  def decr(key) : Int64
+    @redis.decr key
+  end
+
   def get(key : String) : String?
     @redis.get key
   end
 
   def unset(key : String)
     @redis.del key
+  end
+
+  def expire(key : String, timeout : Time::Span)
+    @redis.expire key, timeout.total_seconds.to_i
   end
 
   def close

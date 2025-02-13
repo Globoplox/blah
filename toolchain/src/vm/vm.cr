@@ -238,9 +238,15 @@ class RiSC16::VM
     @halted
   end
 
-  def run
+  def run(step_limit = nil) : Int32
+    step_counter = 0
     while !@halted
       step
+      step_counter += 1
+      if step_limit && step_counter > step_limit
+        raise "VM executed instruction count exceeded maximum allowed: #{step_limit}"
+      end
     end
+    return step_counter
   end
 end

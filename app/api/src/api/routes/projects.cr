@@ -24,6 +24,12 @@ class Api
       end
     end
 
+    count_for_user = @projects.count_for_user user_id
+    user = @users.read(user_id)
+    if count_for_user + 1 > user.allowed_project
+      raise "Cannot create project #{project.name}, project count would exceed limit #{user.allowed_project}"
+    end
+
     project_id = @projects.insert(
       name: project.name,
       owner_id: user_id,

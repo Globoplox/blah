@@ -10,6 +10,7 @@ import { useNavigate } from "react-router";
 /*
   TODO:
   - ACL
+  - Temporary directory specifier that create a job local space for files that is not persisted ?
   - Markdown
   - Debugger might actually works as is with xtermjs
   - Might need a bigger tty for this

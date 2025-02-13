@@ -83,10 +83,12 @@ class Repositories::Files::Database < Repositories::Files
         project_files.file_edited_at,
         project_files.is_directory,
         author_users.name as author_name,
-        editor_users.name as editor_name
+        editor_users.name as editor_name,
+        blobs.size
       FROM project_files
       LEFT JOIN users author_users ON author_users.id = project_files.author_id
       LEFT JOIN users editor_users ON editor_users.id = project_files.editor_id
+      LEFT JOIN blobs ON blobs.id = project_files.blob_id
       WHERE project_files.project_id = $1 AND project_files.path = $2
     SQL
   end
@@ -108,6 +110,29 @@ class Repositories::Files::Database < Repositories::Files
       LEFT JOIN users author_users ON author_users.id = project_files.author_id
       LEFT JOIN users editor_users ON editor_users.id = project_files.editor_id
       WHERE project_id = $1
+    SQL
+  end
+
+  def sum_for_user(user_id : UUID) : Int64
+    @connection.scalar(<<-SQL, user_id).as(Int64)
+      SELECT SUM(blobs.size) FROM project_files
+      JOIN blobs ON project_files.blob_id = blobs.id
+      WHERE project_files.editor_id = $1
+    SQL
+  end
+
+  def sum_for_project(project_id : UUID) : Int64
+    @connection.scalar(<<-SQL, project_id).as(Int64)
+      SELECT SUM(blobs.size) FROM project_files
+      JOIN blobs ON project_files.blob_id = blobs.id
+      WHERE project_files.project_id = $1
+    SQL
+  end
+
+  def count_for_project(project_id : UUID) : Int64
+    @connection.scalar(<<-SQL, project_id).as(Int64)
+      SELECT COUNT(*) FROM project_files
+      WHERE project_files.project_id = $1
     SQL
   end
 

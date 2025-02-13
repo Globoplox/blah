@@ -11,7 +11,7 @@ require "../models/validations"
 
 class Api
   VERSION = {{ `shards version #{__DIR__}`.chomp.stringify }}
-  
+
   @@router = Cradix((Api, Context) -> Nil).new
   @@websockets_router = Cradix((Api, HTTP::WebSocket, Context) -> Nil).new
   @@debug = ENV["ENV"]?.in?({"dev", "local"})
@@ -42,6 +42,10 @@ class Api
       else
         handler, path_parameters, wildcard = routes.first
         ctx.path_parameters = path_parameters
+        # cradix bug fix:
+        if wildcard && ctx.request.path.ends_with?("/") && !wildcard.ends_with?("/")
+          wildcard = "#{wildcard}/"
+        end
         ctx.path_wildcard = wildcard
         begin
           handler.call self, socket, ctx
@@ -97,8 +101,16 @@ class Api
       Log.info &.emit "Took: #{(Time.monotonic - t).total_milliseconds}ms"
     end
 
-    Log.info &.emit "Bound to #{bind}"
-    @server.bind uri: bind
+    uri = URI.parse bind
+    pp uri.scheme
+    pp uri.query_params["reuse_port"]?
+    if uri.scheme == "tcp" && uri.query_params["reuse_port"]? == "true"
+      Log.info &.emit "Bound to tcp #{uri.host || "localhost"}:#{uri.port || 80}, reuse_port: true"
+      @server.bind_tcp host: uri.host || "localhost", port: uri.port || 80, reuse_port: true
+    else
+      Log.info &.emit "Bound to #{bind}"
+      @server.bind bind
+    end
   end
 
   def start

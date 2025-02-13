@@ -1,7 +1,15 @@
 require "log"
+
+Log.define_formatter Log::InstancedFormat, "#{progname} #{timestamp} #{severity} - #{source(after: ": ")}#{message}" \
+                                           "#{data(before: " -- ")}#{context(before: " -- ")}#{exception}"
+
+ENV["INSTANCE"]?.try do |instance_name|
+  Log.progname = instance_name
+  Log.setup backend: Log::IOBackend.new formatter: Log::InstancedFormat
+end
+
 require "db"
 require "pg" # Load the PGSQL driver
-
 require "./storage/s3"
 require "./cache/redis"
 require "./pubsub/redis"

@@ -17,6 +17,12 @@ class Api
       accumulate "path", check_file_path file.path
     end
 
+    project = @projects.read(project_id)
+    count_for_project = @files.count_for_project project_id
+    if count_for_project + 1 > project.allowed_file_amount
+      raise "Cannot create file #{file.path}, total allowed files count for project would exceed limit  #{count_for_project + 1}/#{project.allowed_file_amount}"
+    end
+
     # Check that parent directory exists
     components = file.path.split('/')
     base = (components[0...(components.size - 1)] + [""]).join "/"
@@ -77,6 +83,12 @@ class Api
       accumulate "path", check_directory_path file.path
     end
 
+    project = @projects.read(project_id)
+    count_for_project = @files.count_for_project project_id
+    if count_for_project + 1 > project.allowed_file_amount
+      raise "Cannot create directory #{file.path}, total allowed files count for project would exceed limit  #{count_for_project + 1}/#{project.allowed_file_amount}"
+    end
+
     # Check that parent directory exists
     components = file.path.split('/')
     base = (components[0...(components.size - 2)] + [""]).join "/"
@@ -122,13 +134,28 @@ class Api
     project_id = UUID.new ctx.path_parameter "project_id"
     file_path = ctx.path_wildcard
     file = ctx >> Request::UpdateFile
-    
-    blob_id = @files.get_blob_id(project_id, file_path)
 
+    existing = @files.read(project_id, file_path)
+    raise "File #{file_path} does not exists" unless existing
+
+    blob_id = existing.blob_id
     raise "No a file, cannot put content in a directory" unless blob_id
 
     content_type = "text/plain"
     size = file.content.size
+
+    if size >= existing.size
+      user = @users.read(user_id)
+      user_sum = @files.sum_for_user(user_id)
+      if user_sum + size > user.allowed_blob_size
+        raise "Cannot edit file #{file_path}, total allowed file size sum for user would exceed limit  #{user_sum + size}/#{user.allowed_blob_size}"
+      end
+      project = @projects.read(project_id)
+      project_sum = @files.sum_for_project(project_id)
+      if project_sum + size > project.allowed_blob_size
+        raise "Cannot edit file #{file_path}, total allowed file size sum for project would exceed limit  #{project_sum + size}/#{project.allowed_blob_size}"
+      end
+    end
 
     @storage.put(
       data: file.content,

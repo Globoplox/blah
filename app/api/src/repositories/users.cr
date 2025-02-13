@@ -15,8 +15,7 @@ class Repositories::Users::Database < Repositories::Users
     tag : String,
     allowed_projects : Int32,
     allowed_blob_size : Int32,
-    allowed_concurrent_job : Int32,
-    allowed_concurrent_tty : Int32
+    allowed_concurrent_job : Int32
   ) : UUID | DuplicateNameError | DuplicateEmailError
   
     credential_id = UUID.random
@@ -30,8 +29,7 @@ class Repositories::Users::Database < Repositories::Users
         tag, 
         allowed_projects,
         allowed_blob_size,
-        allowed_concurrent_job,
-        allowed_concurrent_tty 
+        allowed_concurrent_job
       }
 
       transaction.connection.exec <<-SQL, *user                                                                                                               
@@ -41,8 +39,7 @@ class Repositories::Users::Database < Repositories::Users
           tag, 
           allowed_project,                                                                                                                                    
           allowed_blob_size,                                                                                                                                  
-          allowed_concurrent_job,                                                                                                                             
-          allowed_concurrent_tty    
+          allowed_concurrent_job                                                                                                                            
         ) VALUES ($1, $2, $3, $4, $5, $6, $7)                                                                               
       SQL
 
@@ -70,7 +67,6 @@ class Repositories::Users::Database < Repositories::Users
         users.allowed_project,                                                                                                                          
         users.allowed_blob_size,                                                                                                                        
         users.allowed_concurrent_job,                                                                                                                  
-        users.allowed_concurrent_tty,   
         users.created_at,                                                                                                                
         credentials.email,                                                                                                                                       
         credentials.password_hash,                                                                                                                                       
@@ -90,7 +86,6 @@ class Repositories::Users::Database < Repositories::Users
         users.allowed_project,                                                                                                                          
         users.allowed_blob_size,                                                                                                                        
         users.allowed_concurrent_job,                                                                                                                  
-        users.allowed_concurrent_tty,   
         users.created_at
       FROM users                                                                                                                                                                                                              
       WHERE users.id = $1                                                                                                                            
@@ -106,7 +101,6 @@ class Repositories::Users::Database < Repositories::Users
         users.allowed_project,                                                                                                                          
         users.allowed_blob_size,                                                                                                                        
         users.allowed_concurrent_job,                                                                                                                  
-        users.allowed_concurrent_tty,   
         users.created_at      
       FROM users                                                                                                                                                                                                           
       WHERE users.name = $1                                                                                                                            

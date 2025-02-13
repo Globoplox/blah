@@ -76,6 +76,9 @@ export default function Project({api} : {api: Api}) {
   function doLoadProject() { 
     api.read_project(projectId).then(project => {
       setProject(project);
+    }).catch(error => {
+      if (error.code === ErrorCode.Unauthorized)
+        navigate(`/login?redirectTo=${location.pathname}`);
     });
   }
 
@@ -175,13 +178,9 @@ export default function Project({api} : {api: Api}) {
       api.update_file(project.id, file.path, editorContent.current);
     }
     // Open socket
-    const fileToRun = project.files?.find(_ => _.path == filePath)
-    api.run_file(project.id, fileToRun.path, (newSocket: WebSocket) => {
-      (socket as WebSocket)?.close();
-      newSocket.onopen = () => {
-        setSocket(newSocket);
-      };
-    });
+    const fileToRun = project.files?.find(_ => _.path == filePath);
+    (socket?.socket as WebSocket)?.close();
+    setSocket({key: Date.now(), socket: api.run_file(project.id, fileToRun.path)});
   }
 
   function NoFileOpened() {
@@ -242,7 +241,7 @@ export default function Project({api} : {api: Api}) {
           socket != null ? 
           <div className="mt-auto">
             <hr style={{margin: 0}}/>
-            <Terminal socket={socket}/>
+            <Terminal key={socket.key} socket={socket.socket}/>
           </div> : 
           <></>
         }

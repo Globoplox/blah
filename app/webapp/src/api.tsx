@@ -201,24 +201,8 @@ export class Api {
     });
   }
 
-  run_file(project_id: string, path: string, handler: (socket: WebSocket) => void) : Promise<null> {
-    return fetch(
-      `${API_SERVER_URI}/job/create`, {method: "POST", headers: this.#headers, credentials: 'include', body: JSON.stringify({path})}
-    ).then(response => {
-      if (response.ok)
-        response.json().then((job: Job) => {
-          const socket = new WebSocket(`${API_SERVER_URI}/project/${project_id}/job/${job.id}/initialize`);
-          socket.addEventListener("open", _ => {
-            fetch( `${API_SERVER_URI}/job/${job.id}/start`, {method: "PUT", headers: this.#headers, credentials: 'include'}).then(response => {
-              if (!response.ok)
-                return response.json().then(this.handleError.bind(this));
-            });
-          });
-          handler(socket);
-        });
-      else 
-        return response.json().then(this.handleError.bind(this))
-    }, this.mapNetworkError) as unknown as Promise<null>
+  run_file(project_id: string, path: string) : WebSocket {
+    return new WebSocket(`${API_SERVER_URI}/project/${project_id}/job/recipe${path}`);
   }
 }
 

@@ -126,4 +126,11 @@ class Repositories::Projects::Database < Repositories::Projects
         projects.created_at DESC
     SQL
   end
+
+  def count_for_user(user_id : UUID) : Int64
+    @connection.scalar(<<-SQL, user_id).as(Int64)
+      SELECT COUNT(id) FROM projects WHERE projects.user_id = $1
+    SQL
+  end
+
 end

@@ -15,6 +15,7 @@ class Api
   def open_session(user_id : UUID) : SessionID
     session_id = UUID.random
     @cache.set "session:#{session_id}", user_id.to_s
+    @cache.expire "session:#{session_id}", 8.hours
     session_id
   end
 
@@ -85,8 +86,7 @@ class Api
       tag: "0000", 
       allowed_projects: 5, 
       allowed_blob_size: 1_000_000, 
-      allowed_concurrent_job: 1,
-      allowed_concurrent_tty: 10
+      allowed_concurrent_job: 1
     )
 
     case user_id

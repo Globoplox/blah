@@ -5,7 +5,8 @@ services:
       dockerfile: app/api/Dockerfile
     environment:
       - ENV
-      - BIND_URI=tcp://0.0.0.0:3000
+      - REPLICATION=2
+      - BIND_URI=tcp://0.0.0.0:3000?reuse_port=true
       - DB_URI=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgsql:5432/${POSTGRES_DB}
       - CLIENT_ORIGIN=http://localhost:8080
       - S3_REGION
@@ -55,5 +56,7 @@ services:
       - "5432:5432"
   redis:
     image: redis:7.0-alpine
+    ports:
+      - "6379:6379"
     command: >
       -- requirepass "${REDIS_PASSWORD}"
