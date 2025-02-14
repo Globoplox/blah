@@ -67,15 +67,20 @@ export default function Terminal({socket, onRequestFullSize}: {socket: WebSocket
   const [onKeyDown,setOnKeyDown] = useState(null);
 
   socket.onmessage = ((message: MessageEvent<any>) => {
-    if (message.data == "\e?1049h") {
-      setBigTerminal(true);
-      setOptions({...baseOptions, rows: 40, cols: 120});
-      setKey(socket.url + 60 + 120);
-      //setOnKeyDown(() => onKeyDownHandler);
-    } else if (message.data == "\e?1049l") {
-      setBigTerminal(true);
-      setOptions({...baseOptions, rows: 40, cols: 120});
-      setKey(socket.url + 60 + 120);
+    if (typeof(message.data) == "object") {
+      const start = new TextDecoder("utf-8").decode(new Uint8Array(message.data.slice(0, 8)));
+      console.log(start)
+      console.log("\x1B[?1049h")
+      
+      if (start == "\x1B[?1049h") {
+        setBigTerminal(true);
+        setOptions({...baseOptions, rows: 40, cols: 170});
+        setKey(socket.url + 40 + 170);
+      } else if (start == "\x1B[?1049l") {
+        setBigTerminal(false);
+        setOptions({...baseOptions, rows: 15, cols: 80});
+        setKey(socket.url + 15 + 80);
+      }
     }
   });
 

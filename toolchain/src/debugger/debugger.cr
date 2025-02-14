@@ -15,6 +15,48 @@ module RiSC16
     @definitions : Hash(UInt16, {String, Char})
     @references : Hash(UInt16, String)
 
+    @keys = [] of Char | NCurses::KeyCode
+    def input_key : Char | NCurses::KeyCode  
+      return @keys.pop.not_nil! unless @keys.empty?
+      @stdin.blocking = true
+      key = @stdin.read_char
+      if key == '\e'
+        @stdin.blocking = false
+        @stdin.read_timeout = 10.milliseconds
+        begin
+          k2 = @stdin.read_char
+          if k2
+            unless k2 == '['
+              @keys.push k2
+              return key.not_nil!
+            else
+              begin
+                k3 = @stdin.read_char
+                case k3
+                when 'A' then return NCurses::KeyCode::UP
+                when 'B' then return NCurses::KeyCode::DOWN
+                when 'C' then return NCurses::KeyCode::RIGHT
+                when 'D' then return NCurses::KeyCode::LEFT
+                else
+                  @keys.push k2
+                  @keys.push k3 if k3
+                  return key.not_nil!
+                end
+              rescue ex : IO::TimeoutError
+                @keys.push k2
+                return key.not_nil!
+              end
+            end
+          else
+            return key.not_nil!
+          end
+        rescue ex : IO::TimeoutError
+          return key.not_nil!
+        end
+      end
+      return key || raise "EOF"
+    end
+
     def initialize(io, fs, @spec, @stdin, @stdout, io_mapping, @object = nil, at = 0)
       @section_stack_symbol_value = 0
 
@@ -83,13 +125,23 @@ module RiSC16
     end
 
     def run
-      @stdout.puts "test"
+      
 
       NCurses.open(@stdin, @stdout) do
         NCurses.cbreak
         NCurses.noecho
         NCurses.keypad true
         NCurses.notimeout true
+
+        # keys = [] of Char | NCurses::KeyCode
+        # loop do
+        #   # READ a key, blocking, interpreting escape sequences
+        #   NCurses.notimeout true
+        #   @stdout << ">"
+        #   key = input_key
+        #   @stdout.puts "Got '#{key.as?(Char).try(&.dump) || key}'"
+        # end
+
         window_cursor = 0
         windows = [] of Window
 
@@ -140,14 +192,18 @@ module RiSC16
         windows.first.focus = true
         loop do
           windows.each &.draw
-          case NCurses.getch
-          when 'q', NCurses::KeyCode::ESC then break
-          when 's'                        then @vm.step
-          when 'b' then if @breakpoints.includes? code.cursor
-            @breakpoints.delete code.cursor
-          else
-            @breakpoints.add code.cursor
-          end
+          key = input_key
+          case key
+          when 'q', '\e' 
+            break
+          when 's'      
+            @vm.step
+          when 'b'
+            if @breakpoints.includes? code.cursor
+              @breakpoints.delete code.cursor
+            else
+              @breakpoints.add code.cursor
+            end
           when 'c'
             loop do
               @vm.step
@@ -159,13 +215,18 @@ module RiSC16
           when NCurses::KeyCode::RIGHT
             window_cursor = (window_cursor + 1) % windows.size
             windows.each_with_index { |window, index| window.focus = index == window_cursor }
-          when NCurses::KeyCode::UP   then windows[window_cursor].up
-          when NCurses::KeyCode::DOWN then windows[window_cursor].down
+          when NCurses::KeyCode::UP   
+             windows[window_cursor].up
+          when NCurses::KeyCode::DOWN 
+             windows[window_cursor].down
           end
-
           NCurses.clear
         end
       end
+
+      @stdout.puts "\e[?1049l"
+      sleep 100.milliseconds
+
     end
   end
 end

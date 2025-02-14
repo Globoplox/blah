@@ -2,18 +2,27 @@ require "redis"
 require "./cache"
 
 class Cache::Redis < Cache
-  def self.from_environnment
-    new ::Redis::PooledClient.new(
-      host: ENV["REDIS_HOST"],
-      port: ENV["REDIS_PORT"].to_i,
-      database: ENV["REDIS_DB"].to_i,
-      password: ENV["REDIS_PASSWORD"],
-      pool_size: ENV["REDIS_POOL_SIZE"]?.try(&.to_i) || 20,
-      pool_timeout: 1.seconds.total_seconds
-    )
+  def self.from_environnment(no_pool = false)
+    unless no_pool
+      new ::Redis::PooledClient.new(
+        host: ENV["REDIS_HOST"],
+        port: ENV["REDIS_PORT"].to_i,
+        database: ENV["REDIS_DB"].to_i,
+        password: ENV["REDIS_PASSWORD"],
+        pool_size: ENV["REDIS_POOL_SIZE"]?.try(&.to_i) || 20,
+        pool_timeout: 1.seconds.total_seconds
+      )
+    else
+      new ::Redis.new(
+        host: ENV["REDIS_HOST"],
+        port: ENV["REDIS_PORT"].to_i,
+        database: ENV["REDIS_DB"].to_i,
+        password: ENV["REDIS_PASSWORD"]
+      )
+    end
   end
 
-  def initialize(@redis : ::Redis::PooledClient)
+  def initialize(@redis : ::Redis::PooledClient | ::Redis)
   end
 
   def set(key : String, value : String)

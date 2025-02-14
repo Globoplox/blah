@@ -1,10 +1,11 @@
-require "../../toolchain"
+require "./toolchain"
 require "colorize"
+require "./models/validations"
 
 # A fs that use the storage and database
 #
 # TODO: acl
-class JobFileSystem < Toolchain::Filesystem
+class Toolchain::AppFilesystem < Toolchain::Filesystem
   @storage : Storage
   @users : Repositories::Users
   @projects : Repositories::Projects
@@ -251,76 +252,4 @@ class JobFileSystem < Toolchain::Filesystem
     basename = "#{basename}#{extension}" if basename && extension
     Path[(directory || "."), basename].to_s
   end
-end
-
-class JobEventStream < Toolchain::EventStream
-  @socket : HTTP::WebSocket
-
-  def initialize(@socket)
-  end
-
-  protected def location(source : String?, line : Int32?, column : Int32?) : String?
-    location = [] of String
-    location << "in '#{source}'" if source
-    location << "at #{emphasis("line #{line}")}" if line                                                                                                    
-    location << "column #{column}" if column                                                                                                                
-    return nil if location.empty?
-    location.join " "
-  end
-
-  def emphasis(str)
-    str.colorize.bold.underline
-  end
-
-  protected def event_impl(level : Level, title : String, body : String?, locations : Array({String?, Int32?, Int32?}))
-    str = String.build do |io|
-  
-      io << case level
-        in Level::Warning then level.colorize(:yellow).bold
-        in Level::Error then level.colorize(:red).bold
-        in Level::Fatal then level.colorize(:red).bold
-        in Level::Context then level.colorize(:grey).bold
-        in Level::Success then level.colorize(:green).bold
-      end
-
-      io << ": "
-      io << title
-
-      locs = locations.compact_map do |(source, line, column)|
-        location(source, line, column)
-      end
-
-      if locs.empty?
-        io << '\n'
-      elsif locs.size == 1 && (body || @context.empty?)
-        io << " "
-        io << locs.first
-        io << '\n'
-      else
-        io << '\n'
-        locs.each do |location|
-          io << "- "
-          io << location.capitalize
-          io << '\n'
-        end
-      end
-
-      io.puts body if body && !body.empty?
-
-      @context.reverse_each do |(title, source, line, column)|
-        io << "While "
-        io << title
-        location(source, line, column).try do |l|
-          io << " "
-          io << l
-        end
-        io << '\n'
-      end
-
-      io.puts if !@context.empty?  
-    end
-
-    @socket.send str
-  end
-
 end

@@ -23,6 +23,8 @@ dependencies:
     github: agatan/ncurses.cr
 
 targets:
+  debugger:
+    main: src/debugger_main.cr
   api:
     main: src/main.cr
 

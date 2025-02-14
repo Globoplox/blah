@@ -311,5 +311,7 @@ class Toolchain
 
       RiSC16::Debugger.new(binary, @fs, spec, input, output, io_mapping, object: object, at: 0).run
     end
+    @events.event(:success, "Finished debug session '#{@events.emphasis(@fs.normalize source)}'")
+
   end
 end

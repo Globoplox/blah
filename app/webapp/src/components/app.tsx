@@ -12,8 +12,6 @@ import { useNavigate } from "react-router";
   - ACL
   - Temporary directory specifier that create a job local space for files that is not persisted ?
   - Markdown
-  - Debugger might actually works as is with xtermjs
-  - Might need a bigger tty for this
   - Filetree create file and directory buttons and maybe RUN on recipe files ?
   - Project page global toast
   - All auth related chore (reset, doube auth, email verification, oauth, device kick, ...)

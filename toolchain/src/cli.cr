@@ -2,125 +2,11 @@ require "option_parser"
 require "colorize"
 require "./toolchain"
 require "./debugger"
+require "./local_filesystem"
+require "./stderr_event_stream"
 
 # CLI front for Toolchain.
 module Clients::Cli
-
-  # Implement an event stream that simply log to 
-  # STDERR with a few ansi colors and effects. 
-  class CLIEventStream < Toolchain::EventStream
-    @debug = true
-
-    protected def location(source : String?, line : Int32?, column : Int32?) : String?
-      location = [] of String
-      location << "in '#{source}'" if source
-      location << "at #{emphasis("line #{line}")}" if line
-      location << "column #{column}" if column
-      return nil if location.empty?
-      location.join " "
-    end
-
-    def emphasis(str)
-      str.colorize.bold.underline
-    end
-
-    protected def event_impl(level : Level, title : String, body : String?, locations : Array({String?, Int32?, Int32?}))
-      STDERR << case level
-        in Level::Warning then level.colorize(:yellow).bold
-        in Level::Error then level.colorize(:red).bold
-        in Level::Fatal then level.colorize(:red).bold
-        in Level::Context then level.colorize(:grey).bold
-        in Level::Success then level.colorize(:green).bold
-      end
-    
-      STDERR << ": "
-      STDERR << title
-
-      locations = locations.compact_map do |(source, line, column)|
-        location(source, line, column)
-      end
-
-      if locations.empty?
-        STDERR << '\n'
-      elsif locations.size == 1 && (body || @context.empty?)
-        STDERR << " "
-        STDERR << locations.first
-        STDERR << '\n'
-      else
-        STDERR << '\n'
-        locations.each do |location|
-          STDERR << "- "
-          STDERR << location.capitalize
-          STDERR << '\n'
-        end
-      end
-
-      STDERR.puts body if body && !body.empty?
-
-      @context.reverse_each do |(title, source, line, column)|
-        STDERR << "While "
-        STDERR << title
-        location(source, line, column).try do |l| 
-          STDERR << " "
-          STDERR << l
-        end
-        STDERR << '\n'
-      end
-     
-      STDERR.puts if !@context.empty?
-    end
-  
-  end
-  
-  # Implement a filesystem provider that simply wrap the local filesystem.
-  class LocalFilesystem < Toolchain::Filesystem
-   
-    def normalize(path : String) : String
-      Path[path].relative_to("./").to_s
-    end
-
-    def absolute(path : String, root = nil) : String
-      if root
-        Path[path].expand(home:true, base: root).to_s
-      else
-        Path[path].expand(home:true).to_s
-      end
-    end
-    
-    def open(path : String, mode : String) : IO
-      File.open path, mode
-    end
-    
-    def read(path : String, block)
-      File.open path, "r" do |io|
-        block.call io
-      end
-    end
-    
-    def write(path : String, block)
-      File.open path, "w" do |io| 
-        block.call io
-      end
-    end
-    
-    def directory?(path : String) : Bool
-      File.directory? path
-    end
-    
-    def base(path : String) : {String, String?, String?} # directory, base name, extension
-      dir = File.dirname(path) || "."
-      ext = File.extname path
-      base = File.basename path, ext
-      base = nil if base.empty?
-      ext = nil if ext.empty?
-      {dir, base, ext}
-    end
-    
-    def path_for(directory : String, basename : String?, extension : String?)
-      basename = "#{basename}#{extension}" if basename && extension
-      Path[(directory || "."), basename].to_s
-    end
-  end
 
   begin
     sources_files = [] of String
@@ -209,8 +95,8 @@ module Clients::Cli
       puts help
     else
 
-      fs = LocalFilesystem.new
-      events = CLIEventStream.new
+      fs = Toolchain::LocalFilesystem.new
+      events = Toolchain::IOEventStream.new STDERR
       app = Toolchain.new debug, spec_file, macros, fs, events
       
       case command
@@ -224,8 +110,6 @@ module Clients::Cli
           STDERR << "More than one program specified" 
           exit 1
         end
-
-       
 
         if !debug
           io_mapping = {} of String => {IO, IO}
