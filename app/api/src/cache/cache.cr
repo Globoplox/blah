@@ -9,7 +9,7 @@ abstract class Cache
 
   abstract def decr(key) : Int64
   
-  abstract def setnx(key : String, value : String)
+  abstract def setnx(key : String, value : String) : Bool
 
   abstract def get(key : String) : String?
 

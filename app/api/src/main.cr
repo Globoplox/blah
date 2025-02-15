@@ -19,8 +19,14 @@ pubsub = PubSub::Redis.from_environnment
 # and loaded drivers.
 database = DB.open ENV["DB_URI"]
 
-# Run migrations if any
-Schema.migrate database, schema: "main"
+# Run migrations. Only one instance may run migration at the same time
+if cache.setnx "/database/lock", "lock"
+  begin
+    Schema.migrate database, schema: "main"
+  ensure
+    cache.unset "/database/lock"
+  end
+end
 
 # Back to dependencies
 users = Repositories::Users::Database.new database

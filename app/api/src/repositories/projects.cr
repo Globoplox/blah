@@ -121,7 +121,7 @@ class Repositories::Projects::Database < Repositories::Projects
       FROM projects
       LEFT JOIN users ON users.id = projects.owner_id
       LEFT JOIN user_project_acls ON user_project_acls.project_id = projects.id AND user_id = $2
-      WHERE projects.owner_id = $2 OR user_project_acls.id IS NOT NULL
+      WHERE projects.owner_id = $2 OR user_project_acls.project_id IS NOT NULL
       ORDER BY 
         LEVENSHTEIN(projects.name, COALESCE($1, projects.name)) DESC, 
         projects.created_at DESC
@@ -137,7 +137,7 @@ class Repositories::Projects::Database < Repositories::Projects
   def user_can_rw(project_id : UUID, user_id : UUID) : {Bool, Bool}
     @connection.query_one(<<-SQL, project_id, user_id, as: {Bool, Bool})
       SELECT 
-        (projects.public OR projects.owner_id = $2 OR user_project_acls.id IS NOT NULL) as can_red,  
+        (projects.public OR projects.owner_id = $2 OR user_project_acls.project_id IS NOT NULL) as can_red,  
         (projects.owner_id = $2 OR user_project_acls.can_write) as can_write
       FROM projects
       LEFT JOIN user_project_acls ON user_project_acls.project_id = $1 AND user_id = $2

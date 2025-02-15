@@ -29,8 +29,8 @@ class Cache::Redis < Cache
     @redis.set key, value
   end
 
-  def setnx(key : String, value : String)
-    @redis.setnx key, value
+  def setnx(key : String, value : String) : Bool
+    @redis.setnx(key, value) == 1
   end
 
   def incr(key) : Int64
