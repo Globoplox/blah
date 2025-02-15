@@ -8,6 +8,8 @@ dependencies:
   cradix:
     github: globoplox/cradix
     version: ~> 1.1.0
+  shimfs:
+    github: globoplox/shimfs
   pg:
     github: will/crystal-pg
   awscr-s3:

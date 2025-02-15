@@ -1,7 +1,7 @@
 require "../../toolchain"
 require "../../toolchain/io_event_stream"
 require "../../app_filesystem"
-
+require "shimfs"
 
 lib LibGNU
   fun openpty(master : LibC::Int*, slave : LibC::Int*, name : Void*, termios : Void*, winsize : Void*)
@@ -116,7 +116,9 @@ class Api
     @cache.incr "users/#{user_id}/quota"
     did_incr = true
 
-    fs = Toolchain::AppFilesystem.new @storage, @users, @projects, @files, @blobs, @notifications, project_id, user_id, es
+    shimfs = Shimfs.new  1024 * 128
+
+    fs = Toolchain::AppFilesystem.new @storage, @users, @projects, @files, @blobs, @notifications, project_id, user_id, es, shimfs
 
     recipe = es.with_context "Reading recipe file '#{recipe_path}'" do 
       fs.read(recipe_path) do |io|
@@ -218,7 +220,10 @@ class Api
             command.source, 
             command.symbol_source || "",
             project_id.to_s,
-            user_id.to_s
+            user_id.to_s,
+            shimfs.resource_name, 
+            shimfs.size.to_s, 
+            shimfs.address.to_s
           ]
 
           recipe.macros.each do |key, value|
@@ -232,9 +237,9 @@ class Api
             output: slave,
             error: slave,
           )
-          
-          process.try &.wait
 
+          process.try &.wait
+          
         ensure
           slave.close unless slave.closed? if slave
           master.close unless master.closed? if master

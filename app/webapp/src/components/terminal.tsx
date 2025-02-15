@@ -69,8 +69,7 @@ export default function Terminal({socket, onRequestFullSize}: {socket: WebSocket
   socket.onmessage = ((message: MessageEvent<any>) => {
     if (typeof(message.data) == "object") {
       const start = new TextDecoder("utf-8").decode(new Uint8Array(message.data.slice(0, 8)));
-      console.log(start)
-      console.log("\x1B[?1049h")
+
       
       if (start == "\x1B[?1049h") {
         setBigTerminal(true);
@@ -83,16 +82,6 @@ export default function Terminal({socket, onRequestFullSize}: {socket: WebSocket
       }
     }
   });
-
-  function onKeyDownHandler(event : KeyboardEvent<HTMLDivElement>) {
-    console.log(event);
-    if (event.key == 'Escape') {
-      setBigTerminal(false);
-      setOptions({...baseOptions, rows: 15, cols: 80});
-      setKey(socket.url + 15 + 80);
-      setOnKeyDown(null);
-    }
-  }
 
   // key used to force recreation of the terminal, react might try to be smarter than it is otherwise 
   return <div tabIndex={0} onKeyDown={onKeyDown} className={bigTerminal ? "modal-terminal" : ""}>

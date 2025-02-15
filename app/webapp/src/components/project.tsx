@@ -146,8 +146,6 @@ export default function Project({api} : {api: Api}) {
     if (file != null && fileToOpen.path == file.path)
       return;
    
-    const type = fileType(fileToOpen);
-
     if (syncTimeoutId.current != null) {
       clearTimeout(syncTimeoutId.current);
       syncTimeoutId.current = null;

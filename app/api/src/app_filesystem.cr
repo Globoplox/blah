@@ -2,9 +2,9 @@ require "./toolchain"
 require "colorize"
 require "./models/validations"
 
+require "shimfs"
+
 # A fs that use the storage and database
-#
-# TODO: acl
 class Toolchain::AppFilesystem < Toolchain::Filesystem
   @storage : Storage
   @users : Repositories::Users
@@ -15,11 +15,9 @@ class Toolchain::AppFilesystem < Toolchain::Filesystem
   @project_id : UUID
   @user_id : UUID
   @events : Toolchain::EventStream
-
-  @temporary_path : String
-  getter temporary_path
-
-  def initialize(@storage, @users, @projects, @files, @blobs, @notifications, @project_id, @user_id, @events, @temporary_path = Dir.tempdir)
+  @shimfs : Shimfs
+  
+  def initialize(@storage, @users, @projects, @files, @blobs, @notifications, @project_id, @user_id, @events, @shimfs)
     @user_name = @users.read(@user_id).name
     @project_name = @projects.read(@project_id).name
   end
@@ -29,6 +27,8 @@ class Toolchain::AppFilesystem < Toolchain::Filesystem
   end
 
   def absolute(path : String, root = nil) : String
+    @events.fatal!("Temporary file are not allowed in this context", nil) {} if path.starts_with? '@'
+
     components = path.split(":")
     if components.size == 1
       user_id = @user_name
@@ -53,8 +53,6 @@ class Toolchain::AppFilesystem < Toolchain::Filesystem
     end
   end
   
-  # TODO limit maximum individual file size
-  # Apply quotas
   class StorageIO < IO::Memory
     @storage : Storage 
     @users : Repositories::Users
@@ -170,6 +168,10 @@ class Toolchain::AppFilesystem < Toolchain::Filesystem
   end
 
   def open(path : String, mode : String) : IO
+    if path.starts_with? '@'
+      return @shimfs.open path, mode 
+    end
+
     user_name, project_name, path = absolute(path, "/").split(":")
     if user_name == @user_name
       user_id = @user_id
@@ -248,7 +250,7 @@ class Toolchain::AppFilesystem < Toolchain::Filesystem
     path.ends_with? "/"
   end
 
-  def base(path : String) : {String, String?, String?}    
+  def base(path : String) : {String, String?, String?}
     dir = File.dirname(path) || "."
     ext = File.extname path
     base = File.basename path, ext

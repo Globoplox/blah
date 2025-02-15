@@ -9,14 +9,11 @@ import { useNavigate } from "react-router";
 
 /*
   TODO:
-  - Retry debugger hosted in the same process
-  - If it does works, implement an easy in house FS for temporary files in jobs
   - Seed some public projects in migrations
   - Avatar, acl UI, public project explorer
 
   - Test ACL
 
-  - Temporary directory specifier that create a job local space for files that are not persisted
   - Markdown
   - Filetree create file and directory buttons and maybe RUN on recipe files ?
   - Project page global toast
