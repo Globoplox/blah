@@ -55,6 +55,7 @@ module Repositories
 
     abstract def read(id : UUID) : User
     abstract def get_by_name(name : String) : User?
+    abstract def set_avatar(user_id : UUID, blob_id : UUID?)
   end
 
   abstract class Projects
@@ -84,11 +85,22 @@ module Repositories
       property owner_name : String
     end
 
+    class Acl
+      include DB::Serializable
+      property user_id : UUID
+      property user_name : String
+      property can_write : Bool
+    end
+
     abstract def search_public(query  : String?) : Array(Project)
     abstract def search_owned(owner_id : UUID, query  : String?) : Array(Project)
     abstract def read(id  : UUID) : Project
     abstract def get_by_user_and_name(user_id : UUID, name : String) : Project?
     abstract def count_for_user(user_id : UUID) : Int64
+    abstract def user_can_rw(project_id : UUID, user_id : UUID) : {Bool, Bool}
+    abstract def acl(project_id : UUID) : Array(Acl)
+    abstract def set_acl(project_id : UUID, user_id : UUID, can_read : Bool, can_write : Bool)
+    abstract def set_avatar(project_id : UUID, blob_id : UUID?)
   end
 
   abstract class Blobs

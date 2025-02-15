@@ -120,7 +120,8 @@ class Repositories::Projects::Database < Repositories::Projects
         users.name as owner_name
       FROM projects
       LEFT JOIN users ON users.id = projects.owner_id
-      WHERE projects.owner_id = $2
+      LEFT JOIN user_project_acls ON user_project_acls.project_id = projects.id AND user_id = $2
+      WHERE projects.owner_id = $2 OR user_project_acls.id IS NOT NULL
       ORDER BY 
         LEVENSHTEIN(projects.name, COALESCE($1, projects.name)) DESC, 
         projects.created_at DESC
@@ -130,6 +131,52 @@ class Repositories::Projects::Database < Repositories::Projects
   def count_for_user(user_id : UUID) : Int64
     @connection.scalar(<<-SQL, user_id).as(Int64)
       SELECT COUNT(id) FROM projects WHERE projects.owner_id = $1
+    SQL
+  end
+
+  def user_can_rw(project_id : UUID, user_id : UUID) : {Bool, Bool}
+    @connection.query_one(<<-SQL, project_id, user_id, as: {Bool, Bool})
+      SELECT 
+        (projects.public OR projects.owner_id = $2 OR user_project_acls.id IS NOT NULL) as can_red,  
+        (projects.owner_id = $2 OR user_project_acls.can_write) as can_write
+      FROM projects
+      LEFT JOIN user_project_acls ON user_project_acls.project_id = $1 AND user_id = $2
+      WHERE projects.id = $1
+    SQL
+  end
+
+  def acl(project_id : UUID) : Array(Acl)
+    Acl.from_rs @connection.query <<-SQL, project_id
+      SELECT
+        user_project_acls.user_id,
+        users.name as user_name,
+        user_project_acls.can_write
+      FROM user_project_acls
+      JOIN users ON user_project_acls.user_id = users.id
+      WHERE project_id = $1
+    SQL
+  end
+
+  def set_acl(project_id : UUID, user_id : UUID, can_read : Bool, can_write : Bool)
+    raise "Bad acl: can_read cannot be false if can_write is true" if !can_read && can_write
+    if !can_read
+      @connection.exec <<-SQL, project_id, user_id
+        DELETE FROM user_project_acls WHERE project_id = $1 AND user_id = $2
+      SQL
+    else
+      @connection.exec <<-SQL, project_id, user_id, can_write
+        INSERT INTO user_project_acls 
+          (project_id, user_id, can_write) 
+        VALUES 
+          ($1, $2, $3)
+        ON CONFLICT (projec_id, user_id) DO UPDATE SET can_write = $3;
+      SQL
+    end
+  end
+
+  def set_avatar(project_id : UUID, blob_id : UUID?)
+    @connection.exec <<-SQL, project_id, blob_id
+      UPDATE projects SET blob_id = $2 WHERE id = $1
     SQL
   end
 

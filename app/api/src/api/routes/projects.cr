@@ -94,6 +94,9 @@ class Api
     user_id = authenticate(ctx)
     project_id = UUID.new ctx.path_parameter "id"
 
+    can_read, can_write = @projects.user_can_rw project_id, user_id
+    raise "Access forbidden" unless can_read
+
     project = @projects.read(project_id)
     files = @files.list(project_id)
 
@@ -154,6 +157,9 @@ class Api
     user_id = authenticate(ctx)
     project_id = UUID.new ctx.path_parameter "id"
     
+    can_read, can_write = @projects.user_can_rw project_id, user_id
+    raise "Access forbidden" unless can_read
+
     subscription_creation = @notifications.on_file_created project_id, ->(path : String) do
       @files.read(project_id, path).try do |file|
         socket.send({event: "created", file: repository_file_to_response_file(file)}.to_json)

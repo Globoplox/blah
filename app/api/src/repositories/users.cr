@@ -106,4 +106,10 @@ class Repositories::Users::Database < Repositories::Users
       WHERE users.name = $1                                                                                                                            
     SQL
   end
+
+  def set_avatar(user_id : UUID, blob_id : UUID?)
+    @connection.exec <<-SQL, user_id, blob_id
+      UPDATE users SET blob_id = $2 WHERE id = $1
+    SQL
+  end
 end

@@ -98,6 +98,10 @@ class Api
     user_id = authenticate(ctx)
     project_id = UUID.new ctx.path_parameter "project_id"
     recipe_path = ctx.path_wildcard
+
+    can_read, can_write = @projects.user_can_rw project_id, user_id
+    raise "Access forbidden" unless can_read
+
     socket_output = SocketIO.new socket
 
     es = Toolchain::IOEventStream.new socket_output

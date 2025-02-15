@@ -11,6 +11,9 @@ class Api
     user_id = authenticate(ctx)
     project_id = UUID.new ctx.path_parameter "project_id"
 
+    can_read, can_write = @projects.user_can_rw project_id, user_id
+    raise "Access forbidden" unless can_write
+
     file = ctx >> Request::CreateFile
 
     Validations.validate! do
@@ -77,6 +80,9 @@ class Api
     user_id = authenticate(ctx)
     project_id = UUID.new ctx.path_parameter "project_id"
 
+    can_read, can_write = @projects.user_can_rw project_id, user_id
+    raise "Access forbidden" unless can_write
+
     file = ctx >> Request::CreateFile
 
     Validations.validate! do
@@ -135,6 +141,9 @@ class Api
     file_path = ctx.path_wildcard
     file = ctx >> Request::UpdateFile
 
+    can_read, can_write = @projects.user_can_rw project_id, user_id
+    raise "Access forbidden" unless can_write
+
     existing = @files.read(project_id, file_path)
     raise "File #{file_path} does not exists" unless existing
 
@@ -185,6 +194,10 @@ class Api
   route DELETE, "/projects/:project_id/files/*", def delete_file(ctx)
     user_id = authenticate(ctx)
     project_id = UUID.new ctx.path_parameter "project_id"
+
+    can_read, can_write = @projects.user_can_rw project_id, user_id
+    raise "Access forbidden" unless can_write
+
     file_path = ctx.path_wildcard
     blob_id = @files.get_blob_id(project_id: project_id, path: file_path)
     @files.delete(project_id: project_id, path: file_path)
@@ -208,6 +221,9 @@ class Api
     user_id = authenticate(ctx)
     project_id = UUID.new ctx.path_parameter "project_id"
     file = ctx >> Request::MoveFile
+
+    can_read, can_write = @projects.user_can_rw project_id, user_id
+    raise "Access forbidden" unless can_write
 
     if @files.is_directory? project_id: project_id, path: file.old_path      
       # Check path is a valid file path

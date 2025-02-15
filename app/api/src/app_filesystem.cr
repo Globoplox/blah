@@ -16,7 +16,10 @@ class Toolchain::AppFilesystem < Toolchain::Filesystem
   @user_id : UUID
   @events : Toolchain::EventStream
 
-  def initialize(@storage, @users, @projects, @files, @blobs, @notifications, @project_id, @user_id, @events)
+  @temporary_path : String
+  getter temporary_path
+
+  def initialize(@storage, @users, @projects, @files, @blobs, @notifications, @project_id, @user_id, @events, @temporary_path = Dir.tempdir)
     @user_name = @users.read(@user_id).name
     @project_name = @projects.read(@project_id).name
   end
@@ -194,6 +197,9 @@ class Toolchain::AppFilesystem < Toolchain::Filesystem
 
     case mode
     when "r"
+      can_read, can_write = @projects.user_can_rw project_id, user_id
+      raise "Access forbidden" unless can_read
+
       file = @files.read(project_id, path)
 
       if file.nil?
@@ -216,6 +222,9 @@ class Toolchain::AppFilesystem < Toolchain::Filesystem
       return IO::Memory.new content, writeable: false
     
     when "w"
+      can_read, can_write = @projects.user_can_rw project_id, user_id
+      raise "Access forbidden" unless can_read
+
       if user_id != @user_id
         @events.with_context "Opening '#{path}'" do
           @events.fatal!("Cannot write files in other users projects") {}
