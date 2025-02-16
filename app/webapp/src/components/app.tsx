@@ -10,9 +10,14 @@ import { useNavigate } from "react-router";
 /*
   TODO:
   - Seed some public projects in migrations
-  - Avatar, acl UI, public project explorer
+  - Self Profile page
+  - Disconnect button in uri
+  - Project acl dropdown in navigation in projects ?
+  - Can access projects without user if project is public
 
-  - Test ACL
+    Public (Owned) / Public / Private (owned) / Private (can read) / Private (can write)
+    If private owned, is a dropdown
+      With avatar and name of users and a checkbox of right
 
   - Markdown
   - Filetree create file and directory buttons and maybe RUN on recipe files ?

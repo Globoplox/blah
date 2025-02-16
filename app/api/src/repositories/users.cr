@@ -52,7 +52,7 @@ class Repositories::Users::Database < Repositories::Users
 
     user_id
   rescue ex : PQ::PQError
-    return DuplicateNameError.new if ex.fields.any? { |field| field.name == :constraint_name && field.message == "users_name_key" }
+    return DuplicateNameError.new if ex.fields.any? { |field| field.name == :constraint_name && field.message == "users_name_key" || field.message == "users_name_tag_key"}
     return DuplicateEmailError.new if ex.fields.any? { |field| field.name == :constraint_name && field.message == "users_email_key" }
     raise ex
   end
@@ -70,7 +70,7 @@ class Repositories::Users::Database < Repositories::Users
         users.created_at,                                                                                                                
         credentials.email,                                                                                                                                       
         credentials.password_hash,                                                                                                                                       
-        credentials.id as credential_id                                                                                                                                    
+        credentials.id as credential_id
       FROM credentials
         LEFT JOIN users ON users.id = credentials.user_id                                                                                                    
       WHERE credentials.email = $1                                                                                                                            
@@ -86,7 +86,8 @@ class Repositories::Users::Database < Repositories::Users
         users.allowed_project,                                                                                                                          
         users.allowed_blob_size,                                                                                                                        
         users.allowed_concurrent_job,                                                                                                                  
-        users.created_at
+        users.created_at,
+        users.avatar_blob_id      
       FROM users                                                                                                                                                                                                              
       WHERE users.id = $1                                                                                                                            
     SQL
@@ -101,7 +102,8 @@ class Repositories::Users::Database < Repositories::Users
         users.allowed_project,                                                                                                                          
         users.allowed_blob_size,                                                                                                                        
         users.allowed_concurrent_job,                                                                                                                  
-        users.created_at      
+        users.created_at,
+        users.avatar_blob_id      
       FROM users                                                                                                                                                                                                           
       WHERE users.name = $1                                                                                                                            
     SQL
@@ -109,7 +111,7 @@ class Repositories::Users::Database < Repositories::Users
 
   def set_avatar(user_id : UUID, blob_id : UUID?)
     @connection.exec <<-SQL, user_id, blob_id
-      UPDATE users SET blob_id = $2 WHERE id = $1
+      UPDATE users SET avatar_blob_id = $2 WHERE id = $1
     SQL
   end
 end

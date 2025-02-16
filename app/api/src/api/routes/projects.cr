@@ -182,4 +182,22 @@ class Api
       subscription_moved.cancel
     end
   end
+
+  class RightStatus
+    include JSON::Serializable
+    property owned : Bool
+    property public : Bool
+    property acls : Array(Acl)?
+    class Acl
+      include JSON::Serializable
+      property user_id : UUID
+      property name : String
+      property avatar_uri : String?
+      property can_write : Bool
+    end
+  end
+
+  route GET, "/projects/:id/acl", def get_project_acl
+  end
+
 end

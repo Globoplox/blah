@@ -21,7 +21,7 @@ module Repositories
       tag : String,
       allowed_projects : Int32,
       allowed_blob_size : Int32,
-      allowed_concurrent_job : Int32
+      allowed_concurrent_job : Int32,
     ) : UUID | DuplicateNameError | DuplicateEmailError
 
     class UserWithCredentials
@@ -29,7 +29,6 @@ module Repositories
       property id : UUID
       property name : String
       property tag : String
-      property avatar_id : UUID?
       property allowed_blob_size : Int32
       property allowed_project : Int32
       property allowed_concurrent_job : Int32
@@ -46,7 +45,7 @@ module Repositories
       property id : UUID
       property name : String
       property tag : String
-      property avatar_id : UUID?
+      property avatar_blob_id : UUID?
       property allowed_blob_size : Int32
       property allowed_project : Int32
       property allowed_concurrent_job : Int32

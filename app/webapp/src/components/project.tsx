@@ -203,7 +203,7 @@ export default function Project({api} : {api: Api}) {
 
   return (
     <Stack style={{width: "100%"}}>
-    <Navigation></Navigation>
+    <Navigation api={api}></Navigation>
     <hr style={{margin: 0}}/>
     <Stack direction="horizontal" style={{height: "100%", width: "100%"}}>
 

@@ -1,6 +1,22 @@
 require "crypto/bcrypt"
+require "pluto"
+require "pluto/format/jpeg"
+require "pluto/format/png"
 
 class Api
+
+  class User
+    include JSON::Serializable
+    property name : String
+    property avatar_uri : String?
+    property allowed_blob_size : Int32
+    property allowed_project : Int32
+    property allowed_concurrent_job : Int32
+    property created_at : Time
+
+    def initialize(@name, @avatar_uri, @allowed_blob_size, @allowed_project, @allowed_concurrent_job, @created_at)
+    end
+  end
 
   def authenticate(ctx) : UUID
     session_id = get_session_cookie(ctx)
@@ -99,7 +115,16 @@ class Api
     session_id = open_session(user_id)
     set_session_cookie(ctx, session_id, registration.stay_signed)
 
+    user = @users.read(user_id)
     ctx.response.status = HTTP::Status::CREATED
+    ctx << User.new(
+      name: user.name,
+      avatar_uri: user.avatar_blob_id.try { |blob_id| @storage.uri(blob_id.to_s) },
+      allowed_blob_size: user.allowed_blob_size,
+      allowed_project: user.allowed_project,
+      allowed_concurrent_job: user.allowed_concurrent_job,
+      created_at: user.created_at
+    )
   end
 
   class Request::Login
@@ -123,11 +148,31 @@ class Api
     
     session_id = open_session(user_and_credentials.id)
     set_session_cookie(ctx, session_id, login.stay_signed)
+
+    user = @users.read(user_and_credentials.id)
     ctx.response.status = HTTP::Status::CREATED
+    ctx << User.new(
+      name: user.name,
+      avatar_uri: user.avatar_blob_id.try { |blob_id| @storage.uri(blob_id.to_s) },
+      allowed_blob_size: user.allowed_blob_size,
+      allowed_project: user.allowed_project,
+      allowed_concurrent_job: user.allowed_concurrent_job,
+      created_at: user.created_at
+    )
   end
 
   route GET, "/self", def get_self(ctx)
     user_id = authenticate(ctx)
+    user = @users.read(user_id)
+    ctx.response.status = HTTP::Status::OK
+    ctx << User.new(
+      name: user.name,
+      avatar_uri: user.avatar_blob_id.try { |blob_id| @storage.uri(blob_id.to_s) },
+      allowed_blob_size: user.allowed_blob_size,
+      allowed_project: user.allowed_project,
+      allowed_concurrent_job: user.allowed_concurrent_job,
+      created_at: user.created_at
+    )
   end
 
   route DELETE, "/disconnect", def disconnect(ctx)
@@ -137,4 +182,60 @@ class Api
     ctx.response.status = HTTP::Status::NO_CONTENT
   end
 
+  AVATAR_EDGE_SIZE = 180
+
+  route POST, "/users/self/avatar", def put_self_avatar(ctx)
+    user_id = authenticate(ctx)
+
+    case ctx.request.headers["content-type"]
+    when "image/png"  then pic = Pluto::ImageRGBA.from_png ctx.request.body || raise Error::MissingBody.new
+    when "image/jpeg" then pic = Pluto::ImageRGBA.from_jpeg ctx.request.body || raise Error::MissingBody.new
+    else                   raise "unexpected picture format"
+    end
+
+    edge = Math.min pic.width, pic.height
+    data = IO::Memory.new
+    pic.crop!(
+      (pic.width - edge) // 2,
+      (pic.height - edge) // 2,
+      edge,
+      edge
+    ).bilinear_resize!(AVATAR_EDGE_SIZE, AVATAR_EDGE_SIZE).to_png data
+    data.rewind
+
+    content_type = "image/png"
+    size = data.size
+
+    user = @users.read(user_id)
+
+    user.avatar_blob_id.try do |existing|
+      @blobs.delete(existing)
+      @storage.delete(existing.to_s)
+    end 
+    
+    blob_id = @blobs.insert(
+      content_type: content_type,
+      size: size
+    )
+
+    @storage.put(
+      data: data, 
+      mime: content_type, 
+      name: blob_id.to_s,
+      acl: Storage::ACL::Private
+    )
+
+    @users.set_avatar(user_id, blob_id)
+
+    ctx << User.new(
+      name: user.name,
+      avatar_uri: user.avatar_blob_id.try { |blob_id| @storage.uri(blob_id.to_s) },
+      allowed_blob_size: user.allowed_blob_size,
+      allowed_project: user.allowed_project,
+      allowed_concurrent_job: user.allowed_concurrent_job,
+      created_at: user.created_at
+    )
+
+    ctx.response.status = HTTP::Status::CREATED
+  end
 end

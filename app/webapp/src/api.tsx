@@ -49,11 +49,25 @@ export type Job = {
   started: boolean
 }
 
+export type User = {
+  name: string,
+  avatar_uri: string
+}
+
 export type IDResponse = {id: string}
 
 export class Api {
 
   #headers = new Headers({'content-type': 'application/json'})
+  user : User = null
+  emitter = new EventTarget();
+
+  constructor() {
+    this.self().catch(error => {
+      if (error.code != ErrorCode.Unauthorized)
+        return error;
+    });
+  }
 
   handleError(error: Error) {
     return Promise.reject(error)
@@ -63,30 +77,58 @@ export class Api {
       return Promise.reject({code: ErrorCode.NetworkError, error: "Network error", message: JSON.stringify(error)})
   }
 
-  login(email: string, password: string, staySignedIn : boolean) : Promise<null | Error> {
+  login(email: string, password: string, staySignedIn : boolean) : Promise<User> {
     const body = {email, password, stay_signed: staySignedIn};
-
     return fetch(
       `${API_SERVER_URI}/login`, {method: "PUT", headers: this.#headers, body: JSON.stringify(body), credentials: 'include'}
     ).then(response => {
       if (response.ok)
-        return null
+        return response.json().then((user: User) => {
+          this.user = user;
+          const event = new Event('user-change');
+          (event as any).data = user;
+          this.emitter.dispatchEvent(event);
+          return user
+        });
       else 
         return response.json().then(this.handleError.bind(this))
-    }, this.mapNetworkError)
+    }, this.mapNetworkError) as unknown as Promise<User>
   }
 
-  register(email: string, name: string, password: string, staySignedIn : boolean) : Promise<null> {
+  self() : Promise<User> {
+    return fetch(
+      `${API_SERVER_URI}/self`, {method: "GET", headers: this.#headers, credentials: 'include'}
+    ).then(response => {
+      if (response.ok)
+        return response.json().then((user: User) => {
+          this.user = user;
+          const event = new Event('user-change');
+          (event as any).data = user;
+          this.emitter.dispatchEvent(event);
+          return user
+        });
+      else 
+        return response.json().then(this.handleError.bind(this))
+    }, this.mapNetworkError) as unknown as Promise<User>
+  }
+
+  register(email: string, name: string, password: string, staySignedIn : boolean) : Promise<User> {
     const body = {email, name, password, stay_signed: staySignedIn};
 
     return fetch(
       `${API_SERVER_URI}/register`, {method: "POST", headers: this.#headers, body: JSON.stringify(body), credentials: 'include'}
     ).then(response => {
-      if (response.ok)
-        return null
+      if (response.ok) 
+        return response.json().then((user: User) => {
+          this.user = user;
+          const event = new Event('user-change');
+          (event as any).data = user;
+          this.emitter.dispatchEvent(event);
+          return user
+        });
       else 
         return response.json().then(this.handleError.bind(this))
-    }, this.mapNetworkError) as unknown as Promise<null>
+    }, this.mapNetworkError) as unknown as Promise<User>
   }
 
   create_project(name: string, isPublic: boolean, description: string) : Promise<IDResponse> {
@@ -203,6 +245,17 @@ export class Api {
 
   run_file(project_id: string, path: string) : WebSocket {
     return new WebSocket(`${API_SERVER_URI}/project/${project_id}/job/recipe${path}`);
+  }
+
+  set_avatar(avatar : any) : Promise<null> {
+    return fetch(
+      `${API_SERVER_URI}/users/self/avatar`, {method: "POST", headers: {...this.#headers, "Content-Type": avatar.type}, credentials: 'include', body: avatar}
+    ).then(response => {
+      if (response.ok)
+        return null
+      else 
+        return response.json().then(this.handleError.bind(this))
+    }, this.mapNetworkError) as unknown as Promise<null>
   }
 }
 

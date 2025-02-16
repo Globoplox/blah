@@ -29,6 +29,14 @@ module.exports = {
       },
 
       {
+        test: /\.jpg($|\?)|\.png($|\?)|\.bmp($|\?)|\.webp($|\?)/i,
+        type: 'asset/resource',
+        generator: {
+            filename: 'pictures/[name][ext][query]'
+        }
+      },
+
+      {
         test: /\.ts(x)?$/,
         loader: 'ts-loader',
       },
