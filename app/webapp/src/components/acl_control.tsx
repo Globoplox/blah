@@ -48,7 +48,9 @@ export default function ACLControl({api, project}: {api: Api, project: Project})
   }
 
   function AclListEntry({acl}: {acl: ACLEntry}) {
-    const [mode, setMode] = useState(getMode(acl));
+    const isYou = acl.user_id == api.user?.id;
+
+    const [mode, setMode] = useState(isYou ? 3 : getMode(acl));
 
     function getMode(acl: ACLEntry) : string {
       if (acl.can_read && acl.can_write)
@@ -77,9 +79,10 @@ export default function ACLControl({api, project}: {api: Api, project: Project})
       });
     }
 
+
     return <Row className="mt-2 d-flex">
      <Col xs="5">
-        <Form.Select className="ms-2" size="sm" value={mode} onChange={onChange}>
+        <Form.Select disabled={isYou} className="ms-2" size="sm" value={mode} onChange={onChange}>
           <option value="1">No Access</option>
           <option value="2">Read only</option>
           <option value="3">Read & Write</option>
@@ -88,6 +91,7 @@ export default function ACLControl({api, project}: {api: Api, project: Project})
       <Col xs="7">
         <Image width="32" height="32" src={acl.avatar_uri ? acl.avatar_uri : "/pictures/default_avatar.jpg"} roundedCircle />
         <u className="ms-3 my-auto">{acl.name}</u>
+        {isYou ? <span className="ms-1">(you)</span> : <></>}
       </Col>
     </Row>;
   }

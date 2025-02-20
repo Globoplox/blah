@@ -215,7 +215,7 @@ export default function Project({api} : {api: Api}) {
       <div style={{width: "17.5%", height: "calc(100vh - 0.5in - 1px)"}}>
         {
           project != null
-          ? <Filetree api={api} project={JSON.parse(JSON.stringify(project))} onDelete={onFileTreeDelete} onOpen={onFileTreeOpen} onCreate={onFileTreeCreate} onMove={onFileTreeMove}/>
+          ? <Filetree api={api} project={JSON.parse(JSON.stringify(project))} onDelete={onFileTreeDelete} onOpen={onFileTreeOpen} onCreate={onFileTreeCreate} onMove={onFileTreeMove} onRun={onRunFile}/>
           : <div className="d-flex align-items-center mt-3" style={{width: "100%"}}>
               <Spinner size="sm" className="ms-auto"/>
               <strong className="ms-2 me-auto">Loading...</strong>
@@ -226,11 +226,6 @@ export default function Project({api} : {api: Api}) {
       <div className="vr" />
 
       <Stack direction="vertical" style={{height: "calc(100vh - 0.5in - 1px)"}}>
-        {
-          (file != null && file.type == "json") ?
-          <Button style={{position: "absolute", top: 0, right: 0}} onClick={() => onRunFile(file.path)}>Run</Button> :
-          <></>
-        }
 
         {
           file != null ?

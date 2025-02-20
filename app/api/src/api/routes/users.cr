@@ -13,8 +13,9 @@ class Api
     property allowed_project : Int32
     property allowed_concurrent_job : Int32
     property created_at : Time
+    property id : UUID
 
-    def initialize(@name, @avatar_uri, @allowed_blob_size, @allowed_project, @allowed_concurrent_job, @created_at)
+    def initialize(@name, @avatar_uri, @allowed_blob_size, @allowed_project, @allowed_concurrent_job, @created_at, @id)
     end
   end
 
@@ -123,7 +124,8 @@ class Api
       allowed_blob_size: user.allowed_blob_size,
       allowed_project: user.allowed_project,
       allowed_concurrent_job: user.allowed_concurrent_job,
-      created_at: user.created_at
+      created_at: user.created_at,
+      id: user_id
     )
   end
 
@@ -157,7 +159,8 @@ class Api
       allowed_blob_size: user.allowed_blob_size,
       allowed_project: user.allowed_project,
       allowed_concurrent_job: user.allowed_concurrent_job,
-      created_at: user.created_at
+      created_at: user.created_at,
+      id: user_and_credentials.id
     )
   end
 
@@ -171,7 +174,8 @@ class Api
       allowed_blob_size: user.allowed_blob_size,
       allowed_project: user.allowed_project,
       allowed_concurrent_job: user.allowed_concurrent_job,
-      created_at: user.created_at
+      created_at: user.created_at,
+      id: user_id
     )
   end
 
@@ -233,7 +237,8 @@ class Api
       allowed_blob_size: user.allowed_blob_size,
       allowed_project: user.allowed_project,
       allowed_concurrent_job: user.allowed_concurrent_job,
-      created_at: user.created_at
+      created_at: user.created_at,
+      id: user_id
     )
 
     ctx.response.status = HTTP::Status::CREATED

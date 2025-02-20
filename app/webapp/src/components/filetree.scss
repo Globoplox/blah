@@ -4,7 +4,8 @@
     cursor: pointer;
     font-weight: 400;
     font-size: 14px;
-    user-select: none;border: 1px dashed transparent;
+    //user-select: none;
+    border: 1px dashed transparent;
 }
 
 [role="treeitem"]:focus-visible {
@@ -55,4 +56,9 @@
 .edit-item input:focus {
     box-shadow: none;
 }
-    // role treeitem.edit-item / div / input 
+
+.bigger-on-hover:hover {
+    position: relative;
+    font-size: 18px;
+    left: 2px;
+}

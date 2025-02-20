@@ -66,12 +66,17 @@ export default function Terminal({socket, onClose}: {socket: WebSocket, onClose?
   const [options, setOptions] = useState({...baseOptions, rows: 15, cols: 80});
   const [key, setKey] = useState(socket.url + options.cols + options.rows);
   const [onKeyDown,setOnKeyDown] = useState(null);
+  const termRef : React.MutableRefObject<XTerm> = useRef();
+
+  useEffect(() => {
+    setTimeout(() => {
+      termRef.current?.focus();  
+    }, 200); // It just works
+  }, [key]);
 
   socket.onmessage = ((message: MessageEvent<any>) => {
     if (typeof(message.data) == "object") {
       const start = new TextDecoder("utf-8").decode(new Uint8Array(message.data.slice(0, 8)));
-
-      
       if (start == "\x1B[?1049h") {
         setBigTerminal(true);
         setOptions({...baseOptions, rows: 40, cols: 170});
@@ -88,7 +93,7 @@ export default function Terminal({socket, onClose}: {socket: WebSocket, onClose?
 
   // key used to force recreation of the terminal, react might try to be smarter than it is otherwise 
   return <div style={{position: "relative"}} tabIndex={0} onKeyDown={onKeyDown} className={bigTerminal ? "modal-terminal" : ""}>
-    <XTerm key={key} options={options} addons={[new AttachAddon(socket, {bidirectional: true})]} />
+    <XTerm ref={termRef} key={key} options={options} addons={[new AttachAddon(socket, {bidirectional: true})]} />
     <CloseButton aria-label="Close terminal" style={{position: "absolute", top: bigTerminal ? "4%" : "16px", right: bigTerminal ? "2%" : "16px"}} onClick={() => onClose?.()}/>
   </div>;
 }

@@ -64,7 +64,8 @@ export type Job = {
 
 export type User = {
   name: string,
-  avatar_uri: string
+  avatar_uri: string,
+  id: string
 }
 
 export type IDResponse = {id: string}

@@ -7,18 +7,24 @@ import { RiArrowRightSLine } from "react-icons/ri";
 import useResizeObserver from "use-resize-observer";
 import Toast from 'react-bootstrap/Toast';
 import ToastContainer from 'react-bootstrap/ToastContainer';
+import Stack from 'react-bootstrap/Stack';
+import { FaRegFile } from "react-icons/fa";
+import { FaRegFolder } from "react-icons/fa";
+import { GrPlay } from "react-icons/gr";
+
 import "./filetree.scss";
 
 type NodeData = {id: string, name: string, children: NodeData[], isRoot?: boolean}
 type Toast = {id: number, body: string}
 
-export default function Filetree({api, project, onOpen = null, onDelete = null, onCreate = null, onMove = null}: {
+export default function Filetree({api, project, onOpen = null, onDelete = null, onCreate = null, onMove = null, onRun = null}: {
     api: Api, 
     project: Project,
     onOpen?: (file: ProjectFile) => void,
     onCreate?: (file: ProjectFile) => void,
     onMove?: (oldPath: string, file: ProjectFile) => void,
     onDelete?: (id: string) => void,  
+    onRun?: (id: string) => void
 }) {
 
   function traverse(node: NodeData, proc: (_: NodeData) => void) {
@@ -222,7 +228,7 @@ export default function Filetree({api, project, onOpen = null, onDelete = null, 
 
   function FolderArrow({node}: {node: NodeApi<NodeData>}) {
     if (node.isLeaf || node.isEditing) return <></>;
-    return (<span>{node.isOpen ? <RiArrowDownSLine/> : <RiArrowRightSLine/>}</span>);
+    return node.isOpen ? <RiArrowDownSLine/> : <RiArrowRightSLine/>;
   }
 
   function Input({ node }: { node: NodeApi<NodeData> }) {
@@ -272,6 +278,19 @@ export default function Filetree({api, project, onOpen = null, onDelete = null, 
     );
   }
 
+  function NormalNode({node}: {node: NodeData}) {
+    if (node.children != null)
+      return <>
+        {node.name}
+        {/*<span className="ms-auto me-2"> <FaRegFile className="bigger-on-hover"/> </span>
+        <span className="me-2"> <FaRegFolder className="bigger-on-hover" /> </span> */}
+      </>;
+    else if (node.name.endsWith(".recipe"))
+      return <>{node.name}<span className="ms-auto me-2"><GrPlay className="bigger-on-hover" onClick={() => onRun?.(node.id)}/></span></>
+    else
+      return <>{node.name}</>;
+  }
+
   function Node({node, tree, style, dragHandle}: NodeRendererProps<NodeData>) {
     const classNames = [];
     if (node.data.isRoot == true)
@@ -282,15 +301,16 @@ export default function Filetree({api, project, onOpen = null, onDelete = null, 
       classNames.push("will-receive-drop-item");
 
     return (
-      <div
+      <Stack
         ref={dragHandle}
         style={style}
         onClick={() => node.isInternal && node.toggle()}
         className={classNames.join(' ')}
+        direction="horizontal"
       >
         <FolderArrow node={node} />
-        <span>{node.isEditing ? <Input node={node}/> : node.data.name}</span>
-      </div>
+        {node.isEditing ? <Input node={node}/> : <NormalNode node={node.data}/>}
+      </Stack>
     );
   }
 
