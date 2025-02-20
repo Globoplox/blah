@@ -127,12 +127,14 @@ class Api
     end
 
     toolchain = Toolchain.new false, recipe.spec_path, recipe.macros, fs, es
-  
-    recipe.commands.each do |command|
-      spawn do
-        socket.run
-      end
+    on_close = [] of Proc(Void)
 
+    spawn do
+      socket.run
+      on_close.each &.call
+    end
+
+    recipe.commands.each do |command|
       total_step = 0
       step_limit = 1_000_000
 
@@ -171,6 +173,16 @@ class Api
             end
           end
 
+          on_close.push(->() do
+            socket_pipe_output.close 
+            socket_pipe_input.close
+            io_mapping.each do |_, value|
+              in_io, out_io = value
+              in_io.close
+              out_io.close
+            end
+          end)
+
           remaining_step = step_limit - total_step
           total_step += toolchain.run(command.source, io_mapping, step_limit: remaining_step) do
             socket_output.puts
@@ -192,11 +204,11 @@ class Api
 
           process = nil
 
-          socket.on_close do
+          on_close.push(->() do
+            process.try &.terminate unless process.try &.terminated?
             slave.close unless slave.closed?
             master.close unless master.closed?
-            process.try &.terminate graceful: true unless process.try &.terminated?
-          end
+          end)
 
           socket.on_message do |message|
             master.write message.to_slice
@@ -253,6 +265,7 @@ class Api
   ensure
     @cache.decr "users/#{user_id}/quota" if did_incr
     socket.close
+    on_close.try &.each &.call
   end
 
 end

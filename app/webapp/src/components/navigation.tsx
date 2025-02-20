@@ -1,5 +1,6 @@
 import Container from 'react-bootstrap/Container';
 import Navbar from 'react-bootstrap/Navbar';
+import ACLControl from "./acl_control"
 import { ErrorCode, Api, Error, ParameterError, Project } from "../api";
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
@@ -10,12 +11,9 @@ import Button from 'react-bootstrap/Button';
 import Nav from 'react-bootstrap/Nav';
 import NavDropdown from 'react-bootstrap/NavDropdown';
 import { ChangeEvent, useState, KeyboardEvent, useEffect, useRef } from 'react';
-import { FaUnlock } from "react-icons/fa";
-import { FaLock } from "react-icons/fa";
-import { FaPen } from "react-icons/fa";
-import { FaHome } from "react-icons/fa";
 
-export default function Navigation({api}: {api: Api}) {
+
+export default function Navigation({api, project}: {api: Api, project?: Project}) {
 
   const [user, setUser] = useState(api.user);
 
@@ -49,16 +47,12 @@ export default function Navigation({api}: {api: Api}) {
 
   return (
     <Navbar style={{height: "0.5in"}} className="bg-body-tertiary">
-      <Container fluid>
+      <Container fluid className="justify-content-between">
         <Navbar.Brand href="#">Blah</Navbar.Brand>
-        <Navbar.Collapse id="navbarScroll">
-          <Nav
-            className="me-auto my-2 my-lg-0"
-            style={{ maxHeight: '100px' }}
-            navbarScroll
-          />
-          <div className="d-flex">{user ? <Self/> : <Anonymous/>}</div>
-        </Navbar.Collapse>
+        <Nav>
+          {project ? <ACLControl api={api} project={project}/> : <></>}
+        </Nav>
+        <div>{user ? <Self/> : <Anonymous/>}</div>
       </Container>
     </Navbar>
   );

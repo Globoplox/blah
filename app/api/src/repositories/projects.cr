@@ -145,16 +145,34 @@ class Repositories::Projects::Database < Repositories::Projects
     SQL
   end
 
-  def acl(project_id : UUID) : Array(Acl)
-    Acl.from_rs @connection.query <<-SQL, project_id
-      SELECT
-        user_project_acls.user_id,
-        users.name as user_name,
-        user_project_acls.can_write
-      FROM user_project_acls
-      JOIN users ON user_project_acls.user_id = users.id
-      WHERE project_id = $1
-    SQL
+  def acl(project_id : UUID, query : String? = nil) : Array(Acl)
+    query = nil if query && query.empty?
+    if query
+      Acl.from_rs @connection.query <<-SQL, project_id, query
+        SELECT
+          users.id as user_id,
+          users.name as user_name,
+          COALESCE(user_project_acls.can_write, false) as can_write,
+          users.avatar_blob_id,
+          (user_project_acls.project_id IS NOT NULL) as can_read
+        FROM users 
+        LEFT JOIN user_project_acls ON user_project_acls.project_id = $1 AND user_project_acls.user_id = users.id 
+        ORDER BY LEVENSHTEIN(users.name, $2) DESC
+        LIMIT 10
+      SQL
+    else
+      Acl.from_rs @connection.query <<-SQL, project_id
+        SELECT
+          user_project_acls.user_id,
+          users.name as user_name,
+          user_project_acls.can_write,
+          users.avatar_blob_id,
+          true as can_read
+        FROM user_project_acls
+        JOIN users ON user_project_acls.user_id = users.id
+        WHERE project_id = $1
+      SQL
+    end
   end
 
   def set_acl(project_id : UUID, user_id : UUID, can_read : Bool, can_write : Bool)
@@ -169,7 +187,7 @@ class Repositories::Projects::Database < Repositories::Projects
           (project_id, user_id, can_write) 
         VALUES 
           ($1, $2, $3)
-        ON CONFLICT (projec_id, user_id) DO UPDATE SET can_write = $3;
+        ON CONFLICT (project_id, user_id) DO UPDATE SET can_write = $3;
       SQL
     end
   end

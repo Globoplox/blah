@@ -201,9 +201,14 @@ export default function Project({api} : {api: Api}) {
     </Container>;
   }
 
+  function onTerminalClose() {
+    socket?.socket?.close();
+    setSocket(null);
+  }
+
   return (
     <Stack style={{width: "100%"}}>
-    <Navigation api={api}></Navigation>
+    <Navigation api={api} project={project}></Navigation>
     <hr style={{margin: 0}}/>
     <Stack direction="horizontal" style={{height: "100%", width: "100%"}}>
 
@@ -239,7 +244,7 @@ export default function Project({api} : {api: Api}) {
           socket != null ? 
           <div className="mt-auto">
             <hr style={{margin: 0}}/>
-            <Terminal key={socket.key} socket={socket.socket}/>
+            <Terminal key={socket.key} socket={socket.socket} onClose={onTerminalClose}/>
           </div> : 
           <></>
         }

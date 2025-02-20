@@ -20,10 +20,11 @@ import { useNavigate } from "react-router";
 import { XTerm } from "@pablo-lion/xterm-react";
 import { ITerminalOptions } from "@xterm/xterm";
 import { AttachAddon } from '@xterm/addon-attach';
+import CloseButton from 'react-bootstrap/CloseButton';
 import "./terminal.scss";
 
 
-export default function Terminal({socket, onRequestFullSize}: {socket: WebSocket, onRequestFullSize?: () => void}) {
+export default function Terminal({socket, onClose}: {socket: WebSocket, onClose?: () => void}) {
 
   const theme = {
     background: '#F8F8F8',
@@ -83,8 +84,11 @@ export default function Terminal({socket, onRequestFullSize}: {socket: WebSocket
     }
   });
 
+
+
   // key used to force recreation of the terminal, react might try to be smarter than it is otherwise 
-  return <div tabIndex={0} onKeyDown={onKeyDown} className={bigTerminal ? "modal-terminal" : ""}>
+  return <div style={{position: "relative"}} tabIndex={0} onKeyDown={onKeyDown} className={bigTerminal ? "modal-terminal" : ""}>
     <XTerm key={key} options={options} addons={[new AttachAddon(socket, {bidirectional: true})]} />
+    <CloseButton aria-label="Close terminal" style={{position: "absolute", top: bigTerminal ? "4%" : "16px", right: bigTerminal ? "2%" : "16px"}} onClick={() => onClose?.()}/>
   </div>;
 }

@@ -12,7 +12,7 @@ import { useNavigate } from "react-router";
   - Seed some public projects in migrations
   - Self Profile page
   - Disconnect button in uri
-  - Project acl dropdown in navigation in projects ?
+
   - Can access projects without user if project is public
 
     Public (Owned) / Public / Private (owned) / Private (can read) / Private (can write)

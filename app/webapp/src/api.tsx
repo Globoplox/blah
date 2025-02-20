@@ -32,6 +32,16 @@ export type ProjectNotification =
   {event: 'moved', old_path: string, file: File} | 
   {event: 'deleted', path: string}
 
+
+export type ProjectListEntry = {
+  id: string,
+  name: string,
+  public: boolean,
+  description: string | null,
+  created_at: string,
+  owner_name: string
+}
+
 export type Project = {
   id: string,
   name: string,
@@ -39,7 +49,10 @@ export type Project = {
   description: string | null,
   created_at: string,
   owner_name: string,
-  files?: File[]
+  files: File[],
+  owned: boolean,
+  can_write: boolean,
+  acl: ACLEntry[]
 }
 
 export type Job = {
@@ -55,6 +68,14 @@ export type User = {
 }
 
 export type IDResponse = {id: string}
+
+export type ACLEntry = {
+  user_id: string,
+  name: string,
+  avatar_uri: string,
+  can_write: boolean,
+  can_read: boolean,
+}
 
 export class Api {
 
@@ -144,7 +165,7 @@ export class Api {
     }, this.mapNetworkError)
   }
 
-  public_projects(query : string) : Promise<Project[]> {
+  public_projects(query : string) : Promise<ProjectListEntry[]> {
     return fetch(
       `${API_SERVER_URI}/projects/public?query=${query}`, {method: "GET", headers: this.#headers, credentials: 'include'}
     ).then(response => {
@@ -155,7 +176,7 @@ export class Api {
     }, this.mapNetworkError)
   }
 
-  owned_projects(query : string) : Promise<Project[]> {
+  owned_projects(query : string) : Promise<ProjectListEntry[]> {
     return fetch(
       `${API_SERVER_URI}/projects/owned?query=${query}`, {method: "GET", headers: this.#headers, credentials: 'include'}
     ).then(response => {
@@ -175,6 +196,32 @@ export class Api {
       else 
         return response.json().then(this.handleError.bind(this))
     }, this.mapNetworkError)
+  }
+
+  read_project_acl(project_id: string, query?: string) : Promise<ACLEntry[]> {
+    return fetch(
+      `${API_SERVER_URI}/projects/${project_id}/acl?query=${query}`, {method: "GET", headers: this.#headers, credentials: 'include'}
+    ).then(response => {
+      if (response.ok)
+        return response.json()
+      else 
+        return response.json().then(this.handleError.bind(this))
+    }, this.mapNetworkError)
+  }
+
+  set_project_acl(project_id: string, user_id: string, can_read: boolean, can_write: boolean) : Promise<null> {
+    const body = {
+      user_id, can_read, can_write
+    };
+
+    return fetch(
+      `${API_SERVER_URI}/projects/${project_id}/acl`, {method: "PUT", headers: this.#headers, credentials: 'include', body: JSON.stringify(body)}
+    ).then(response => {
+      if (response.ok)
+        return null
+      else 
+        return response.json().then(this.handleError.bind(this))
+    }, this.mapNetworkError) as unknown as Promise<null>
   }
 
   create_file(project_id: string, path: string) : Promise<File> {

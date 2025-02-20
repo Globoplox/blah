@@ -57,7 +57,22 @@ class Api
     property created_at : Time
     property owner_name : String
     property files : Array(File)?
-    
+    property owned : Bool?
+    property can_write : Bool?
+    property acl : Array(Acl)?
+
+    class Acl
+      include JSON::Serializable
+      property user_id : UUID
+      property name : String
+      property avatar_uri : String?
+      property can_read : Bool
+      property can_write : Bool
+
+      def initialize(@user_id, @name, @avatar_uri, @can_write, @can_read)
+      end
+    end
+
     class File
       include JSON::Serializable
       property project_id : UUID
@@ -73,7 +88,7 @@ class Api
       end
     end
 
-    def initialize(@id, @name, @public, @description, @created_at, @owner_name, @files = nil)
+    def initialize(@id, @name, @public, @description, @created_at, @owner_name, @files = nil, @owned = nil, @can_write = nil, @acl = nil)
     end
   end
 
@@ -100,6 +115,12 @@ class Api
     project = @projects.read(project_id)
     files = @files.list(project_id)
 
+    if project.owner_id == user_id
+      acl = @projects.acl(project_id)
+    else
+      acl = nil
+    end
+
     ctx << Response::Project.new(
       id: project.id,
       name: project.name,
@@ -107,9 +128,67 @@ class Api
       description: project.description,
       created_at: project.created_at,
       owner_name: project.owner_name,
+      owned: project.owner_id == user_id,
+      can_write: can_write,
       files: files.map do |file|
         repository_file_to_response_file file
+      end, 
+      acl: acl.try &.map do |acl|
+        Response::Project::Acl.new(
+          user_id: acl.user_id,
+          name: acl.user_name,
+          avatar_uri: acl.avatar_blob_id.try { |blob_id| @storage.uri(blob_id.to_s) },
+          can_write: acl.can_write,
+          can_read: acl.can_read
+        )
       end
+    )
+  end
+
+  route GET, "/projects/:id/acl", def read_project_acl(ctx)
+    user_id = authenticate(ctx)
+    project_id = UUID.new ctx.path_parameter "id"
+
+    project = @projects.read(project_id)
+    raise "Access forbidden" unless project.owner_id == user_id
+
+    query = ctx.request.query_params["query"]?
+    query = nil if query && query.empty?
+
+    acl = @projects.acl(project_id, query)
+
+    ctx << acl.map do |acl|
+      Response::Project::Acl.new(
+        user_id: acl.user_id,
+        name: acl.user_name,
+        avatar_uri: acl.avatar_blob_id.try { |blob_id| @storage.uri(blob_id.to_s) },
+        can_write: acl.can_write,
+        can_read: acl.can_read
+      )
+    end
+  end
+
+  class Request::PutProjectACL
+    include JSON::Serializable
+    property user_id : UUID
+    property can_read : Bool
+    property can_write : Bool
+  end
+
+  route PUT, "/projects/:id/acl", def set_project_acl(ctx)
+    user_id = authenticate(ctx)
+    project_id = UUID.new ctx.path_parameter "id"
+
+    acl_info = ctx >> Request::PutProjectACL
+
+    project = @projects.read(project_id)
+    raise "Access forbidden" unless project.owner_id == user_id
+
+    @projects.set_acl(
+      project_id: project_id, 
+      user_id: acl_info.user_id, 
+      can_read: acl_info.can_read, 
+      can_write: acl_info.can_write
     )
   end
 
@@ -185,19 +264,7 @@ class Api
 
   class RightStatus
     include JSON::Serializable
-    property owned : Bool
-    property public : Bool
-    property acls : Array(Acl)?
-    class Acl
-      include JSON::Serializable
-      property user_id : UUID
-      property name : String
-      property avatar_uri : String?
-      property can_write : Bool
-    end
-  end
 
-  route GET, "/projects/:id/acl", def get_project_acl
   end
 
 end

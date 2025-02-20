@@ -4,7 +4,7 @@ import Stack from 'react-bootstrap/Stack';
 import { ChangeEvent, useState, KeyboardEvent, useEffect } from 'react';
 import Form from 'react-bootstrap/Form';
 import Accordion from 'react-bootstrap/Accordion';
-import { ErrorCode, Api, Project } from "../api";
+import { ErrorCode, Api, Project, ProjectListEntry } from "../api";
 import Button from 'react-bootstrap/Button';
 import InputGroup from 'react-bootstrap/InputGroup';
 import { Link } from "react-router";
@@ -14,11 +14,11 @@ import { useNavigate, useSearchParams, useLocation } from "react-router";
 
 export default function ProjectExplorer({api, style} : {api: Api, style: React.CSSProperties}) {
 
-  function ProjectExplorerEntry({project} : {project: Project}) {
+  function ProjectExplorerEntry({project} : {project: ProjectListEntry}) {
     return <div><Link className="soft-link" to={`/project/${project.id}`}>{project.owner_name}/{project.name}</Link></div>;
   }
 
-  function ProjectList({projects}: {projects: Project[]}) {
+  function ProjectList({projects}: {projects: ProjectListEntry[]}) {
     if (projects.length == 0) {
       return <p className="text-center">
         You dont have created any project yet.
@@ -31,7 +31,7 @@ export default function ProjectExplorer({api, style} : {api: Api, style: React.C
   }
 
   const [query, setQuery] = useState("");
-  const [entries, setEntries] = useState([] as Project[]);
+  const [entries, setEntries] = useState([] as ProjectListEntry[]);
   const [isLoaded, setIsLoaded] = useState(false);
   const loadProjects = useEffect(() => search(""), []);
   const navigate = useNavigate();
