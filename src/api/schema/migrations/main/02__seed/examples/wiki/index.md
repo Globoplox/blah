@@ -179,5 +179,3 @@ As for project filesystem, this temporary filesystem is subject to quotas for ma
 - [Virutal Machine](vm.md)
 - [Compiler](stacklang.md) for a rudimentary imperative programming language
 - [Debugger](debugger.md) curse tool for visualizing binaries and execution
-
-### Webapp
