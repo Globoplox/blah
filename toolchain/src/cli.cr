@@ -3,7 +3,7 @@ require "colorize"
 require "./toolchain"
 require "./debugger"
 require "./local_filesystem"
-require "./stderr_event_stream"
+require "./io_event_stream"
 
 # CLI front for Toolchain.
 module Clients::Cli

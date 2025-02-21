@@ -9,7 +9,14 @@ import { useNavigate } from "react-router";
 
 /*
   TODO:
-  - Seed some public projects in migrations
+  - Markdown
+  - Doc
+  - File organization
+  - Fixing project.tsx
+  - Re-open notifications sockets if closed when back to page ?
+
+
+
   - Self Profile page
   - Disconnect button in uri
 

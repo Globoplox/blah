@@ -4,6 +4,10 @@ version: 1.0.0
 authors:
   - Globoplox <globoplox@gmail.com>
 
+dependencies:
+  ncurses:
+    github: agatan/ncurses.cr
+
 crystal: 1.15.0
 
 license: MIT

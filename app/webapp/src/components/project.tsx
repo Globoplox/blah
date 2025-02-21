@@ -24,8 +24,9 @@ import "./prism_language_blah";
 import "./prism_language_stacklang";
 import "prism-react-editor/layout.css";
 import "prism-react-editor/themes/github-light.css"
-
 import Terminal from "./terminal";
+import { MDXEditor, codeMirrorPlugin, CodeMirrorEditor, headingsPlugin, listsPlugin, quotePlugin, thematicBreakPlugin, markdownShortcutPlugin, UndoRedo, BoldItalicUnderlineToggles, toolbarPlugin, InsertTable, tablePlugin, InsertCodeBlock, codeBlockPlugin, linkDialogPlugin, linkPlugin } from '@mdxeditor/editor'
+import '@mdxeditor/editor/style.css'
 
 export default function Project({api} : {api: Api}) {
   const navigate = useNavigate();
@@ -107,6 +108,18 @@ export default function Project({api} : {api: Api}) {
     if (index != -1) {
       project.files[index] = file;
     }
+    
+    if (oldPath == currentEditedFilePathRef.current) {
+      if (syncTimeoutId.current) {
+        clearTimeout(syncTimeoutId.current);
+        syncTimeoutId.current = null;
+        editorContent.current = "";
+        api.update_file(project.id, file.path, editorContent.current).then(() => {
+          navigate(`/project/${projectId}/file${file.path}`);
+        });
+      } else
+      navigate(`/project/${projectId}/file${file.path}`);
+    }
   }
 
   // Close currently edited file from editor if it has been deleted 
@@ -139,6 +152,8 @@ export default function Project({api} : {api: Api}) {
       return "ini";
     else if (file.path.endsWith(".recipe") || file.path.endsWith(".json"))
       return "json";
+    else if (file.path.endsWith(".md"))
+      return "markdown";
     return "txt";
   }
   
@@ -155,7 +170,20 @@ export default function Project({api} : {api: Api}) {
     navigate(`/project/${projectId}/file${fileToOpen.path}`);
   }
 
-  function onUpdate(value: string, editor: PrismEditor) {
+  function onUpdate(value: string) {
+    if (value == editorContent.current)
+      return;
+    editorContent.current = value;
+
+    if (syncTimeoutId.current == null) {
+      syncTimeoutId.current = setTimeout(() => {
+        api.update_file(project.id, file.path, editorContent.current);
+        syncTimeoutId.current = null;
+      }, 5000);
+    }
+  }
+
+  function onUpdateMarkdown(value: string) {
     if (value == editorContent.current)
       return;
     editorContent.current = value;
@@ -214,12 +242,18 @@ export default function Project({api} : {api: Api}) {
 
       <div style={{width: "17.5%", height: "calc(100vh - 0.5in - 1px)"}}>
         {
-          project != null
-          ? <Filetree api={api} project={JSON.parse(JSON.stringify(project))} onDelete={onFileTreeDelete} onOpen={onFileTreeOpen} onCreate={onFileTreeCreate} onMove={onFileTreeMove} onRun={onRunFile}/>
-          : <div className="d-flex align-items-center mt-3" style={{width: "100%"}}>
-              <Spinner size="sm" className="ms-auto"/>
-              <strong className="ms-2 me-auto">Loading...</strong>
-            </div>
+          project != null ?
+          <Filetree api={api} project={JSON.parse(JSON.stringify(project))} 
+            onDelete={onFileTreeDelete} 
+            onOpen={onFileTreeOpen} 
+            onCreate={onFileTreeCreate} 
+            onMove={onFileTreeMove} 
+            onRun={onRunFile}
+          /> : 
+          <div className="d-flex align-items-center mt-3" style={{width: "100%"}}>
+            <Spinner size="sm" className="ms-auto"/>
+            <strong className="ms-2 me-auto">Loading...</strong>
+          </div>
         }
       </div>
 
@@ -229,9 +263,35 @@ export default function Project({api} : {api: Api}) {
 
         {
           file != null ?
-          <Editor readOnly={!project.can_write} language={file.type} value={file.content} onUpdate={onUpdate} >
-            {(editor: any) => <BasicSetup editor={editor}/>}
-          </Editor> :
+          (file.type == "markdown" ?
+            <MDXEditor readOnly={!project.can_write} key={file.path} markdown={file.content} plugins={[
+              headingsPlugin(), 
+              listsPlugin(), 
+              quotePlugin(), 
+              thematicBreakPlugin(), 
+              tablePlugin(),
+              codeBlockPlugin({ codeBlockEditorDescriptors: [{ priority: -10, match: (_) => true, Editor: CodeMirrorEditor }] }),
+              codeMirrorPlugin({codeBlockLanguages: { jsx: 'JavaScript (react)', js: 'JavaScript', css: 'CSS', tsx: 'TypeScript (react)' }}),      
+              linkPlugin(), 
+              linkDialogPlugin(),
+              toolbarPlugin({
+                toolbarClassName: 'markdown-toolbar',
+                toolbarContents: () => (
+                    <>
+                      {' '}
+                      <UndoRedo />
+                      <BoldItalicUnderlineToggles />
+                      <InsertTable />
+                      <InsertCodeBlock />
+                    </>
+                  )
+              }),
+              markdownShortcutPlugin()
+            ]} onChange={onUpdateMarkdown} /> :
+            <Editor key={file.path} readOnly={!project.can_write} language={file.type} value={file.content} onUpdate={onUpdate} >
+              {(editor: any) => <BasicSetup editor={editor}/>}
+            </Editor>
+          ) :
           (project != null ? <NoFileOpened/> : <></>)
         }
   

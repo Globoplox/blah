@@ -1,5 +1,8 @@
 # Blah
 
+
+# Blah
+
 You know **con**langs, **Blah** is a **con**con (for con computer).  
 It is a from-scratch computing environnment based on [RiSC16](https://user.eng.umd.edu/~blj/risc/).
 
@@ -25,27 +28,27 @@ All of which are bundled within a single CLI tool, written in [Crystal](https://
   - [x] Linker errors
   - [x] ~~Native codegen errors~~ Unfinished but enough for now
   - [x] Spec errors
-- [ ] Split projects into toolchain/app toolchain/clients app/api app/client app/database, ...
+- [x] Split projects into toolchain/app toolchain/clients app/api app/client app/database, ...
 - [ ] Build language servers
 - [ ] Rename the project
-- [ ] Recipe files / books (makeshift makefiles)
-- [ ] Debugger server
+- [x] Recipe files / books (makeshift makefiles)
+- [x] Debugger server
 - [ ] Design a reasonnably doable webappified version:
   - [ ] API with:
     - [ ] Docker, Migration, User with in-house auth and social logins
-    - [ ] Project with a file tree (total size quotas per project / per user)
-    - [ ] Websocket for streaming warning / error / compilation progress, and runtime tty (websocket quotas)
-    - [ ] Projects ACL, for sharing projects with various privilege (private, shared, public, read/write priviliege)
-      - [ ] Browse public projects (such as stdlib, wiki, demo)
+    - [x] Project with a file tree (total size quotas per project / per user)
+    - [x] Websocket for streaming warning / error / compilation progress, and runtime tty (websocket quotas)
+    - [x] Projects ACL, for sharing projects with various privilege (private, shared, public, read/write priviliege)
+      - [x] Browse public projects (such as stdlib, wiki, demo)
       - [ ] Clone project
-      - [ ] Language feature to allow references to public projects 
+      - [x] Language feature to allow references to other projects 
   - [ ] Frontend client with:
     - [ ] Toolbar for account/project management (create, switch, delete, export, log out, account details)
-    - [ ] File explorer
-    - [ ] Code editor
-    - [ ] Log console
+    - [x] File explorer
+    - [x] Code editor
+    - [x] Log console
     - [ ] Up to several tty console
-    - [ ] A debugger client
+    - [x] A debugger client
     - [ ] Markdown rendering
   - [ ] TESTS
 
