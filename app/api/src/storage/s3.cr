@@ -99,7 +99,11 @@ class Storage::S3 < Storage
     end
 
     unless @client.list_buckets.buckets.includes? @bucket_name
-      @client.put_bucket @bucket_name, @region
+      begin
+        @client.put_bucket @bucket_name, @region
+      rescue ex: Awscr::S3::BucketAlreadyOwnedByYou
+        # Initialization race, safe to ignore
+      end
     end
   end
 

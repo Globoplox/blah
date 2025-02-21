@@ -1,0 +1,10 @@
+{
+  "spec_path": "builtins:stdlib:/default.ini",
+  "macros": {},
+  "commands": [
+    {"command": "assemble", "source": "echo.blah", "destination": "@echo.ro"},
+    {"command": "merge", "sources": ["@echo.ro"], "destination": "@merged.ro"},
+    {"command": "link", "source": "@merged.ro", "destination": "@echo"},
+    {"command": "run", "source": "@echo"}
+  ]
+}

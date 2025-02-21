@@ -229,7 +229,7 @@ export default function Project({api} : {api: Api}) {
 
         {
           file != null ?
-          <Editor language={file.type} value={file.content} onUpdate={onUpdate} >
+          <Editor readOnly={!project.can_write} language={file.type} value={file.content} onUpdate={onUpdate} >
             {(editor: any) => <BasicSetup editor={editor}/>}
           </Editor> :
           (project != null ? <NoFileOpened/> : <></>)

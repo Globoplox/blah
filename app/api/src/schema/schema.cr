@@ -5,21 +5,21 @@ require "log"
 module Schema
   extend self
 
-  # abstract struct Migration
-  #   abstract def version
+  abstract struct Migration
+    abstract def version
 
-  #   def name
-  #     {{ @type.name.gsub(/^.+::/, "").stringify.underscore }}
-  #   end
+    def name
+      {{ @type.name.gsub(/^.+::/, "").stringify.underscore }}
+    end
 
-  #   macro inherited
-  #     def self.schema
-  #       Path[__DIR__].basename
-  #     end
-  #   end
+    macro inherited
+      def self.schema
+        Path[__DIR__].basename
+      end
+    end
 
-  #   abstract def migrate(database)
-  # end
+    abstract def migrate(database, storage)
+  end
 end
 
 require "./migrations/**"
@@ -29,9 +29,9 @@ module Schema
   RAW_MIGRATIONS = {{run "./embed_migration.cr", "#{__DIR__}/migrations"}}
 
   # dir => Database::Migration.class
-  #HANDLED_MIGRATIONS = {{Migration.all_subclasses.reject(&.abstract?).map(&.name)}}.group_by &.schema
+  HANDLED_MIGRATIONS = {{Migration.all_subclasses.reject(&.abstract?).map(&.name)}}.group_by &.schema
 
-  def migrate(database : DB::Database, schema : String)
+  def migrate(database : DB::Database, schema : String, storage : Storage)
 
     database.exec <<-SQL
       CREATE TABLE IF NOT EXISTS migrations (
@@ -46,14 +46,13 @@ module Schema
       SELECT version FROM migrations WHERE schema_name = $1
     SQL
 
-    # handled_migrations = HANDLED_MIGRATIONS[schema]?.try &.map do |migration_class|
-    #   migration = migration_class.new
-    #   {migration.version, migration.name, migration}
-    # end
+    handled_migrations = HANDLED_MIGRATIONS[schema]?.try &.map do |migration_class|
+      migration = migration_class.new
+      {migration.version, migration.name, migration}
+    end
 
     raw_migrations = RAW_MIGRATIONS[schema]?
-    #migrations = (handled_migrations && raw_migrations && handled_migrations + raw_migrations) || handled_migrations || raw_migrations
-    migrations = raw_migrations
+    migrations = (handled_migrations && raw_migrations && handled_migrations + raw_migrations) || handled_migrations || raw_migrations
     return unless migrations
 
     duplicate = migrations.group_by(&.first).select { |_, values| values.size > 1 }
@@ -69,7 +68,7 @@ module Schema
           database.transaction do |transaction|
             case payload
             in String    then transaction.connection.as(PG::Connection).exec_all payload
-            #in Migration then payload.migrate transaction.connection
+            in Migration then payload.migrate transaction.connection, storage
             end
             transaction.connection.exec <<-SQL, version, name, Time.utc, schema
               INSERT INTO migrations (version, name, finished_at, schema_name) VALUES ($1, $2, $3, $4)

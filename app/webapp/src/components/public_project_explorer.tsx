@@ -11,32 +11,33 @@ import { Link } from "react-router";
 import Spinner from 'react-bootstrap/Spinner';
 import { FaSearch } from "react-icons/fa";
 import { useNavigate, useSearchParams, useLocation } from "react-router";
-import Image from 'react-bootstrap/Image';
 import "../pictures/default_project_avatar.jpg";
+import "./public_project_explorer.scss";
 
-export default function ProjectExplorer({api, style} : {api: Api, style: React.CSSProperties}) {
+import Image from 'react-bootstrap/Image';
+
+export default function PublicExplorer({api, style} : {api: Api, style: React.CSSProperties}) {
 
   function ProjectExplorerEntry({project} : {project: ProjectListEntry}) {
-    return <div>
-        <div>
+    return <Accordion.Item eventKey={project.id}>
+        <Accordion.Header>
           <Link className="soft-link" to={`/project/${project.id}`}>
           <Image className="border" width="32" height="32" src={project.avatar_uri ? project.avatar_uri : "/pictures/default_project_avatar.jpg"} roundedCircle />
           <span className="ms-3">{project.owner_name} / {project.name}</span>
           </Link>
-        </div>
-      </div>;
+        </Accordion.Header>
+        <Accordion.Body>
+          {project.description}
+        </Accordion.Body>
+      </Accordion.Item>;
   }
 
   function ProjectList({projects}: {projects: ProjectListEntry[]}) {
-    if (projects.length == 0) {
-      return <p className="text-center">
-        You dont have created any project yet.
-      </p>;
-    } else {
-      return projects.map(_ => 
-          <ProjectExplorerEntry key={_.id} project={_}/>
-      );
-    }
+    return <Accordion className="no-select-color">
+      {projects.map(_ => 
+        <ProjectExplorerEntry key={_.id} project={_}/>
+      )}
+    </Accordion>;
   }
 
   const [query, setQuery] = useState("");
@@ -47,7 +48,7 @@ export default function ProjectExplorer({api, style} : {api: Api, style: React.C
   const location = useLocation();
 
   function search(query: string) {
-    api.owned_projects(query).then(projects => {
+    api.public_projects(query).then(projects => {
       setIsLoaded(true);
       setEntries(projects);
     }).catch(error => {
@@ -68,16 +69,7 @@ export default function ProjectExplorer({api, style} : {api: Api, style: React.C
 
   return (
     <Stack gap={3} style={style} className="p-3">
-      <Stack direction="horizontal" gap={3}>
-        <h4>Your projects</h4>
-       
-          <Link className="ms-auto" to="/project/create">
-            <Button  variant="success">
-              Create
-            </Button>
-          </Link>
- 
-      </Stack>
+      <h4>Public projects</h4>
 
       <InputGroup className="mb-3">
         <Form.Control

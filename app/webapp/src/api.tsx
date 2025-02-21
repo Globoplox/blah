@@ -39,7 +39,8 @@ export type ProjectListEntry = {
   public: boolean,
   description: string | null,
   created_at: string,
-  owner_name: string
+  owner_name: string,
+  avatar_uri?: string
 }
 
 export type Project = {
@@ -52,7 +53,8 @@ export type Project = {
   files: File[],
   owned: boolean,
   can_write: boolean,
-  acl: ACLEntry[]
+  acl: ACLEntry[],
+  avatar_uri?: string
 }
 
 export type Job = {
@@ -64,7 +66,7 @@ export type Job = {
 
 export type User = {
   name: string,
-  avatar_uri: string,
+  avatar_uri?: string,
   id: string
 }
 
@@ -73,7 +75,7 @@ export type IDResponse = {id: string}
 export type ACLEntry = {
   user_id: string,
   name: string,
-  avatar_uri: string,
+  avatar_uri?: string,
   can_write: boolean,
   can_read: boolean,
 }

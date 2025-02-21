@@ -95,17 +95,19 @@ class Repositories::Projects::Database < Repositories::Projects
         projects.allowed_file_amount,
         projects.allowed_blob_size,
         projects.created_at,
-        users.name as owner_name
+        users.name as owner_name,
+        projects.avatar_blob_id as avatar_blob_id
       FROM projects
       LEFT JOIN users ON users.id = projects.owner_id
       WHERE projects.public is true
-      ORDER BY CASE 
-        WHEN $1 IS NULL THEN NULL
-        ELSE LEVENSHTEIN(projects.name, $1)
-      END DESC, projects.created_at DESC
+      ORDER BY 
+        LEVENSHTEIN(projects.name, COALESCE($1, projects.name)) DESC, 
+        projects.created_at DESC
+      LIMIT 10
     SQL
   end
 
+  # Owned or have access to (do not includes non-owned public projects)
   def search_owned(owner_id : UUID, query  : String?) : Array(Project)
     Project.from_rs @connection.query <<-SQL, query, owner_id
       SELECT 
@@ -117,7 +119,8 @@ class Repositories::Projects::Database < Repositories::Projects
         projects.allowed_file_amount,
         projects.allowed_blob_size,
         projects.created_at,
-        users.name as owner_name
+        users.name as owner_name,
+        projects.avatar_blob_id as avatar_blob_id
       FROM projects
       LEFT JOIN users ON users.id = projects.owner_id
       LEFT JOIN user_project_acls ON user_project_acls.project_id = projects.id AND user_id = $2
@@ -137,8 +140,8 @@ class Repositories::Projects::Database < Repositories::Projects
   def user_can_rw(project_id : UUID, user_id : UUID) : {Bool, Bool}
     @connection.query_one(<<-SQL, project_id, user_id, as: {Bool, Bool})
       SELECT 
-        (projects.public OR projects.owner_id = $2 OR user_project_acls.project_id IS NOT NULL) as can_red,  
-        (projects.owner_id = $2 OR user_project_acls.can_write) as can_write
+        (projects.public OR projects.owner_id = $2 OR user_project_acls.project_id IS NOT NULL) as can_read,  
+        (projects.owner_id = $2 OR COALESCE(user_project_acls.can_write, FALSE)) as can_write
       FROM projects
       LEFT JOIN user_project_acls ON user_project_acls.project_id = $1 AND user_id = $2
       WHERE projects.id = $1

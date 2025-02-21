@@ -82,6 +82,7 @@ module Repositories
       property allowed_file_amount : Int32
       property created_at : Time
       property owner_name : String
+      property avatar_blob_id : UUID?
     end
 
     class Acl

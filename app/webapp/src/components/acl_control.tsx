@@ -28,7 +28,8 @@ export default function ACLControl({api, project}: {api: Api, project: Project})
   const [searchResults, setSearchResults] = useState([]);
 
   useEffect(() => {
-    api.read_project_acl(project.id, query).then(setSearchResults);
+    if (project.owned)
+      api.read_project_acl(project.id, query).then(setSearchResults);
   }, [query]);
 
   const tags = [];
@@ -89,7 +90,7 @@ export default function ACLControl({api, project}: {api: Api, project: Project})
         </Form.Select>
       </Col>
       <Col xs="7">
-        <Image width="32" height="32" src={acl.avatar_uri ? acl.avatar_uri : "/pictures/default_avatar.jpg"} roundedCircle />
+        <Image className="border" width="32" height="32" src={acl.avatar_uri ? acl.avatar_uri : "/pictures/default_avatar.jpg"} roundedCircle />
         <u className="ms-3 my-auto">{acl.name}</u>
         {isYou ? <span className="ms-1">(you)</span> : <></>}
       </Col>
@@ -101,7 +102,7 @@ export default function ACLControl({api, project}: {api: Api, project: Project})
   </Stack>;
 
   if (project.owned == false)
-    return <span>{`${project.owner_name} / ${project.name}`}{tagsElement}</span>;
+    return <><span>{`${project.owner_name} / ${project.name}`}</span><span className="ms-2">{tagsElement}</span></>;
 
   return <>
     <NavDropdown className="ms-auto" title={`${project.owner_name} / ${project.name}`} id="basic-nav-dropdown">

@@ -41,14 +41,14 @@ export default function Navigation({api, project}: {api: Api, project?: Project}
   function Self() {
     return <span>
       <u className="my-auto">{user.name}</u>
-      <Image className="ms-3" width="32" height="32" src={user.avatar_uri ? user.avatar_uri : "/pictures/default_avatar.jpg"} roundedCircle />
+      <Image className="border ms-3" width="32" height="32" src={user.avatar_uri ? user.avatar_uri : "/pictures/default_avatar.jpg"} roundedCircle />
     </span>;
   }
 
   return (
     <Navbar style={{height: "0.5in"}} className="bg-body-tertiary">
       <Container fluid className="justify-content-between">
-        <Navbar.Brand href="#">Blah</Navbar.Brand>
+        <Navbar.Brand href="/">Blah</Navbar.Brand>
         <Nav>
           {project ? <ACLControl api={api} project={project}/> : <></>}
         </Nav>

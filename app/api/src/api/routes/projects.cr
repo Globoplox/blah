@@ -60,6 +60,7 @@ class Api
     property owned : Bool?
     property can_write : Bool?
     property acl : Array(Acl)?
+    property avatar_uri : String?
 
     class Acl
       include JSON::Serializable
@@ -88,7 +89,7 @@ class Api
       end
     end
 
-    def initialize(@id, @name, @public, @description, @created_at, @owner_name, @files = nil, @owned = nil, @can_write = nil, @acl = nil)
+    def initialize(@id, @name, @public, @description, @created_at, @owner_name, @files = nil, @owned = nil, @can_write = nil, @acl = nil, @avatar_uri = nil)
     end
   end
 
@@ -130,6 +131,7 @@ class Api
       owner_name: project.owner_name,
       owned: project.owner_id == user_id,
       can_write: can_write,
+      avatar_uri: project.avatar_blob_id.try { |blob_id| @storage.uri(blob_id.to_s) },
       files: files.map do |file|
         repository_file_to_response_file file
       end, 
@@ -207,7 +209,8 @@ class Api
         public: project.public,
         description: project.description,
         created_at: project.created_at,
-        owner_name: project.owner_name
+        owner_name: project.owner_name,
+        avatar_uri: project.avatar_blob_id.try { |blob_id| @storage.uri(blob_id.to_s) }
       )
     end
   end
@@ -227,7 +230,8 @@ class Api
         public: project.public,
         description: project.description,
         created_at: project.created_at,
-        owner_name: project.owner_name
+        owner_name: project.owner_name,
+        avatar_uri: project.avatar_blob_id.try { |blob_id| @storage.uri(blob_id.to_s) }
       )
     end
   end

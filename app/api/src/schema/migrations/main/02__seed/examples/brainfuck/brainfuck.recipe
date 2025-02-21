@@ -1,0 +1,11 @@
+{
+  "spec_path": "brainfuck.ini",
+  "macros": {"bf-source": "hello.bf"},
+  "commands": [
+    {"command": "assemble", "source": "builtins:stdlib:/startup.blah", "destination": "@startup.ro"},
+    {"command": "compile", "source": "brainfuck.sl", "destination": "@brainfuck.ro"},
+    {"command": "merge", "sources": ["@brainfuck.ro", "@startup.ro"], "destination": "@merged.ro"},
+    {"command": "link", "source": "@merged.ro", "destination": "@brainfuck"},
+    {"command": "run", "source": "@brainfuck"}
+  ]
+}

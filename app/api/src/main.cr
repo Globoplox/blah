@@ -22,7 +22,7 @@ database = DB.open ENV["DB_URI"]
 # Run migrations. Only one instance may run migration at the same time
 if cache.setnx "/database/lock", "lock"
   begin
-    Schema.migrate database, schema: "main"
+    Schema.migrate database, schema: "main", storage: storage
   ensure
     cache.unset "/database/lock"
   end
