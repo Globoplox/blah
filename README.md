@@ -10,12 +10,12 @@ It is a from-scratch computing environnment based on [RiSC16](https://user.eng.u
 It serves no other purpose than entertaining me.  
 
 It consists of:
-- A [RiSC16 Assembler](/wiki/assembler.md)
-- A [repositionable object](/wiki/object.md) file format
-- A [linker](/wiki/linker.md)
-- A [virutal-machine](/wiki/vm.md)
-- A compiler for [stacklang](/wiki/stacklang/index.md), a rudimentary imperative programming language
-- A [debugger](/wiki/debugger.md) curse tool for visualizing binaries and execution
+- A [RiSC16 Assembler](/src/api/schema/migrations/main/02__seed/examples/wiki/assembler.md)
+- A [repositionable object](/src/api/schema/migrations/main/02__seed/examples/wiki/object.md) file format
+- A [linker](/src/api/schema/migrations/main/02__seed/examples/wiki/linker.md)
+- A [virutal-machine](/src/api/schema/migrations/main/02__seed/examples/wiki/vm.md)
+- A compiler for [stacklang](/src/api/schema/migrations/main/02__seed/examples/wiki/stacklang.md), a rudimentary imperative programming language
+- A [debugger](/src/api/schema/migrations/main/02__seed/examples/wiki/debugger.md) curse tool for visualizing binaries and execution
 
 All of which are bundled within a single CLI tool, written in [Crystal](https://crystal-lang.org/).
 
@@ -33,7 +33,7 @@ All of which are bundled within a single CLI tool, written in [Crystal](https://
 - [ ] Rename the project
 - [x] Recipe files / books (makeshift makefiles)
 - [x] Debugger server
-- [ ] Design a reasonnably doable webappified version:
+- [x] Design a reasonnably doable webappified version:
   - [ ] API with:
     - [ ] Docker, Migration, User with in-house auth and social logins
     - [x] Project with a file tree (total size quotas per project / per user)
@@ -50,9 +50,7 @@ All of which are bundled within a single CLI tool, written in [Crystal](https://
     - [ ] Up to several tty console
     - [x] A debugger client
     - [ ] Markdown rendering
-  - [ ] TESTS
-
-## TODO Toolchain
+  - [ ] integration tests
 - [ ] Full refactor
   - [ ] Rewrite assembler parser 
   - [ ] Improve assembler/stacklang lexers to stream and parsers to have a fixed low look-ahead

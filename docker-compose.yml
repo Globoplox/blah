@@ -2,7 +2,7 @@ services:
   api-1: &api
     build:
       context: .
-      dockerfile: app/api/Dockerfile
+      dockerfile: Dockerfile-api
     environment:
       - ENV
       - BIND_URI=tcp://0.0.0.0:80

@@ -1,0 +1,8 @@
+FROM crystallang/crystal:1.15.0-alpine
+RUN apk update
+RUN apk add libjpeg-turbo-dev
+RUN apk add libspng-dev
+RUN apk add parallel
+RUN --mount=type=bind,src=.,dst=/ctx,rw cd /ctx; shards build --verbose --no-color -p -s -t --error-trace;  cp /ctx/bin/api /root/api; cp /ctx/bin/debugger /root/debugger; cp -r /ctx/src/api/schema/migrations /root/migrations
+WORKDIR /root 
+CMD ./api

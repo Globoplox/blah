@@ -1,0 +1,37 @@
+name: blah
+version: 1.0.0
+  
+authors:
+  - Globoplox <globoplox@gmail.com>
+
+dependencies:
+  ncurses:
+    github: agatan/ncurses.cr
+  cradix:
+    github: globoplox/cradix
+    version: ~> 1.1.0
+  shimfs:
+    github: globoplox/shimfs
+  pg:
+    github: will/crystal-pg
+  awscr-s3:
+    github: taylorfinnell/awscr-s3
+  pluto:
+    github: phenopolis/pluto
+  redis:
+    github: stefanwille/crystal-redis
+  openssl_ext:
+    github: spider-gazelle/openssl_ext
+    version: ~> 2.3.0
+
+targets:
+  cli:
+    main: src/toolchain/cli.cr
+  debugger:
+    main: src/api/debugger_main.cr
+  api:
+    main: src/api/main.cr
+    
+crystal: 1.15.0
+
+license: MIT
