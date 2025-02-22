@@ -101,7 +101,7 @@ class Repositories::Projects::Database < Repositories::Projects
       LEFT JOIN users ON users.id = projects.owner_id
       WHERE projects.public is true
       ORDER BY 
-        LEVENSHTEIN(projects.name, COALESCE($1, projects.name)) DESC, 
+        LEVENSHTEIN(projects.name, COALESCE($1, projects.name)), 
         projects.created_at DESC
       LIMIT 10
     SQL
@@ -126,7 +126,7 @@ class Repositories::Projects::Database < Repositories::Projects
       LEFT JOIN user_project_acls ON user_project_acls.project_id = projects.id AND user_id = $2
       WHERE projects.owner_id = $2 OR user_project_acls.project_id IS NOT NULL
       ORDER BY 
-        LEVENSHTEIN(projects.name, COALESCE($1, projects.name)) DESC, 
+        LEVENSHTEIN(projects.name, COALESCE($1, projects.name)), 
         projects.created_at DESC
     SQL
   end

@@ -21,7 +21,7 @@ There are two implementation integrating this toolchain:
 
 ## Why is this project
 
-The initial motivation is to experiment with compiler and computer architecture from scratch but without the burden of the complexity of computers. 
+The initial motivation is to experiment with compiler and computer architecture from scratch but without the burden of the complexity of modern computers. 
 This is a pet project and pretext to learn and experiment.  
 
 Since the project began to yield some (moderatly) interesting results I decided to use at as my main portfollio item and so I made it a demo project for more marketable skills and added the web application.  

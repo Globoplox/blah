@@ -162,7 +162,6 @@ class Api
             end
           end
 
-
           toolchain.spec.segments.each do |segment|
             case segment
             when RiSC16::Spec::Segment::IO
@@ -184,7 +183,7 @@ class Api
           end)
 
           remaining_step = step_limit - total_step
-          total_step += toolchain.run(command.source, io_mapping, step_limit: remaining_step) do
+          total_step += toolchain.run(command.source, io_mapping, step_limit: remaining_step, throttling: 5.microseconds, timeout: 5.minute) do
             socket_output.puts
           end
         ensure

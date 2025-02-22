@@ -9,6 +9,12 @@ import { useNavigate } from "react-router";
 
 /*
   TODO:
+  - Api errors
+  - Webapp errors
+  - Api integration/regression tests testing
+  - Recipe call from receipe (with parameters)
+  - Documentation
+  - Global cleanup
   - Fixing project.tsx
   - Re-open notifications sockets if closed when back to page ?
   - Error management

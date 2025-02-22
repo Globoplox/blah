@@ -1,4 +1,5 @@
 require "../risc16"
+require "io/evented"
 
 class RiSC16::VM
   class BusError < ::Exception
@@ -8,8 +9,8 @@ class RiSC16::VM
   end
 
   abstract class Addressable
-    abstract def read(address : UInt16) : UInt16
-    abstract def write(address : UInt16, value : UInt16)
+    abstract def read(address : UInt16, timeout = nil) : UInt16
+    abstract def write(address : UInt16, value : UInt16, timeout = nil)
 
     class Ram < Addressable
       @data : Slice(UInt16)
@@ -22,11 +23,11 @@ class RiSC16::VM
         @data = Slice(UInt16).new segment.size
       end
 
-      def read(address : UInt16) : UInt16
+      def read(address : UInt16, timeout = nil) : UInt16
         @data[address - @start]
       end
 
-      def write(address : UInt16, value : UInt16)
+      def write(address : UInt16, value : UInt16, timeout = nil)
         @data[address - @start] = value
       end
     end
@@ -87,14 +88,16 @@ class RiSC16::VM
 
       EOS = 0xff00u16
 
-      def read(address : Word) : Word
+      def read(address : Word, timeout = nil) : Word
         raise BusError.new address unless address == @start
+        @read.as?(::IO::FileDescriptor).try(&.read_timeout = timeout) if timeout
         value = @read.try &.read_byte.try &.to_u16 || EOS
         return value
       end
 
-      def write(address : Word, value : Word)
+      def write(address : Word, value : Word, timeout = nil)
         raise BusError.new address unless address == @start
+        @read.as?(::IO::FileDescriptor).try(&.write_timeout = timeout) if timeout
         (value & 0xff).to_u8.to_io @write.not_nil!, ::IO::ByteFormat::BigEndian if @write
       end
     end
@@ -113,12 +116,12 @@ class RiSC16::VM
         @write = segment.write
       end
 
-      def read(address : UInt16) : UInt16
+      def read(address : UInt16, timeout = nil) : UInt16
         raise BusError.new address unless @read
         0u16
       end
 
-      def write(address : UInt16, value : UInt16)
+      def write(address : UInt16, value : UInt16, timeout = nil)
         raise BusError.new address unless @write
       end
     end
@@ -170,8 +173,8 @@ class RiSC16::VM
     end || raise BusError.new address
   end
 
-  def read(address : Word) : Word
-    segment(address).read(address)
+  def read(address : Word, timeout = nil) : Word
+    segment(address).read(address, timeout)
   end
 
   def read_noio(address : Word) : Word?
@@ -181,8 +184,8 @@ class RiSC16::VM
     end
   end
 
-  def write(address : Word, value : Word)
-    segment(address).write(address, value)
+  def write(address : Word, value : Word, timeout = nil)
+    segment(address).write(address, value, timeout)
   end
 
   def load(program : Bytes, at = 0)
@@ -213,7 +216,7 @@ class RiSC16::VM
     (a.to_u32 + b.to_u32).bits(0...16).to_u16
   end
 
-  def step
+  def step(timeout = nil)
     @instruction = Instruction.decode read @pc
     case @instruction.opcode
     when ISA::Add  then write_reg_a add reg_b, reg_c
@@ -222,10 +225,10 @@ class RiSC16::VM
     when ISA::Lui  then write_reg_a @instruction.immediate << 6
     when ISA::Sw
       address = add reg_b, @instruction.immediate
-      write address, reg_a
+      write(address, reg_a, timeout)
     when ISA::Lw
       address = add reg_b, @instruction.immediate
-      write_reg_a read address
+      write_reg_a read(address, timeout)
     when ISA::Beq then @pc = add @pc, @instruction.immediate if reg_a == reg_b
     when ISA::Jalr
       return @halted = true if @instruction.immediate != 0
@@ -238,13 +241,42 @@ class RiSC16::VM
     @halted
   end
 
-  def run(step_limit = nil) : Int32
+  def run(step_limit = nil, throttling : Time::Span? = nil, timeout : Time::Span? = nil) : Int32
     step_counter = 0
+    batching = 100
+    batch_count = 0
+    batch_start = Time.monotonic
+    run_start = batch_start
+    batch_timeout = timeout.try { timeout - (batch_start - run_start) }
+
     while !@halted
-      step
+      
+      begin
+        step batch_timeout
+      rescue ex: ::IO::TimeoutError
+        raise "VM run timeout on IO after #{(Time.monotonic - run_start).total_microseconds.to_i}us"
+      end
+
       step_counter += 1
       if step_limit && step_counter > step_limit
         raise "VM executed instruction count exceeded maximum allowed: #{step_limit}"
+      end
+
+      batch_count += 1
+      batch_end = Time.monotonic
+      
+      if timeout && batch_end - run_start > timeout
+        raise "VM run timeout after #{(batch_end - run_start).total_microseconds.to_i}us"
+      end
+
+      if batch_count == batching
+        if throttling && batch_end - batch_start < throttling * batching
+          sleep throttling * batching - (batch_end - batch_start)
+        end
+
+        batch_count = 0
+        batch_start = batch_end
+        batch_timeout = timeout.try { timeout - (batch_start - run_start) }
       end
     end
     return step_counter

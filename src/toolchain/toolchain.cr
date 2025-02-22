@@ -18,7 +18,7 @@ class Toolchain
 
   getter spec
 
-  # Provide access to files, asbtracting actual files locations.
+  # Provide access to files, abstracting actual files locations.
   abstract class Filesystem
     
     # Produce an user facing representation
@@ -229,7 +229,6 @@ class Toolchain
   end
 
   def merge(sources : Indexable(String), destination : String, dce : Bool = true) 
-
     source_names = sources.map { |source| @fs.normalize source }.join " "
     @events.with_context "merging '#{source_names}' into '#{@fs.normalize destination}'" do 
       objects = sources.map do |source|
@@ -278,7 +277,14 @@ class Toolchain
     run(source, io_mapping) {}
   end
 
-  def run(source : String, io_mapping : Hash(String, {IO, IO}), step_limit = nil, &) : Int32
+
+  # Create a virtual machine from specification and load the binary at *source* in a VM address space at address 0, the run it. 
+  # *step_limit* is a positive integer that limit the total amount of executed instruction. 
+  # *throttling* is time span for the execution duration of a single instruction. If set the VM will put itself to sleep 
+  #   in order to reach this average
+  # *timeout* is a time span after which the vm will stop running if reached. This timeout includes time spent waiting on IO 
+  # Return the total amount of instruction executed 
+  def run(source : String, io_mapping : Hash(String, {IO, IO}), step_limit : Int32? = nil, throttling : Time::Span? = nil, timeout : Time::Span? = nil, &) : Int32
     step_counter = 0
     vm = nil  
     @events.with_context "running '#{@fs.normalize source}'" do 
@@ -291,7 +297,7 @@ class Toolchain
     return 0 unless vm
     @events.event(:success, "Running ... '#{@events.emphasis(@fs.normalize source)}'")
     @events.with_context "running '#{@fs.normalize source}'" do 
-      step_counter = vm.run step_limit: step_limit
+      step_counter = vm.run step_limit: step_limit, throttling: throttling, timeout: timeout
       yield
     end
     @events.event(:success, "Ran '#{@events.emphasis(@fs.normalize source)}'")
