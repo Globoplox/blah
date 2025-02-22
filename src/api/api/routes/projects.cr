@@ -27,7 +27,7 @@ class Api
     count_for_user = @projects.count_for_user user_id
     user = @users.read(user_id)
     if count_for_user + 1 > user.allowed_project
-      raise "Cannot create project #{project.name}, project count would exceed limit #{user.allowed_project}"
+      raise Error::Quotas.new "Cannot create project #{project.name}, project count would exceed limit #{user.allowed_project}"
     end
 
     project_id = @projects.insert(
@@ -111,7 +111,7 @@ class Api
     project_id = UUID.new ctx.path_parameter "id"
 
     can_read, can_write = @projects.user_can_rw project_id, user_id
-    raise "Access forbidden" unless can_read
+    raise Error::Unauthorized.new "No read access for this project" unless can_read
 
     project = @projects.read(project_id)
     files = @files.list(project_id)
@@ -152,7 +152,8 @@ class Api
     project_id = UUID.new ctx.path_parameter "id"
 
     project = @projects.read(project_id)
-    raise "Access forbidden" unless project.owner_id == user_id
+    raise Error::Unauthorized.new "No administration access for this project" unless project.owner_id == user_id
+
 
     query = ctx.request.query_params["query"]?
     query = nil if query && query.empty?
@@ -184,7 +185,7 @@ class Api
     acl_info = ctx >> Request::PutProjectACL
 
     project = @projects.read(project_id)
-    raise "Access forbidden" unless project.owner_id == user_id
+    raise Error::Unauthorized.new "No administration access for this project" unless project.owner_id == user_id
 
     @projects.set_acl(
       project_id: project_id, 
@@ -241,7 +242,7 @@ class Api
     project_id = UUID.new ctx.path_parameter "id"
     
     can_read, can_write = @projects.user_can_rw project_id, user_id
-    raise "Access forbidden" unless can_read
+    raise Error::Unauthorized.new "No read access for this project" unless can_read
 
     subscription_creation = @notifications.on_file_created project_id, ->(path : String) do
       @files.read(project_id, path).try do |file|

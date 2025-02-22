@@ -1,3 +1,4 @@
+# RiSC16 ISA definition
 module RiSC16
   VERSION = {{ `shards version`.chomp.stringify }}
 
@@ -38,7 +39,7 @@ module RiSC16
     def initialize(@opcode, @reg_a = 0_u16, @reg_b = 0_u16, @reg_c = 0_u16, @immediate = 0_u16)
     end
 
-    # return the instruction encoded as a 16 bit integer.
+    # return the instruction encoded as a 16 bit word.
     def encode
       instruction = @opcode.value.to_u16 << 13
       case @opcode
@@ -54,6 +55,7 @@ module RiSC16
       instruction
     end
 
+    # Decode an instruction from a 16 bit word.
     def self.decode(instruction : Word) : self
       opcode = ISA.from_value instruction >> 13
       reg_a = (instruction >> 10) & 0b111

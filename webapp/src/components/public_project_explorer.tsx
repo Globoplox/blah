@@ -51,9 +51,6 @@ export default function PublicExplorer({api, style} : {api: Api, style: React.CS
     api.public_projects(query).then(projects => {
       setIsLoaded(true);
       setEntries(projects);
-    }).catch(error => {
-      if (error.code === ErrorCode.Unauthorized)
-        navigate(`/login?redirectTo=${location.pathname}`);
     });
   }
 

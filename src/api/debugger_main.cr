@@ -1,4 +1,18 @@
-# Entrypoint for launching a debugger within an APPlication filesystem
+# Entrypoint for launching a debugger within an application filesystem.
+# This must be compiled and provided along the api binary in order to enable running debug jobs tasks.
+# Note that this cannot be ran standalone as a shared file system handle is required.
+
+# CLI parameters (all path and ID are relative to the application):
+# 1) specification file path 
+# 2) binary source file path to debug
+# 3) symbol source file path. This can be an empty string if no symbol file is available.
+# 4) the project id in which the job invoking this debugger is running
+# 5) the user id owning the job
+# 6) the name of the shared filesystem memory region
+# 7) the size of the shared filesystem memory region
+# 8) the address at which the shared filesystem memory region is mapped
+# 9..n) any other parameters are macro and must be provided in a "key=value" format
+
 require "log"
 require "db"
 require "pg"

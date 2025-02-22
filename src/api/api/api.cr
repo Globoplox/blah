@@ -37,8 +37,7 @@ class Api
       routes = @@websockets_router.search ctx.request.path
       ctx = Context.new ctx
       if routes.empty?
-        socket.close
-        ctx << Error::NotFound.new "Websocket #{ctx.request.path}"
+        socket.send Error::NotFound.new("Websocket #{ctx.request.path} does not exists").to_json
       else
         handler, path_parameters, wildcard = routes.first
         ctx.path_parameters = path_parameters
@@ -50,12 +49,10 @@ class Api
         begin
           handler.call self, socket, ctx
         rescue error : Error
-          socket.close
-          ctx << error
+          socket.send error.to_json
         rescue ex
-          socket.close
           Log.error exception: ex, &.emit "Exception handling websocket#{ctx.request.path}"
-          ctx << Error::ServerError.new ex.message
+          socket.send Error::ServerError.new(ex.message).to_json
         end
       end
       Log.info &.emit "Took: #{(Time.monotonic - t).total_milliseconds}ms"

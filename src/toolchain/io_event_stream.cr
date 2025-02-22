@@ -3,8 +3,10 @@ require "colorize"
 require "./toolchain"
 require "./debugger"
 
-# Implement an event stream that simply log to 
-# an io with a few ansi colors and effects. 
+# Implement an event stream that simply log to an io with a few ansi colors and effects.
+# This is suitable for event stream:
+# - that can be accessed as an IO 
+# - whose peer support ansi escape sequences (which include terminal emulators through tty or pty)
 class Toolchain::IOEventStream < Toolchain::EventStream
 
   def initialize(@out : IO)

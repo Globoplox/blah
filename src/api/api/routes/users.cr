@@ -21,9 +21,9 @@ class Api
 
   def authenticate(ctx) : UUID
     session_id = get_session_cookie(ctx)
-    raise Error::Auth.new "Not authenticated" unless session_id
+    raise Error::Authentication.new "Not authenticated" unless session_id
     user_id = get_session(session_id)
-    raise Error::Auth.new "Not authenticated" unless user_id
+    raise Error::Authentication.new "Not authenticated" unless user_id
     user_id
   end
 

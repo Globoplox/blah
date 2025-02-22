@@ -4,7 +4,9 @@ require "./models/validations"
 
 require "shimfs"
 
-# A fs that use the storage and database
+# Toolchain filesystem implementation that use the application projects as filesystems
+# It supports cross projects file references through a [[user:]project:]/path syntax
+# It also supports using a given shared in memory filesystem for all path starting with a '@'
 class Toolchain::AppFilesystem < Toolchain::Filesystem
   @storage : Storage
   @users : Repositories::Users
@@ -63,8 +65,9 @@ class Toolchain::AppFilesystem < Toolchain::Filesystem
     @path : String
     @project_id : UUID 
     @user_id : UUID
+    @events : Toolchain::EventStream
 
-    def initialize(@storage, @users, @projects, @blobs, @files, @notifications, @path, @project_id, @user_id)
+    def initialize(@storage, @users, @projects, @blobs, @files, @notifications, @path, @project_id, @user_id, @events)
       super()
     end
 
@@ -82,19 +85,19 @@ class Toolchain::AppFilesystem < Toolchain::Filesystem
             user = @users.read(@user_id)
             user_sum = @files.sum_for_user(@user_id)
             if user_sum + size > user.allowed_blob_size
-              raise "Cannot edit file #{file.path}, total allowed file size sum for user would exceed limit  #{user_sum + size}/#{user.allowed_blob_size}"
+               @events.fatal!("Cannot edit file #{file.path}, total allowed file size sum for user would exceed limit  #{user_sum + size}/#{user.allowed_blob_size}", nil) {}
             end
             project = @projects.read(@project_id)
             project_sum = @files.sum_for_project(@project_id)
             if project_sum + size > project.allowed_blob_size
-              raise "Cannot edit file #{file.path}, total allowed file size sum for project would exceed limit  #{project_sum + size}/#{project.allowed_blob_size}"
+              @events.fatal!("Cannot edit file #{file.path}, total allowed file size sum for project would exceed limit  #{project_sum + size}/#{project.allowed_blob_size}", nil) {}
             end
           end
 
           @blobs.update(blob_id, size)
         
         else
-          raise "exists but is a directory"
+          @events.fatal!("Path #{@path} exists but is a directory and cannot be written to", nil) {}
         end
       else
 
@@ -109,7 +112,7 @@ class Toolchain::AppFilesystem < Toolchain::Filesystem
           if base == "/" || @files.is_directory?(@project_id, base)
           else
             if count_for_project + 1 > project.allowed_file_amount
-              raise "Cannot create parent directory #{base}, total allowed files count for project would exceed limit  #{count_for_project + 1}/#{project.allowed_file_amount}"
+               @events.fatal!("Cannot create parent directory #{base}, total allowed files count for project would exceed limit  #{count_for_project + 1}/#{project.allowed_file_amount}", nil) {}
             end
             count_for_project += 1
             @files.insert(
@@ -124,19 +127,19 @@ class Toolchain::AppFilesystem < Toolchain::Filesystem
         end
 
         if count_for_project + 1 > project.allowed_file_amount
-          raise "Cannot create file #{@path}, total allowed files count for project would exceed limit  #{count_for_project + 1}/#{project.allowed_file_amount}"
+          @events.fatal!("Cannot create file #{@path}, total allowed files count for project would exceed limit  #{count_for_project + 1}/#{project.allowed_file_amount}", nil) {}
         end
         count_for_project += 1
 
         user = @users.read(@user_id)
         user_sum = @files.sum_for_user(@user_id)
         if user_sum + size > user.allowed_blob_size
-          raise "Cannot edit file #{@path}, total allowed file size sum for user would exceed limit  #{user_sum + size}/#{user.allowed_blob_size}"
+          @events.fatal!("Cannot edit file #{@path}, total allowed file size sum for user would exceed limit  #{user_sum + size}/#{user.allowed_blob_size}", nil) {}
         end
         project = @projects.read(@project_id)
         project_sum = @files.sum_for_project(@project_id)
         if project_sum + size > project.allowed_blob_size
-          raise "Cannot edit file #{@path}, total allowed file size sum for project would exceed limit  #{project_sum + size}/#{project.allowed_blob_size}"
+           @events.fatal!("Cannot edit file #{@path}, total allowed file size sum for project would exceed limit  #{project_sum + size}/#{project.allowed_blob_size}", nil) {}
         end
 
         blob_id = @blobs.insert(
@@ -200,7 +203,7 @@ class Toolchain::AppFilesystem < Toolchain::Filesystem
     case mode
     when "r"
       can_read, can_write = @projects.user_can_rw project_id, user_id
-      raise "Access forbidden" unless can_read
+      @events.fatal!("Read access to this project is not granted", nil) {} unless can_read
 
       file = @files.read(project_id, path)
 
@@ -210,7 +213,7 @@ class Toolchain::AppFilesystem < Toolchain::Filesystem
 
       blob_id = file.blob_id
       unless blob_id
-        raise "exists but is a dir"
+        @events.fatal!("Path #{path} exists but is a directory and cannot be written to", nil) {}
       end
 
       uri = @storage.uri blob_id.to_s, internal: true
@@ -218,14 +221,15 @@ class Toolchain::AppFilesystem < Toolchain::Filesystem
         if response.success?
           response.body_io.getb_to_end
         else
-          raise "Could not open '#{path}'"
+          Log.error &.emit "Opening blob #{blob_id}, storage download failed: #{response.body}"
+          @events.fatal!("Server error: could not open '#{path}'", nil) {}
         end
       end  
       return IO::Memory.new content, writeable: false
     
     when "w"
       can_read, can_write = @projects.user_can_rw project_id, user_id
-      raise "Access forbidden" unless can_read
+      @events.fatal!("Write access to this project is not granted", nil) {} unless can_write
 
       if user_id != @user_id
         @events.with_context "Opening '#{path}'" do
@@ -241,8 +245,9 @@ class Toolchain::AppFilesystem < Toolchain::Filesystem
       end
       
       # return an handle that will actually write/create the file on close. 
-      return StorageIO.new @storage, @users, @projects, @blobs, @files, @notifications, path, @project_id, @user_id
-    else raise "bad mode '#{mode}'"
+      return StorageIO.new @storage, @users, @projects, @blobs, @files, @notifications, path, @project_id, @user_id, @events
+    else 
+      @events.fatal!("Server error: cannot open file with mode '#{mode}'", nil) {}
     end
   end
 

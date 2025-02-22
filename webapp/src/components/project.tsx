@@ -99,9 +99,6 @@ export default function Project({api} : {api: Api}) {
   function doLoadProject() { 
     api.read_project(projectId).then(project => {
       setProject(project);
-    }).catch(error => {
-      if (error.code === ErrorCode.Unauthorized)
-        navigate(`/login?redirectTo=${location.pathname}`);
     });
   }
 

@@ -89,8 +89,6 @@ export default function Terminal({socket, onClose}: {socket: WebSocket, onClose?
     }
   });
 
-
-
   // key used to force recreation of the terminal, react might try to be smarter than it is otherwise 
   return <div style={{position: "relative"}} tabIndex={0} onKeyDown={onKeyDown} className={bigTerminal ? "modal-terminal" : ""}>
     <XTerm ref={termRef} key={key} options={options} addons={[new AttachAddon(socket, {bidirectional: true})]} />

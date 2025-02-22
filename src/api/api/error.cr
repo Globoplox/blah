@@ -9,18 +9,26 @@ class Api
   class Error < Exception
 
     enum Code
+      UNAUTHENTICATED
       UNAUTHORIZED
       INVALID_CREDENTIALS
       BAD_REQUEST
       BAD_PARAMETER
       SERVER_ERROR
       NOT_FOUND
+      QUOTAS
     end
 
     def self.status_for(code : Code) : HTTP::Status
       case code
-      when Code::SERVER_ERROR then HTTP::Status::INTERNAL_SERVER_ERROR
-      else HTTP::Status::UNPROCESSABLE_ENTITY
+      in Code::UNAUTHENTICATED then HTTP::Status::UNAUTHORIZED
+      in Code::UNAUTHORIZED then HTTP::Status::FORBIDDEN
+      in Code::INVALID_CREDENTIALS then HTTP::Status::FORBIDDEN
+      in Code::BAD_REQUEST then HTTP::Status::BAD_REQUEST
+      in Code::BAD_PARAMETER then HTTP::Status::UNPROCESSABLE_ENTITY
+      in Code::SERVER_ERROR then HTTP::Status::INTERNAL_SERVER_ERROR
+      in Code::NOT_FOUND then HTTP::Status::NOT_FOUND
+      in Code::QUOTAS then HTTP::Status::FORBIDDEN
       end
     end
 
@@ -39,8 +47,8 @@ class Api
     end
 
     class NotFound < Error
-      def initialize(resource)
-        super(:not_found, "Ressource not found", "The resource #{resource} was not found")
+      def initialize(message)
+        super(:not_found, message)
       end
     end
 
@@ -56,9 +64,27 @@ class Api
       end
     end
 
-    class Auth < Error
+    class Authentication < Error
+      def initialize(message)
+        super(:unauthenticated, "Unauthorized", message)
+      end
+    end
+
+    class BadRequest < Error
+      def initialize(message)
+        super(:bad_request, "bad rquest", message)
+      end
+    end
+
+    class Unauthorized < Error
       def initialize(message)
         super(:unauthorized, "Unauthorized", message)
+      end
+    end
+
+    class Quotas < Error
+      def initialize(message)
+        super(:quotas, "Unauthorized", message)
       end
     end
 

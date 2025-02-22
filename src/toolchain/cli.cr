@@ -6,6 +6,7 @@ require "./local_filesystem"
 require "./io_event_stream"
 
 # CLI front for Toolchain.
+# Run `cli --help` for usage
 module Clients::Cli
 
   begin

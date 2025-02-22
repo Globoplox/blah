@@ -5,8 +5,6 @@ import { Tree, NodeApi, NodeRendererProps } from 'react-arborist';
 import { RiArrowDownSLine } from "react-icons/ri";
 import { RiArrowRightSLine } from "react-icons/ri";
 import useResizeObserver from "use-resize-observer";
-import Toast from 'react-bootstrap/Toast';
-import ToastContainer from 'react-bootstrap/ToastContainer';
 import Stack from 'react-bootstrap/Stack';
 import { FaRegFile } from "react-icons/fa";
 import { FaRegFolder } from "react-icons/fa";
@@ -15,7 +13,6 @@ import { GrPlay } from "react-icons/gr";
 import "./filetree.scss";
 
 type NodeData = {id: string, name: string, children: NodeData[], isRoot?: boolean}
-type Toast = {id: number, body: string}
 
 export default function Filetree({api, project, onOpen = null, onDelete = null, onCreate = null, onMove = null, onRun = null}: {
     api: Api, 
@@ -69,8 +66,6 @@ export default function Filetree({api, project, onOpen = null, onDelete = null, 
   // Used as a cache to prevent having to re query the project at every file tree modification
   const projectFiles = useRef(project.files);
   const [tree, setTree] = useState(projectToTree(project, projectFiles.current));
-  const [toasts, setToasts] = useState([] as Toast[]);
-  const toastId = useRef(0);
 
   // Open notification socket
   const notifications = useRef(null);
@@ -116,11 +111,6 @@ export default function Filetree({api, project, onOpen = null, onDelete = null, 
     };
   }, []);
 
-  function toast(message: string) {
-    const newToasts = [...toasts, {id: (toastId.current += 1), body: message}];
-    setToasts(newToasts);
-  }
-
   function onClickInternal(node: NodeApi<NodeData>) {
     if (node.isLeaf) {
       const  file = projectFiles.current.find(_ => _.path == node.data.id)
@@ -164,11 +154,6 @@ export default function Filetree({api, project, onOpen = null, onDelete = null, 
           const newTree = projectToTree(project, projectFiles.current);
           setTree(newTree);
         */
-      }).catch(error => {
-        if (error.code == ErrorCode.BadParameter)
-          toast(error.parameters[0].issue);
-        else
-          toast(error.message);
       });
     });
   };
@@ -335,21 +320,6 @@ export default function Filetree({api, project, onOpen = null, onDelete = null, 
         disableEdit={_ => _.isRoot === true}
         disableDrag={_ => _.isRoot === true}
       >{Node}</Tree>
-       <ToastContainer
-          className="p-3"
-          position="bottom-start"
-          style={{ zIndex: 1 }}
-        >
-          {toasts.map(toast => 
-            <Toast key={toast.id} onClose={_ => setToasts(toasts.filter(_ => _.id != toast.id))} animation={true} bg="warning">
-              <Toast.Header>
-                <strong className="me-auto">Error</strong>
-                <small>11 mins ago</small>
-              </Toast.Header>
-              <Toast.Body>{toast.body}</Toast.Body>
-            </Toast>
-          )}
-        </ToastContainer>
     </div>
   );
 }

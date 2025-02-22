@@ -3,7 +3,8 @@ require "colorize"
 require "./toolchain"
 require "./debugger"
 
-# Implement a filesystem provider that simply wrap the local filesystem.
+# Implement a toolchain filesystem provider that wrap the local filesystem.
+# Notably used by the command line interface client
 class Toolchain::LocalFilesystem < Toolchain::Filesystem
   
   def normalize(path : String) : String

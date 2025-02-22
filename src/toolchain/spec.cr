@@ -2,12 +2,35 @@ require "./risc16"
 require "ini"
 require "log"
 
+# Specification for a RiSC16 toolchain.
+# This is a collection of hardware segments and linker sections.
+# Spec are serialized as ini files:
+# ```ini
+# [linker.section.text]
+# start=0x0
+#
+# [linker.section.stack]
+# start=0xff00
+# size=0x00fe
+#
+# [hardware.segment.ram]
+# kind=ram
+# start=0x0
+# size=0xfffe
+#
+# [hardware.segment.tty]
+# kind=io
+# start=0xfffe
+# tty=true
+#```
 class RiSC16::Spec
   @properties : Hash(String, Hash(String, String))
   @sections : Array(Section)?
   @segments : Array(Segment)?
   @macros : Hash(String, String)
 
+  # Represent a data section. This is used to configure the linker to enforce 
+  # rules about data andinstructions location within a linked binary.
   class Section
     property name : String
     property base_address : UInt32?
@@ -18,6 +41,7 @@ class RiSC16::Spec
     end
   end
 
+  # Represent a segment of a VM address space. 
   abstract class Segment
     enum Kind
       RAM
@@ -142,6 +166,7 @@ class RiSC16::Spec
     end
   end
 
+  # Parse specification in ini format from the given IO
   def self.open(io, macros, path, events)
     self.new INI.parse(io), macros, path, events
   end

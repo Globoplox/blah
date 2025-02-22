@@ -1,6 +1,7 @@
 require "../risc16"
 require "io/evented"
 
+# Virtual machine executing RiSC16 bitcode
 class RiSC16::VM
   class BusError < ::Exception
     def initialize(address)

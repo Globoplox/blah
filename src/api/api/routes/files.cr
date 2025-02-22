@@ -12,7 +12,7 @@ class Api
     project_id = UUID.new ctx.path_parameter "project_id"
 
     can_read, can_write = @projects.user_can_rw project_id, user_id
-    raise "Access forbidden" unless can_write
+    raise Error::Unauthorized.new "No write access for this project" unless can_write
 
     file = ctx >> Request::CreateFile
 
@@ -23,7 +23,7 @@ class Api
     project = @projects.read(project_id)
     count_for_project = @files.count_for_project project_id
     if count_for_project + 1 > project.allowed_file_amount
-      raise "Cannot create file #{file.path}, total allowed files count for project would exceed limit  #{count_for_project + 1}/#{project.allowed_file_amount}"
+      raise Error::Quotas.new "Cannot create file #{file.path}, total allowed files count for project would exceed limit  #{count_for_project + 1}/#{project.allowed_file_amount}"
     end
 
     # Check that parent directory exists
@@ -81,7 +81,7 @@ class Api
     project_id = UUID.new ctx.path_parameter "project_id"
 
     can_read, can_write = @projects.user_can_rw project_id, user_id
-    raise "Access forbidden" unless can_write
+    raise Error::Unauthorized.new "No write access for this project" unless can_write
 
     file = ctx >> Request::CreateFile
 
@@ -92,7 +92,7 @@ class Api
     project = @projects.read(project_id)
     count_for_project = @files.count_for_project project_id
     if count_for_project + 1 > project.allowed_file_amount
-      raise "Cannot create directory #{file.path}, total allowed files count for project would exceed limit  #{count_for_project + 1}/#{project.allowed_file_amount}"
+      raise Error::Quotas.new "Cannot create directory #{file.path}, total allowed files count for project would exceed limit  #{count_for_project + 1}/#{project.allowed_file_amount}"
     end
 
     # Check that parent directory exists
@@ -142,13 +142,13 @@ class Api
     file = ctx >> Request::UpdateFile
 
     can_read, can_write = @projects.user_can_rw project_id, user_id
-    raise "Access forbidden" unless can_write
+    raise Error::Unauthorized.new "No write access for this project" unless can_write
 
     existing = @files.read(project_id, file_path)
-    raise "File #{file_path} does not exists" unless existing
+    raise Error::NotFound.new "File #{file_path} does not exists" unless existing
 
     blob_id = existing.blob_id
-    raise "No a file, cannot put content in a directory" unless blob_id
+    raise Error::BadRequest.new "Not a file, cannot put content in a directory" unless blob_id
 
     content_type = "text/plain"
     size = file.content.size
@@ -157,12 +157,12 @@ class Api
       user = @users.read(user_id)
       user_sum = @files.sum_for_user(user_id)
       if user_sum + size > user.allowed_blob_size
-        raise "Cannot edit file #{file_path}, total allowed file size sum for user would exceed limit  #{user_sum + size}/#{user.allowed_blob_size}"
+        raise Error::Quotas.new "Cannot edit file #{file_path}, total allowed file size sum for user would exceed limit  #{user_sum + size}/#{user.allowed_blob_size}"
       end
       project = @projects.read(project_id)
       project_sum = @files.sum_for_project(project_id)
       if project_sum + size > project.allowed_blob_size
-        raise "Cannot edit file #{file_path}, total allowed file size sum for project would exceed limit  #{project_sum + size}/#{project.allowed_blob_size}"
+        raise Error::Quotas.new "Cannot edit file #{file_path}, total allowed file size sum for project would exceed limit  #{project_sum + size}/#{project.allowed_blob_size}"
       end
     end
 
@@ -196,7 +196,7 @@ class Api
     project_id = UUID.new ctx.path_parameter "project_id"
 
     can_read, can_write = @projects.user_can_rw project_id, user_id
-    raise "Access forbidden" unless can_write
+    raise Error::Unauthorized.new "No write access for this project" unless can_write
 
     file_path = ctx.path_wildcard
     blob_id = @files.get_blob_id(project_id: project_id, path: file_path)
@@ -223,7 +223,7 @@ class Api
     file = ctx >> Request::MoveFile
 
     can_read, can_write = @projects.user_can_rw project_id, user_id
-    raise "Access forbidden" unless can_write
+    raise Error::Unauthorized.new "No write access for this project" unless can_write
 
     if @files.is_directory? project_id: project_id, path: file.old_path      
       # Check path is a valid file path

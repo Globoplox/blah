@@ -9,7 +9,9 @@ require "./stacklang/compiler"
 require "./vm"
 require "./debugger"
 
-# Representation and location independant business logic
+# This is a pure RiSC16 toolchain that support assembly, compilation, linking, runnign and debugging.
+# It is representation and location independant business logic.
+# Filesystem and stdio are provided through `Toolchain::Filesystem` and `Toolchain::EventStream` implementation.
 class Toolchain
   @debug : Bool
   @spec : RiSC16::Spec
@@ -83,6 +85,7 @@ class Toolchain
       event level, title, nil, [] of {String?, Int32?, Int32?}
     end
 
+    # Emit an event
     protected abstract def event_impl(level : Level, title : String, body : String?, locations : Array({String?, Int32?, Int32?}))
 
     @context = [] of {String, String?, Int32?, Int32?}
