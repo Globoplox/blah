@@ -2,21 +2,18 @@ const API_SERVER_URI = process.env.API_SERVER_URI;
 
 // Api error codes
 export enum ErrorCode {
-  Unauthenticated = "unauthenticated",
   Unauthorized = "unauthorized",
   InvalidCredentials = "invalid_credentials",
-  BadRequest = "bad_request",
   BadParameter = "bad_parameter",
-  Server = "server_error",
-  NotFound = "not_found",
-  Quotas = "quotas",
+  BadRequest = "bad_request",
+  ServerError = "server_error",
   // This one is used to produce mock api error incase of network error on client side 
-  Network = "network",
+  NetworkError = "network",
 }
 
 type BaseError = {code: ErrorCode, error: string, message: string | null}
 
-export type ParameterError = BaseError & {parameters : {name: string, issue: string}[]};
+export type ParameterError = {code: ErrorCode.BadParameter, error: string, message: string | null, parameters : {name: string, issue: string}[]}
 export type Error = ParameterError | BaseError
 
 export type File = {
@@ -88,30 +85,20 @@ export class Api {
   #headers = new Headers({'content-type': 'application/json'})
   user : User = null
   emitter = new EventTarget();
-  default_handlers : { [Code in ErrorCode]?: (error: Error) => Promise<Error> | void}
 
-  constructor(error_handlers: { [Code in ErrorCode]?: (error: Error) => Promise<Error> | void} = {}) {
-    this.default_handlers = error_handlers;
-    // When the api is started, it performs an initial self request so user is cached
-    // However if this request fail with unauthenticated, it should not trigger the usual unauthenticated handler
-    // since this is a automated request that whose failure is part of the normal usage flow 
-    this.self({"unauthenticated": null}).catch(error => {
+  constructor() {
+    this.self().catch(error => {
       if (error.code != ErrorCode.Unauthorized)
         return error;
     });
   }
 
-  handleError(error: Error, contextual_handlers: { [Code in ErrorCode]?: (error: Error) => Promise<Error> | void} = {}): Promise<Error> | void{
-    const handlers = {...this.default_handlers, ...contextual_handlers};
-    const handler = handlers[error.code];
-    if (handler)
-      return handler(error);
-    else
-      return Promise.reject(error);
+  handleError(error: Error) {
+    return Promise.reject(error)
   }
 
-  mapNetworkError(error: unknown): Promise<Error> | void{
-      return this.handleError({code: ErrorCode.Network, error: "Network error", message: JSON.stringify(error)});
+  mapNetworkError(error: unknown): Promise<Error> {
+      return Promise.reject({code: ErrorCode.NetworkError, error: "Network error", message: JSON.stringify(error)})
   }
 
   login(email: string, password: string, staySignedIn : boolean) : Promise<User> {
@@ -129,10 +116,10 @@ export class Api {
         });
       else 
         return response.json().then(this.handleError.bind(this))
-    }, this.mapNetworkError.bind(this)) as unknown as Promise<User>
+    }, this.mapNetworkError) as unknown as Promise<User>
   }
 
-  self(error_handlers: { [Code in ErrorCode]?: (error: Error) => Promise<Error> | void} = {}) : Promise<User> {
+  self() : Promise<User> {
     return fetch(
       `${API_SERVER_URI}/self`, {method: "GET", headers: this.#headers, credentials: 'include'}
     ).then(response => {
@@ -145,8 +132,8 @@ export class Api {
           return user
         });
       else 
-        return response.json().then(error => this.handleError(error, error_handlers) as unknown)
-    }, this.mapNetworkError.bind(this)) as unknown as Promise<User>
+        return response.json().then(this.handleError.bind(this))
+    }, this.mapNetworkError) as unknown as Promise<User>
   }
 
   register(email: string, name: string, password: string, staySignedIn : boolean) : Promise<User> {
@@ -165,7 +152,7 @@ export class Api {
         });
       else 
         return response.json().then(this.handleError.bind(this))
-    }, this.mapNetworkError.bind(this)) as unknown as Promise<User>
+    }, this.mapNetworkError) as unknown as Promise<User>
   }
 
   create_project(name: string, isPublic: boolean, description: string) : Promise<IDResponse> {
@@ -178,7 +165,7 @@ export class Api {
         return response.json()
       else 
         return response.json().then(this.handleError.bind(this))
-    }, this.mapNetworkError.bind(this))
+    }, this.mapNetworkError)
   }
 
   public_projects(query : string) : Promise<ProjectListEntry[]> {
@@ -189,7 +176,7 @@ export class Api {
         return response.json()
       else 
         return response.json().then(this.handleError.bind(this))
-    }, this.mapNetworkError.bind(this))
+    }, this.mapNetworkError)
   }
 
   owned_projects(query : string) : Promise<ProjectListEntry[]> {
@@ -200,7 +187,7 @@ export class Api {
         return response.json()
       else 
         return response.json().then(this.handleError.bind(this))
-    }, this.mapNetworkError.bind(this))
+    }, this.mapNetworkError)
   }
 
   read_project(project_id: string) : Promise<Project> {
@@ -211,7 +198,7 @@ export class Api {
         return response.json()
       else 
         return response.json().then(this.handleError.bind(this))
-    }, this.mapNetworkError.bind(this))
+    }, this.mapNetworkError)
   }
 
   read_project_acl(project_id: string, query?: string) : Promise<ACLEntry[]> {
@@ -222,7 +209,7 @@ export class Api {
         return response.json()
       else 
         return response.json().then(this.handleError.bind(this))
-    }, this.mapNetworkError.bind(this))
+    }, this.mapNetworkError)
   }
 
   set_project_acl(project_id: string, user_id: string, can_read: boolean, can_write: boolean) : Promise<null> {
@@ -237,7 +224,7 @@ export class Api {
         return null
       else 
         return response.json().then(this.handleError.bind(this))
-    }, this.mapNetworkError.bind(this)) as unknown as Promise<null>
+    }, this.mapNetworkError) as unknown as Promise<null>
   }
 
   create_file(project_id: string, path: string) : Promise<File> {
@@ -249,7 +236,7 @@ export class Api {
         return response.json()
       else 
         return response.json().then(this.handleError.bind(this))
-    }, this.mapNetworkError.bind(this))
+    }, this.mapNetworkError)
   }
 
   create_directory(project_id: string, path: string) : Promise<File> {
@@ -261,7 +248,7 @@ export class Api {
         return response.json()
       else 
         return response.json().then(this.handleError.bind(this))
-    }, this.mapNetworkError.bind(this))
+    }, this.mapNetworkError)
   }
 
   move_file(project_id: string, old_path: string, new_path: string) : Promise<null> {
@@ -273,7 +260,7 @@ export class Api {
         return null
       else 
         return response.json().then(this.handleError.bind(this))
-    }, this.mapNetworkError.bind(this)) as unknown as Promise<null>
+    }, this.mapNetworkError) as unknown as Promise<null>
   }
 
   delete_file(project_id: string, path: string) : Promise<null> {
@@ -284,7 +271,7 @@ export class Api {
         return null
       else 
       return response.json().then(this.handleError.bind(this))
-    }, this.mapNetworkError.bind(this)) as unknown as Promise<null>
+    }, this.mapNetworkError) as unknown as Promise<null>
   }
 
   update_file(project_id: string, path: string, content: string) : Promise<File> {
@@ -296,7 +283,7 @@ export class Api {
         return response.json()
       else 
         return response.json().then(this.handleError.bind(this))
-    }, this.mapNetworkError.bind(this)) as unknown as Promise<null>
+    }, this.mapNetworkError) as unknown as Promise<null>
   }
 
   register_notification(project_id: string, handler: (socket: WebSocket) => void) : void {
@@ -318,7 +305,7 @@ export class Api {
         return null
       else 
         return response.json().then(this.handleError.bind(this))
-    }, this.mapNetworkError.bind(this)) as unknown as Promise<null>
+    }, this.mapNetworkError) as unknown as Promise<null>
   }
 }
 
