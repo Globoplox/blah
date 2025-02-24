@@ -11,7 +11,7 @@ import { Link } from "react-router";
 export default function Login({api}: {api: Api}) {
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [staySignedIn, setStaySignedIn] = useState(false);
   const [feedback, setFeedback] = useState(null);
@@ -21,7 +21,7 @@ export default function Login({api}: {api: Api}) {
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    api.login(email, password, staySignedIn).then(_ => {
+    api.login(identifier, password, staySignedIn).then(_ => {
       setFeedback({type: "valid", content: "Successfully logged in", alert: "success"});
       setTimeout(() => { navigate(redirectTo || "/") }, 1000)
     }).catch(error => {
@@ -33,8 +33,8 @@ export default function Login({api}: {api: Api}) {
     return false;
   }
 
-  function onEmailInput(event: ChangeEvent<HTMLInputElement>) {
-    setEmail(event.target.value);
+  function onIdentifierInput(event: ChangeEvent<HTMLInputElement>) {
+    setIdentifier(event.target.value);
   }
 
   function onPasswordInput(event: ChangeEvent<HTMLInputElement>) {
@@ -51,10 +51,9 @@ export default function Login({api}: {api: Api}) {
         <Form onSubmit={onSubmit}>
           <h3 className="pb-3">Sign-in</h3>
 
-          <Form.Group className="mb-3" controlId="formBasicEmail">
-            <Form.Label>Email address</Form.Label>
-            {/* Not using type="email" because something then fuck up the form by adding random validation popup */}
-            <Form.Control type="text" placeholder="Enter email" value={email} onChange={onEmailInput} isInvalid={feedback?.type == "invalid"}/>
+          <Form.Group className="mb-3" controlId="formBasicidentifier">
+            <Form.Label>Identifier</Form.Label>
+            <Form.Control type="text" placeholder="Enter identifier" value={identifier} onChange={onIdentifierInput} isInvalid={feedback?.type == "invalid"}/>
           </Form.Group>
 
           <Form.Group className="mb-3" controlId="formBasicPassword">

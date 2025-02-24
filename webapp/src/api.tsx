@@ -3,6 +3,7 @@ const API_SERVER_URI = process.env.API_SERVER_URI;
 // Api error codes
 export enum ErrorCode {
   Unauthorized = "unauthorized",
+  Unauthenticated = "unauthenticated",
   InvalidCredentials = "invalid_credentials",
   BadParameter = "bad_parameter",
   BadRequest = "bad_request",
@@ -101,8 +102,8 @@ export class Api {
       return Promise.reject({code: ErrorCode.NetworkError, error: "Network error", message: JSON.stringify(error)})
   }
 
-  login(email: string, password: string, staySignedIn : boolean) : Promise<User> {
-    const body = {email, password, stay_signed: staySignedIn};
+  login(identifier: string, password: string, staySignedIn : boolean) : Promise<User> {
+    const body = {identifier, password, stay_signed: staySignedIn};
     return fetch(
       `${API_SERVER_URI}/login`, {method: "PUT", headers: this.#headers, body: JSON.stringify(body), credentials: 'include'}
     ).then(response => {
@@ -136,8 +137,8 @@ export class Api {
     }, this.mapNetworkError) as unknown as Promise<User>
   }
 
-  register(email: string, name: string, password: string, staySignedIn : boolean) : Promise<User> {
-    const body = {email, name, password, stay_signed: staySignedIn};
+  register(identifier: string, name: string, password: string, staySignedIn : boolean) : Promise<User> {
+    const body = {identifier, name, password, stay_signed: staySignedIn};
 
     return fetch(
       `${API_SERVER_URI}/register`, {method: "POST", headers: this.#headers, body: JSON.stringify(body), credentials: 'include'}

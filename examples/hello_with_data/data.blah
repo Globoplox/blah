@@ -1,1 +1,0 @@
-export hello: 	.ascii "Hello world !\n"

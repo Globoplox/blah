@@ -11,40 +11,37 @@ module Repositories
     class DuplicateNameError
     end
 
-    class DuplicateEmailError
+    class DuplicateIdentifierError
     end
 
     abstract def insert(
-      email : String,
+      identifier : String,
       password_hash : String,
       name : String,
-      tag : String,
       allowed_projects : Int32,
       allowed_blob_size : Int32,
       allowed_concurrent_job : Int32,
-    ) : UUID | DuplicateNameError | DuplicateEmailError
+    ) : UUID | DuplicateNameError | DuplicateIdentifierError
 
     class UserWithCredentials
       include DB::Serializable
       property id : UUID
       property name : String
-      property tag : String
       property allowed_blob_size : Int32
       property allowed_project : Int32
       property allowed_concurrent_job : Int32
       property created_at : Time
       property credential_id : UUID
-      property email : String
+      property identifier : String
       property password_hash : String
     end
 
-    abstract def get_by_email_with_credentials(email : String) : UserWithCredentials?
+    abstract def get_by_identifier_with_credentials(identifier : String) : UserWithCredentials?
 
     class User
       include DB::Serializable
       property id : UUID
       property name : String
-      property tag : String
       property avatar_blob_id : UUID?
       property allowed_blob_size : Int32
       property allowed_project : Int32

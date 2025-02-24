@@ -160,7 +160,7 @@ class Repositories::Projects::Database < Repositories::Projects
           (user_project_acls.project_id IS NOT NULL) as can_read
         FROM users 
         LEFT JOIN user_project_acls ON user_project_acls.project_id = $1 AND user_project_acls.user_id = users.id 
-        ORDER BY LEVENSHTEIN(users.name, $2) DESC
+        ORDER BY LEVENSHTEIN(users.name, $2)
         LIMIT 10
       SQL
     else

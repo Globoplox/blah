@@ -9,14 +9,13 @@ class Repositories::Users::Database < Repositories::Users
   end
 
   def insert(
-    email : String,
+    identifier : String,
     password_hash : String,
     name : String,
-    tag : String,
     allowed_projects : Int32,
     allowed_blob_size : Int32,
     allowed_concurrent_job : Int32
-  ) : UUID | DuplicateNameError | DuplicateEmailError
+  ) : UUID | DuplicateNameError | DuplicateIdentifierError
   
     credential_id = UUID.random
     user_id = UUID.random
@@ -26,7 +25,6 @@ class Repositories::Users::Database < Repositories::Users
       user = {
         user_id, 
         name, 
-        tag, 
         allowed_projects,
         allowed_blob_size,
         allowed_concurrent_job
@@ -36,44 +34,42 @@ class Repositories::Users::Database < Repositories::Users
         INSERT INTO users (
           id, 
           name, 
-          tag, 
           allowed_project,                                                                                                                                    
           allowed_blob_size,                                                                                                                                  
           allowed_concurrent_job                                                                                                                            
-        ) VALUES ($1, $2, $3, $4, $5, $6)                                                                               
+        ) VALUES ($1, $2, $3, $4, $5)                                                                               
       SQL
 
-      credential = {credential_id, user_id, email, password_hash}
+      credential = {credential_id, user_id, identifier, password_hash}
 
       transaction.connection.exec <<-SQL, *credential                                                                                                         
-        INSERT INTO credentials  (id, user_id, email, password_hash) VALUES ($1, $2, $3, $4)                                                                  
+        INSERT INTO credentials  (id, user_id, identifier, password_hash) VALUES ($1, $2, $3, $4)                                                                  
       SQL
     end
 
     user_id
   rescue ex : PQ::PQError
-    return DuplicateNameError.new if ex.fields.any? { |field| field.name == :constraint_name && field.message == "users_name_key" || field.message == "users_name_tag_key"}
-    return DuplicateEmailError.new if ex.fields.any? { |field| field.name == :constraint_name && field.message == "users_email_key" }
+    return DuplicateNameError.new if ex.fields.any? { |field| field.name == :constraint_name && field.message == "users_name_key" }
+    return DuplicateIdentifierError.new if ex.fields.any? { |field| field.name == :constraint_name && field.message == "users_identifier_key" }
     raise ex
   end
 
-  def get_by_email_with_credentials(email : String) : UserWithCredentials?
-    UserWithCredentials.from_rs(@connection.query <<-SQL, email).first?                                   
+  def get_by_identifier_with_credentials(identifier : String) : UserWithCredentials?
+    UserWithCredentials.from_rs(@connection.query <<-SQL, identifier).first?                                   
       SELECT                                                                                                                                                  
         credentials.password_hash,                                                                                                                            
         users.id,                                                                                                                                             
         users.name,                                                                                                                                           
-        users.tag,                                                                                                                                            
         users.allowed_project,                                                                                                                          
         users.allowed_blob_size,                                                                                                                        
         users.allowed_concurrent_job,                                                                                                                  
         users.created_at,                                                                                                                
-        credentials.email,                                                                                                                                       
+        credentials.identifier,                                                                                                                                       
         credentials.password_hash,                                                                                                                                       
         credentials.id as credential_id
       FROM credentials
         LEFT JOIN users ON users.id = credentials.user_id                                                                                                    
-      WHERE credentials.email = $1                                                                                                                            
+      WHERE credentials.identifier = $1                                                                                                                            
     SQL
   end
 
@@ -82,7 +78,6 @@ class Repositories::Users::Database < Repositories::Users
       SELECT                                                                                                                                                  
         users.id,                                                                                                                                             
         users.name,                                                                                                                                           
-        users.tag,                                                                                                                                            
         users.allowed_project,                                                                                                                          
         users.allowed_blob_size,                                                                                                                        
         users.allowed_concurrent_job,                                                                                                                  
@@ -98,7 +93,6 @@ class Repositories::Users::Database < Repositories::Users
       SELECT                                                                                                                                                  
         users.id,                                                                                                                                             
         users.name,                                                                                                                                           
-        users.tag,                                                                                                                                            
         users.allowed_project,                                                                                                                          
         users.allowed_blob_size,                                                                                                                        
         users.allowed_concurrent_job,                                                                                                                  

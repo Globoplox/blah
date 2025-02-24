@@ -47,6 +47,18 @@ The webapp frontend is built with react.
 
 The most down to earth objective one can have with this toolchain is to build and run a program.  
 
+![](pictures/c.png)
+
+![](pictures/e.png)
+
+![](pictures/f.png)
+
+![](pictures/g.png)
+
+![](pictures/h.png)
+
+![](pictures/j.png)
+
 ### Computer specification
 
 An instruction set architecture is a description of a CPU capabilities, not a description of a full computers. 
@@ -138,15 +150,17 @@ Success: Ran 'hello'
 ### CLI
 
 Build the command line with the crystal shard tool:  
-`shards build cli`  
+`shards build cli --release`
 Or with docker:  
-`docker run -v './:/root' -w /root crystallang/crystal:1.15.0-alpine shards build cli`
+`docker run -v './:/root' -w /root crystallang/crystal:1.15.0-alpine shards build cli --release`
 
 The CLI binary will be found in `./bin/cli`.  
 
 - [Command Line Documentation](cli.md)
 
 ### Web Application
+
+#### Development
 
 Building and running the API with development parameters for local usage:  
 `docker-compose --env-file local.env up`  
@@ -306,82 +320,3 @@ fun main:_ {
 ```
 
 Other sources files used for building the stdlib can be found in the [stdlib directory](/stdlib)
-
-## TODO
-- [x] Group functionalities behind a presentation independent application
-  - [x] Build a CLI presentation layer
-- [ ] Improve app instrumentation (stream events)
-  - [x] Multiple sources per errors
-  - [x] Text effects
-  - [x] Linker errors
-  - [x] ~~Native codegen errors~~ Unfinished but enough for now
-  - [x] Spec errors
-- [x] Split projects into toolchain/app toolchain/clients app/api app/client app/database, ...
-- [ ] Build language servers
-- [ ] Rename the project
-- [x] Recipe files / books (makeshift makefiles)
-- [x] Debugger server
-- [x] Design a reasonnably doable webappified version:
-  - [ ] API with:
-    - [ ] Docker, Migration, User with in-house auth and social logins
-    - [x] Project with a file tree (total size quotas per project / per user)
-    - [x] Websocket for streaming warning / error / compilation progress, and runtime tty (websocket quotas)
-    - [x] Projects ACL, for sharing projects with various privilege (private, shared, public, read/write priviliege)
-      - [x] Browse public projects (such as stdlib, wiki, demo)
-      - [ ] Clone project
-      - [x] Language feature to allow references to other projects 
-  - [ ] Frontend client with:
-    - [ ] Toolbar for account/project management (create, switch, delete, export, log out, account details)
-    - [x] File explorer
-    - [x] Code editor
-    - [x] Log console
-    - [ ] Up to several tty console
-    - [x] A debugger client
-    - [ ] Markdown rendering
-  - [ ] integration tests
-- [ ] Full refactor
-  - [ ] Rewrite assembler parser 
-  - [ ] Improve assembler/stacklang lexers to stream and parsers to have a fixed low look-ahead
-  - [x] Full compiler refactor
-     - [x] Three address code intermediary
-     - [x] Various simples optimizations
-     - [x] Smarter register handling
-  - [ ] ~~Consider switching to a custom 20 bits words ISA~~
-- [x] Write an assembler able to ouput raw bitcode
-  - [ ] Better error output for linker
-- [x] Write a dummy virtual machine that can execute this raw bitcode
-  - [x] IO
-  - [ ] IO with both data and control register
-  - [x] Hello World
-  - [ ] Propose memory paging mechanisms
-  - [ ] Propose memory protection mechanisms
-- [x] Design and write a compiler for a small stack language
-  - [x] Finish parser refactor to full-featurness
-  - [x] Detect unterminating functions
-  - [x] Rework compiler error handling
-  - [ ] Define a way to debug at link time (A non-loaded section that can contain an index of informations)
-  - [ ] Operators overload on non-word or pointer types
-  - [ ] Implement else, elsif, next, break
-  - [ ] Global variable initialization
-  - [x] Scoped variables (in statement blocks) allocated as needed
-  - [ ] ~~Add error for stack size exceding small immediate size~~
-  - [x] Fix && and ||
-  - [x] Fix >= and <=
-  - [x] Refactor compiler to be simpler
-  - [ ] ~~Inline small functions~~
-- [ ] Stdlib
-  - [ ] IO handling
-  - [ ] Basic math
-- [ ] Write an OS
-  - [ ] Implement a file system
-  - [ ] Relocate and load another program
-  - [ ] Relocate and load a dynamic library
-  - [ ] Load, relocate a program with link to a dynamic library
-  - [ ] Handle syscalls 
-  - [ ] Run multiple programs
-  - [ ] Memory management 
-  - [ ] Fork and threads
-  - [ ] Memory paging trhough bank switch or file system
-  - [ ] Memory protection (isolate programs and limit jump between programs)  
-- [ ] Define fixed spec for a computer
-- [ ] Define a standard configuration/description mechanism for detecting 'hardware'

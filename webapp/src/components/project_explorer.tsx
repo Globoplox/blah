@@ -50,6 +50,9 @@ export default function ProjectExplorer({api, style} : {api: Api, style: React.C
     api.owned_projects(query).then(projects => {
       setIsLoaded(true);
       setEntries(projects);
+    }).catch(error => {
+      if (error.code === ErrorCode.Unauthenticated)
+        navigate(`/login?redirectTo=${location.pathname}`);
     });
   }
 

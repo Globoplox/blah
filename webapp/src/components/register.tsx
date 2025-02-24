@@ -16,14 +16,14 @@ import "../pictures/default_avatar.jpg";
 export default function Register({api}: {api: Api}) {
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
 
   const [staySignedIn, setStaySignedIn] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [nameFeedback, setNameFeedback] = useState(null);
-  const [emailFeedback, setEmailFeedback] = useState(null);
+  const [identifierFeedback, setidentifierFeedback] = useState(null);
   const [passwordFeedback, setPasswordFeedback] = useState(null);
 
   const [avatar, setAvatar] = useState(null)
@@ -34,14 +34,14 @@ export default function Register({api}: {api: Api}) {
 
   const parameterFeedbacks : Record<string, Dispatch<{type: string, content: string, alert: string}>> = {
     "name": setNameFeedback,
-    "email": setEmailFeedback,
+    "identifier": setidentifierFeedback,
     "password": setPasswordFeedback,
   };
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     
-    api.register(email, name, password, staySignedIn).then(_ => {
+    api.register(identifier, name, password, staySignedIn).then(_ => {
       if (avatar != null)
         api.set_avatar(avatar).catch(console.error);
       setFeedback({type: "valid", content: "Successfully signed-in", alert: "success"});
@@ -58,8 +58,8 @@ export default function Register({api}: {api: Api}) {
     return false;
   }
 
-  function onEmailInput(event: ChangeEvent<HTMLInputElement>) {
-    setEmail(event.target.value);
+  function onIdentifierInput(event: ChangeEvent<HTMLInputElement>) {
+    setIdentifier(event.target.value);
   }
 
   function onNameInput(event: ChangeEvent<HTMLInputElement>) {
@@ -113,14 +113,10 @@ export default function Register({api}: {api: Api}) {
           <Row>
             <Col>
               <Form.Group className="mb-3">
-                <Form.Label>Email address</Form.Label>
-                {/* Not using type="email" because something then mess up the form by adding random validation popup */}
-                <Form.Control type="text" placeholder="Enter email" value={email} onChange={onEmailInput} isInvalid={emailFeedback?.type == "invalid"}/>
-                <Form.Text className="text-muted">
-                  We'll never share your email with anyone else.
-                </Form.Text>
+                <Form.Label>Identifier</Form.Label>
+                <Form.Control type="text" placeholder="Enter identifier" value={identifier} onChange={onIdentifierInput} isInvalid={identifierFeedback?.type == "invalid"}/>
                 <Form.Control.Feedback type="invalid">
-                  {emailFeedback?.content}
+                  {identifierFeedback?.content}
                 </Form.Control.Feedback>
               </Form.Group>
 

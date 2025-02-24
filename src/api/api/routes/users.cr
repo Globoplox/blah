@@ -78,7 +78,7 @@ class Api
 
   class Request::Registration
     include JSON::Serializable
-    property email : String
+    property identifier : String
     property password : String
     property name : String
     property stay_signed : Bool = false
@@ -88,19 +88,18 @@ class Api
     registration = ctx >> Request::Registration
 
     Validations.validate! do
-      accumulate "email", check_email registration.email
-      accumulate "password", check_password registration.password, email: registration.email, name: registration.name
+      accumulate "identifier", check_identifier registration.identifier
+      accumulate "password", check_password registration.password, identifier: registration.identifier, name: registration.name
       accumulate "name", check_username registration.name
     end
 
     user_id = @users.insert(
-      email: registration.email,
+      identifier: registration.identifier,
       name: registration.name,
       password_hash: Crypto::Bcrypt::Password.create(
         registration.password,
         cost: REGISTER_PASSWORD_BCRYPT_COST
       ).to_s,
-      tag: "0000", 
       allowed_projects: 5, 
       allowed_blob_size: 1_000_000, 
       allowed_concurrent_job: 1
@@ -109,8 +108,8 @@ class Api
     case user_id
     when Repositories::Users::DuplicateNameError
       raise Error.bad_parameter "name", "a users with the same name already exists"
-    when Repositories::Users::DuplicateEmailError
-      raise Error.bad_parameter "email", "a users with the same email already exists"
+    when Repositories::Users::DuplicateIdentifierError
+      raise Error.bad_parameter "identifier", "a users with the same identifier already exists"
     end
 
     session_id = open_session(user_id)
@@ -131,7 +130,7 @@ class Api
 
   class Request::Login
     include JSON::Serializable
-    property email : String
+    property identifier : String
     property password : String
     property stay_signed : Bool = false
   end
@@ -139,7 +138,7 @@ class Api
   route PUT, "/login", def login(ctx)
     login = ctx >> Request::Login
 
-    user_and_credentials = @users.get_by_email_with_credentials(login.email)
+    user_and_credentials = @users.get_by_identifier_with_credentials(login.identifier)
     unless user_and_credentials
       raise Error::InvalidCredential.new
     end

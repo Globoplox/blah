@@ -38,14 +38,14 @@ module Validations
       return "cannot contains whitespace" if name.chars.any? { |c| c.whitespace? }
     end
 
-    def check_email(email : String) : String?
+    def check_identifier(identifier : String) : String?
       nil
     end
 
-    def check_password(password : String, email, name) : String?
+    def check_password(password : String, identifier, name) : String?
       return "must be at least 8 character" if password.size < 8
       return "must be at most 100 character" if password.size > 100
-      return "cannot be the same as email" if email && password == email
+      return "cannot be the same as identifier" if identifier && password == identifier
       return "cannot be the same as name" if name && password == name
       return "must not be one of the most commons weak passwords" if password.in? BANNED_PASSWORDS
     end

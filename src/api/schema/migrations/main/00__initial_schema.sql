@@ -13,20 +13,19 @@ CREATE TABLE users
 (
     id                      UUID PRIMARY KEY        NOT NULL DEFAULT gen_random_uuid(),
     name                    VARCHAR(50)             NOT NULL,
-    tag                     VARCHAR(4)              NOT NULL,
     avatar_blob_id          UUID REFERENCES blobs   DEFAULT NULL,
     created_at              TIMESTAMPTZ             NOT NULL DEFAULT NOW(),
     allowed_blob_size       INT                     NOT NULL,
     allowed_project         INT                     NOT NULL,
     allowed_concurrent_job  INT                     NOT NULL,
-    UNIQUE(name, tag)
+    UNIQUE(name)
 );
 
 CREATE TABLE credentials
 (
     id              UUID PRIMARY KEY      NOT NULL DEFAULT gen_random_uuid(),
     user_id         UUID REFERENCES users NOT NULL UNIQUE,
-    email           VARCHAR(100)          NOT NULL UNIQUE,
+    identifier      VARCHAR(100)          NOT NULL UNIQUE,
     password_hash   VARCHAR(60)           NOT NULL
 );
 

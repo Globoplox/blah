@@ -99,6 +99,9 @@ export default function Project({api} : {api: Api}) {
   function doLoadProject() { 
     api.read_project(projectId).then(project => {
       setProject(project);
+    }).catch(error => {
+      if (error.code === ErrorCode.Unauthenticated)
+        navigate(`/login?redirectTo=${location.pathname}`);
     });
   }
 
@@ -318,7 +321,9 @@ export default function Project({api} : {api: Api}) {
         {
           file != null ?
           (file.type == "markdown" ?
-            <div ref={markdownEditorRef}><MDXEditor readOnly={!project.can_write} key={file.path} markdown={file.content} plugins={markdownEditorPlugins} onChange={onUpdateMarkdown} /></div> :
+            <div style={{maxHeight: "100%", overflow: "scroll"}} ref={markdownEditorRef}>
+              <MDXEditor suppressHtmlProcessing={true} readOnly={!project.can_write} key={file.path} markdown={file.content} plugins={markdownEditorPlugins} onChange={onUpdateMarkdown} />
+            </div> :
             <Editor key={file.path} readOnly={!project.can_write} language={file.type} value={file.content} onUpdate={onUpdate} >
               {(editor: any) => <BasicSetup editor={editor}/>}
             </Editor>

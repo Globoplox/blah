@@ -15,7 +15,6 @@ struct Migrations::Seed < Schema::Migration
 
       user_id = UUID.random
       name = user
-      tag = "0000"
       allowed_projects = 10
       allowed_blob_size = 10_000_000
       allowed_concurrent_job = 0
@@ -45,7 +44,6 @@ struct Migrations::Seed < Schema::Migration
       user_data = {
         user_id, 
         name, 
-        tag, 
         allowed_projects,
         allowed_blob_size,
         allowed_concurrent_job,
@@ -56,12 +54,11 @@ struct Migrations::Seed < Schema::Migration
         INSERT INTO users (
           id, 
           name, 
-          tag, 
           allowed_project,                                                                                                                                    
           allowed_blob_size,                                                                                                                                  
           allowed_concurrent_job,
           avatar_blob_id                                                                                                                         
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ) VALUES ($1, $2, $3, $4, $5, $6)
       SQL
 
       Dir.children(user_path).each do |project|
